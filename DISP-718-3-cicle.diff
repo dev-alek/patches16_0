@@ -1,0 +1,19 @@
+# HG changeset patch
+# User DRuban
+# Parent  9755fbb64a97caf55c8b555d2c1090a4f61c5350
+refs #DISP-718 Создание скрипта для автоматического закрытия смен ТН на несколькихААЗС
+3 цикла повтора
+http://exp-jira.expertek.local:8080/browse/DISP-718
+
+diff --git a/str/proc-startNewShiftTso.p b/str/proc-startNewShiftTso.p
+--- a/str/proc-startNewShiftTso.p
++++ b/str/proc-startNewShiftTso.p
+@@ -4,7 +4,7 @@ define variable vss-date        as chara
+ define variable vss-workfile    as character no-undo init "$Workfile$":U .
+ define variable vss-archive     as character no-undo init "$Archive$":U .
+ define variable vss-description as character no-undo init "Процедура закрытия смены и отпрытия новой".
+-define variable mcicle as integer no-undo init 1.
++define variable mcicle as integer no-undo init 3.
+ { utl/proc-async.i proc_def}
+ { adm/auto-def.i }
+ { gbl/getcntxa.i }

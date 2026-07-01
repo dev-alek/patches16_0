@@ -1,0 +1,20 @@
+# HG changeset patch
+# User SSlivenko
+# Parent  317daba6f077a1841824e5fc302706cce3addeb7
+refs #DEVBO-751 Пересортица с отсутствием строк товаров. #BTS-2570
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-751
+https://msk-exp-jira.expertek.local/browse/BTS-2570
+
+diff --git a/str/peresort.w b/str/peresort.w
+--- a/str/peresort.w
++++ b/str/peresort.w
+@@ -1439,7 +1439,7 @@ DO:
+     ,  input bf_trn-doc.obj-code
+     ,  input bf_goods.gds-code
+     ,  input bf_doc-line.doc-code
+-    ,  input pardoc-mode                /* p-edit-mode  */
++    ,  input {&LOOKUP} /*pardoc-mode  BTS-2570  */            /* p-edit-mode  */
+     ,  input {&parts-l_parts-document} /* p-r-parts    */
+     ,  input {&parts-l_object-current} /* p-one-all    */
+     , input {&parts-l_call-document}

@@ -1,0 +1,40 @@
+# HG changeset patch
+# Parent  4b2e972be4ca4e7f55058ec0889262438def189e
+SC0017729229 Некорректное заполнение тега <doc-date> документов типа «Производство» в пакетах обмена с 1С ERP. TH16
+
+diff --git a/ibs/th/bge/1crn/subjects/fbr-gd-doc.cls b/ibs/th/bge/1crn/subjects/fbr-gd-doc.cls
+--- a/ibs/th/bge/1crn/subjects/fbr-gd-doc.cls
++++ b/ibs/th/bge/1crn/subjects/fbr-gd-doc.cls
+@@ -285,7 +285,7 @@ class ibs.th.bge.1crn.subjects.fbr-gd-do
+         write-data-element ("doc-code", buf_fbr-doc.doc-code).
+         write-data-element ("doc-num", buf_fbr-doc.doc-code).
+         write-data-element ("del-f", string (isDel, "1/0") ).
+-        write-data-element ("doc-date", if buf_fbr-doc.doc-date = ? then "" else iso-date (datetime (buf_fbr-doc.doc-date, buf_fbr-doc.sys-time-int))).
++        write-data-element ("doc-date", if buf_fbr-doc.doc-date = ? then "" else iso-date (datetime (buf_fbr-doc.doc-date, buf_fbr-doc.sys-time-int))). 
+         write-data-element ("fact-date", if buf_fbr-doc.fact-date = ? then "" else iso-date (date (buf_fbr-doc.fact-date))).
+         write-data-element ("doc-type", v-doc-type-ERPRN).
+         write-data-element ("shift-date", if buf_fbr-doc.shift-date = ? then "" else iso-date (date (buf_fbr-doc.shift-date))).
+diff --git a/ibs/th/bge/1crn/subjects/peres-gd-doc.cls b/ibs/th/bge/1crn/subjects/peres-gd-doc.cls
+--- a/ibs/th/bge/1crn/subjects/peres-gd-doc.cls
++++ b/ibs/th/bge/1crn/subjects/peres-gd-doc.cls
+@@ -259,7 +259,7 @@ index sum-type is primary unique sum-typ
+         write-data-element ("doc-code", bf_trn-doc.doc-code).
+         write-data-element ("doc-num", bf_trn-doc.doc-code).
+         write-data-element ("del-f", string (isDel, "1/0") ).
+-        write-data-element ("doc-date", if bf_trn-doc.doc-date = ? then "" else iso-date (date(bf_trn-doc.doc-date) ) + ' ' +  STRING(c-trn-doc.sys-time) ).
++        write-data-element ("doc-date", if bf_trn-doc.doc-date = ? then "" else iso-date (datetime (bf_trn-doc.doc-date, c-trn-doc.sys-time-int)) ).
+         write-data-element ("fact-date", if bf_trn-doc.fact-date = ? then "" else iso-date (date (bf_trn-doc.fact-date))).
+         write-data-element ("shift-date", if bf_trn-doc.shift-date = ? then "" else iso-date (date (bf_trn-doc.shift-date))).
+         write-data-element ("shift-num", if bf_trn-doc.shift-num = ? then "0" else string-mth (bf_trn-doc.shift-num)).
+diff --git a/ibs/th/bge/1crn/subjects/trn-gd-doc.cls b/ibs/th/bge/1crn/subjects/trn-gd-doc.cls
+--- a/ibs/th/bge/1crn/subjects/trn-gd-doc.cls
++++ b/ibs/th/bge/1crn/subjects/trn-gd-doc.cls
+@@ -979,7 +979,7 @@ class ibs.th.bge.1crn.subjects.trn-gd-do
+         write-data-element ("doc-code", buf_trn-doc.doc-code).
+         write-data-element ("doc-num", buf_trn-doc.doc-code).
+         write-data-element ("del-f", string (isDel, "1/0") ).
+-        write-data-element ("doc-date", if buf_trn-doc.doc-date = ? then "" else iso-date (datetime (buf_trn-doc.doc-date, buf_trn-doc.real-time-create * 1000))).
++        write-data-element ("doc-date", if buf_trn-doc.doc-date = ? then "" else iso-date (datetime (buf_trn-doc.doc-date, buf_trn-doc.real-time-create * 1000))).  
+         write-data-element ("fact-date", if buf_trn-doc.fact-date = ? then "" else iso-date (datetime (buf_trn-doc.fact-date, buf_trn-doc.fact-time * 1000))).
+         write-data-element ("doc-type", v-doc-type-ERPRN).
+         if v-is-edo-return

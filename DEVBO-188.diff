@@ -1,0 +1,39 @@
+# HG changeset patch
+# User VSpiridonov
+# Parent  1fb03e21cf5301c2289257f2da088726434470b1
+refs #DEVBO-188  Для промоакции с механикой "Временная скидка, скидка процентом, количество по строке" не выгружается размер скидки в 1С ERP (секция <chk-discnt> BTS-767
+                 Исправлена выгрузка тега chk-discnt, добавлена выгрузка скидок с line-type =  1 и record-type = 0.
+                 Может затронуть только выгрузку тега <chk-discnt> в xml.
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-188
+https://msk-exp-jira.expertek.local/browse/BTS-767
+
+diff --git a/ibs/th/bge/1crn/subjects/check.cls b/ibs/th/bge/1crn/subjects/check.cls
+--- a/ibs/th/bge/1crn/subjects/check.cls
++++ b/ibs/th/bge/1crn/subjects/check.cls
+@@ -1024,17 +1024,17 @@ define private temp-table tt-recid-TranF
+     for each buf_chk-discnt no-lock
+        where buf_chk-discnt.doc-code = p-buf_chk-doc.doc-code
+         /* скидки обычные (record-type = 0) и скидки, которыми выравниваются погрешности (record-type = 2) */
+-         and ( buf_chk-discnt.record-type = 1 or
+-               buf_chk-discnt.record-type = 2 
+-               or buf_chk-discnt.value-type = 14)
++         and ( buf_chk-discnt.record-type = 0 or buf_chk-discnt.record-type = 1 or buf_chk-discnt.record-type = 2 or buf_chk-discnt.value-type = 14 )
+     break by buf_chk-discnt.doc-code :
+       if first-of(buf_chk-discnt.doc-code) then insw:start-element ({&tag-section3}) .
+       /*если промоакции и скидка на подитог, необходимо размазать скидку на все товары*/
+-      if /* buf_chk-discnt.promo-id > "" and */  buf_chk-discnt.line-type = integer({&discnt-sub-total})
+-      and buf_chk-discnt.record-type = 1 
+-      and can-find(first  bf_chk-discnt no-lock
+-          where bf_chk-discnt.doc-code = buf_chk-discnt.doc-code and  bf_chk-discnt.record-type = 1 and bf_chk-discnt.discnt-id = buf_chk-discnt.discnt-id ) then 
+-      do:
++      if /* buf_chk-discnt.promo-id > "" and */  
++      (buf_chk-discnt.line-type = integer({&discnt-sub-total})  and buf_chk-discnt.record-type = 1  
++        and can-find(first  bf_chk-discnt no-lock  where  bf_chk-discnt.doc-code = buf_chk-discnt.doc-code and  bf_chk-discnt.record-type = 1 and bf_chk-discnt.discnt-id = buf_chk-discnt.discnt-id) )
++          or
++      (buf_chk-discnt.line-type =  1  and buf_chk-discnt.record-type = 0 
++        and can-find(first  bf_chk-discnt no-lock  where bf_chk-discnt.doc-code = buf_chk-discnt.doc-code and  bf_chk-discnt.record-type = 0 and bf_chk-discnt.discnt-id = buf_chk-discnt.discnt-id ) )
++      then do:
+          if not vflg
+          then
+          for each bf_chk-discnt no-lock

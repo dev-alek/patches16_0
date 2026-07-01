@@ -1,0 +1,3905 @@
+# HG changeset patch
+# User DRuban
+# Parent  92b78674992dc93d36c71f2dff4015f72f3f2e53
+refs #DISP-718 Создание скрипта для автоматического закрытия смен ТН на несколькихААЗС
+Общие механизмы
+http://exp-jira.expertek.local:8080/browse/DISP-718
+
+diff --git a/adm/l-i-shiftTso.w b/adm/l-i-shiftTso.w
+new file mode 100644
+--- /dev/null
++++ b/adm/l-i-shiftTso.w
+@@ -0,0 +1,430 @@
++&ANALYZE-SUSPEND _VERSION-NUMBER UIB_v8r12 GUI
++&ANALYZE-RESUME
++&Scoped-define WINDOW-NAME w-login
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CUSTOM _DEFINITIONS w-login 
++/*
++
++$Revision$
++$Author$
++$Date$
++$Workfile$
++$Archive$
++
++Окно входа в ИС МОТП
++
++Автор: Чернова Светлана Александровна
++Дата создания: 07/23/08
++Author: Svetlana Chernova
++Creation date: 07/23/08
++
++Автор1: Перваков Михаил Сергеевич
++Дата создания: 04/05/06
++
++*/
++
++/* ***************************  Definitions  ************************** */
++
++def var vss-revision    as character no-undo init "$Revision$":U .
++def var vss-author      as character no-undo init "$Author$":U .
++def var vss-date        as character no-undo init "$Date$":U .
++def var vss-workfile    as character no-undo init "$Workfile$":U .
++def var vss-archive     as character no-undo init "$Archive$":U .
++def var vss-description as character no-undo init "Окно закрытия и открытия смены".
++{ cmp/vssrevis.i }
++{ cmp/str-glbl.i }
++{ cmp/showinf.i  }
++{ adm/auto-def.i new }
++
++define variable v-preconnection as logical   no-undo .
++define variable v-connection as logical no-undo .
++define variable v-param         as character no-undo .
++define variable v-param-name    as character no-undo .
++define variable v-param-value   as character no-undo .
++define variable ind             as integer   no-undo .
++define variable v-num-entries   as integer   no-undo .
++define variable v-mode          as character no-undo .
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++&ANALYZE-SUSPEND _UIB-PREPROCESSOR-BLOCK 
++
++/* ********************  Preprocessor Definitions  ******************** */
++
++&Scoped-define PROCEDURE-TYPE WINDOW
++&Scoped-define DB-AWARE no
++
++/* Name of designated FRAME-NAME and/or first browse and/or first query */
++&Scoped-define FRAME-NAME FRAME-A
++
++/* Standard List Definitions                                            */
++&Scoped-Define ENABLED-OBJECTS IMAGE-1 name password b-OK b-quit 
++
++/* Custom List Definitions                                              */
++/* List-1,List-2,List-3,List-4,List-5,List-6                            */
++
++/* _UIB-PREPROCESSOR-BLOCK-END */
++&ANALYZE-RESUME
++
++
++
++/* ***********************  Control Definitions  ********************** */
++
++/* Define the widget handle for the window                              */
++DEFINE VAR w-login AS WIDGET-HANDLE NO-UNDO.
++
++/* Definitions of the field level widgets                               */
++DEFINE BUTTON b-OK AUTO-GO 
++     LABEL "&Ввод":L 
++     SIZE 10 BY 1.
++
++DEFINE BUTTON b-quit AUTO-END-KEY 
++     LABEL "&Отмена":L 
++     SIZE 10 BY 1.
++
++DEFINE VARIABLE name AS CHARACTER FORMAT "X(12)":U 
++     LABEL "Логин" 
++     VIEW-AS FILL-IN 
++     SIZE 20 BY 1 NO-UNDO.
++
++DEFINE VARIABLE password AS CHARACTER FORMAT "X(16)":U 
++     LABEL "Пароль" 
++     VIEW-AS FILL-IN 
++     SIZE 20 BY 1 NO-UNDO.
++
++DEFINE IMAGE IMAGE-1
++     FILENAME "cmp/ith.bmp":U
++     SIZE 40 BY 8.88.
++
++
++/* ************************  Frame Definitions  *********************** */
++
++DEFINE FRAME FRAME-A
++     name AT ROW 4.96 COL 10 COLON-ALIGNED
++     password AT ROW 6.17 COL 10 COLON-ALIGNED BLANK 
++     b-OK AT ROW 8 COL 11.75
++     b-quit AT ROW 8 COL 21.88
++     IMAGE-1 AT ROW 1 COL 1.13
++    WITH 1 DOWN NO-BOX OVERLAY 
++         SIDE-LABELS THREE-D 
++         AT COL 1 ROW 1
++         SIZE 40.13 BY 8.96.
++
++
++/* *********************** Procedure Settings ************************ */
++
++&ANALYZE-SUSPEND _PROCEDURE-SETTINGS
++/* Settings for THIS-PROCEDURE
++   Type: WINDOW
++ */
++&ANALYZE-RESUME _END-PROCEDURE-SETTINGS
++
++/* *************************  Create Window  ************************** */
++
++&ANALYZE-SUSPEND _CREATE-WINDOW
++IF SESSION:DISPLAY-TYPE = "GUI":U THEN
++  CREATE WINDOW w-login ASSIGN
++         HIDDEN             = YES
++         TITLE              = "Закрытия и открытия смены"
++         COLUMN             = 27
++         ROW                = 7.58
++         HEIGHT             = 9.13
++         WIDTH              = 40.25
++         MAX-HEIGHT         = 35.63
++         MAX-WIDTH          = 160
++         VIRTUAL-HEIGHT     = 35.63
++         VIRTUAL-WIDTH      = 160
++         RESIZE             = no
++         SCROLL-BARS        = yes
++         STATUS-AREA        = no
++         BGCOLOR            = ?
++         FGCOLOR            = ?
++         THREE-D            = yes
++         MESSAGE-AREA       = no
++         SENSITIVE          = yes.
++ELSE {&WINDOW-NAME} = CURRENT-WINDOW.
++/* END WINDOW DEFINITION                                                */
++&ANALYZE-RESUME
++
++
++
++/* ***********  Runtime Attributes and AppBuilder Settings  *********** */
++
++&ANALYZE-SUSPEND _RUN-TIME-ATTRIBUTES
++/* SETTINGS FOR FRAME FRAME-A
++   FRAME-NAME UNDERLINE                                                 */
++/* SETTINGS FOR BUTTON b-OK IN FRAME FRAME-A
++   NO-DISPLAY                                                           */
++/* SETTINGS FOR BUTTON b-quit IN FRAME FRAME-A
++   NO-DISPLAY                                                           */
++/* SETTINGS FOR FILL-IN name IN FRAME FRAME-A
++   NO-DISPLAY                                                           */
++/* SETTINGS FOR FILL-IN password IN FRAME FRAME-A
++   NO-DISPLAY                                                           */
++IF SESSION:DISPLAY-TYPE = "GUI":U AND VALID-HANDLE(w-login)
++THEN w-login:HIDDEN = no.
++
++/* _RUN-TIME-ATTRIBUTES-END */
++&ANALYZE-RESUME
++
++
++/* Setting information for Queries and Browse Widgets fields            */
++
++&ANALYZE-SUSPEND _QUERY-BLOCK FRAME FRAME-A
++/* Query rebuild information for FRAME FRAME-A
++     _Query            is NOT OPENED
++*/  /* FRAME FRAME-A */
++&ANALYZE-RESUME
++
++ 
++
++
++
++/* ************************  Control Triggers  ************************ */
++
++&Scoped-define SELF-NAME b-OK
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL b-OK w-login
++ON CHOOSE OF b-OK IN FRAME FRAME-A /* Ввод */
++DO:
++  if name :screen-value = "" then do:
++    message
++      "Введите имя пользователя"
++      view-as alert-box information .
++    apply "entry" to name .
++    return no-apply .
++  end.
++END.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++&UNDEFINE SELF-NAME
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CUSTOM _MAIN-BLOCK w-login 
++
++
++/* ***************************  Main Block  *************************** */
++
++{ gbl/app_help.i &disable-button=yes }
++
++on "ENTRY" of b-ok do:
++  if lastkey = keycode ("RETURN") then apply "CHOOSE" to b-ok in frame {&frame-name}.
++end.
++
++on window-close of {&window-name} do:
++  apply "end-error" to frame {&frame-name}.
++end.
++
++ASSIGN CURRENT-WINDOW             = {&WINDOW-NAME}
++    SESSION:SYSTEM-ALERT-BOXES = (CURRENT-WINDOW:MESSAGE-AREA = NO).
++    session:three-d = yes.
++PAUSE 0 BEFORE-HIDE.
++
++if session:date-format <> "dmy":U
++  or session:numeric-decimal-point <> ".":U
++  or session:numeric-separator <> ",":U
++then do:
++  message
++    vss-workfile vss-revision vss-description skip
++    "Неправильные установки сессии progress!" skip
++    "Формат даты должен быть - " "'dmy'":U skip
++    "Десятичный разделитель - " "'.'":U skip
++    "Разделитель тысяч - " "','":U skip
++    view-as alert-box error .
++  quit.
++end.
++
++assign
++  v-preconnection = FALSE
++  name            = "":U
++  password        = "":U
++.
++
++if SESSION:PARAMETER <> "":U
++  and SESSION:PARAMETER <> ?
++then do:
++  assign
++    v-num-entries = num-entries( SESSION:PARAMETER, ",":U )
++  .
++  do ind = 1 to v-num-entries :
++    assign
++      v-param = entry( ind, SESSION:PARAMETER, ",":U )
++    .
++    if num-entries( v-param, ":":U ) > 1 then do:
++      assign
++        v-param-name  = entry( 1, v-param, ":":U )
++        v-param-value = substring( v-param, length( v-param-name ) + 2 )
++      .
++      case v-param-name :
++        when "U":U then do:
++          assign
++            name = v-param-value
++          .
++        end.
++        when "P":U then do:
++          assign
++            password = v-param-value
++          .
++        end.
++        when "M":U then do:
++          assign
++            v-mode = replace( v-param-value, {&delim-par}, ",":U )
++          .
++        end.
++        when "A":U then .
++        otherwise do:
++          message
++            substitute("Неизвестный параметр сессии СПН: &1", v-param) skip
++            substitute("Параметр игнорируется.") skip
++            view-as alert-box information .
++        end.
++      end case.
++    end.
++    else do:
++      message
++        substitute("Неизвестный параметр сессии СПН: &1", v-param) skip
++        substitute("Параметр игнорируется.") skip
++        view-as alert-box information .
++    end.
++  end.
++  if name <> "":U
++    and password <> "":U
++  then do:
++    run adm/autoinit.p ( input name
++                    ,input password
++                  ) no-error.
++    run adm/autoconn.p no-error.
++    if error-status :error then do:
++      assign
++        password = "":U
++      .
++    end.
++    else do:
++      assign
++        v-preconnection = TRUE
++      .
++    end.
++    run gbl/dbdiscon.p no-error.
++  end.
++end.
++
++if v-preconnection = FALSE then do:
++  run enable_UI.
++end.
++
++assign
++  session :data-entry-return = yes
++.
++
++run gbl/font-chk.p no-error .
++if error-status :error then do:
++  message
++    vss-workfile vss-revision vss-description skip
++    "Неправильные установки системных шрифтов" skip
++    "Обратитесь к администратору" skip
++    error-status :get-message(1) skip
++    return-value skip
++    view-as alert-box information .
++end.
++
++do1:
++do
++on error  undo, leave
++on endkey undo, leave
++on stop   undo, leave
++:
++  if v-preconnection = FALSE then do:
++    WAIT-FOR GO OF frame {&FRAME-NAME} focus name.
++  end.
++  assign
++    name
++    password
++    v-connection = FALSE
++  .
++  run adm/autoinit.p ( input name
++                  ,input password
++                 ) no-error.
++  if error-status :error then do:
++    message
++      vss-workfile vss-revision vss-description skip
++      "Ошибка инициализации переменных для системы автоматического запуска" skip
++      return-value
++      view-as alert-box error.
++    leave do1.
++  end.
++
++  run adm/autoconn.p no-error.
++  if error-status:error then do:
++    message
++      vss-workfile vss-revision vss-description skip
++      return-value
++      view-as alert-box error.
++    leave do1.
++  end.
++  assign
++    v-connection = TRUE
++  .
++  run gbl/dbdiscon.p no-error.
++end.  /* do1:  on endkey ... */
++assign
++  session :data-entry-return = no
++.
++RUN disable_UI.
++
++/* --------------------- Если произошло подключение к базе данных --------------------- */
++if v-connection
++  and not error-status:error then do:
++  assign
++    log-file-name = "is_stiftTso.log"
++  .
++  run str/startNewShiftTso.p (v-mode) no-error.
++end.
++quit. /* иначе будет после выхода из системы вылетать редактор */
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++/* **********************  Internal Procedures  *********************** */
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE disable_UI w-login  _DEFAULT-DISABLE
++PROCEDURE disable_UI :
++/*------------------------------------------------------------------------------
++  Purpose:     DISABLE the User Interface
++  Parameters:  <none>
++  Notes:       Here we clean-up the user-interface by deleting
++               dynamic widgets we have created and/or hide 
++               frames.  This procedure is usually called when
++               we are ready to "clean-up" after running.
++------------------------------------------------------------------------------*/
++  /* Delete the WINDOW we created */
++  IF SESSION:DISPLAY-TYPE = "GUI":U AND VALID-HANDLE(w-login)
++  THEN DELETE WIDGET w-login.
++  IF THIS-PROCEDURE:PERSISTENT THEN DELETE PROCEDURE THIS-PROCEDURE.
++END PROCEDURE.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE enable_UI w-login  _DEFAULT-ENABLE
++PROCEDURE enable_UI :
++/*------------------------------------------------------------------------------
++  Purpose:     ENABLE the User Interface
++  Parameters:  <none>
++  Notes:       Here we display/view/enable the widgets in the
++               user-interface.  In addition, OPEN all queries
++               associated with each FRAME and BROWSE.
++               These statements here are based on the "Other 
++               Settings" section of the widget Property Sheets.
++------------------------------------------------------------------------------*/
++  ENABLE IMAGE-1 name password b-OK b-quit 
++      WITH FRAME FRAME-A IN WINDOW w-login.
++  {&OPEN-BROWSERS-IN-QUERY-FRAME-A}
++  VIEW w-login.
++END PROCEDURE.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
+diff --git a/cmp/procAsunc.xml b/cmp/procAsunc.xml
+--- a/cmp/procAsunc.xml
++++ b/cmp/procAsunc.xml
+@@ -150,7 +150,18 @@
+     
+       
+   </procAsunc>
+-  
++   <procAsunc>
++    <procid>is_shiftclose</procid>
++    <procval>str/proc-startNewShiftTso.p</procval>
++    <procname>Закрытие смены и открытие новой</procname>
++    <procParam>
++      <procid>is_shiftclose</procid>
++      <paramName>Писать запросы и ответы с ТСО/Автотанком</paramName>
++      <numparam>1</numparam>
++      <ParamValue>yes</ParamValue>
++      <ParamHiden>no</ParamHiden>
++    </procParam>
++  </procAsunc>
+   <SesParam>
+     <parCheck>false</parCheck>
+     <parCode>clientlog</parCode>
+diff --git a/gbl/sht-clos.p b/gbl/sht-clos.p
+--- a/gbl/sht-clos.p
++++ b/gbl/sht-clos.p
+@@ -24,7 +24,11 @@ define input parameter p-curr-obj-type l
+ define input parameter p-curr-obj-code like ub.clients.obj-code no-undo .
+ define input  parameter p-check-cass    as   logical             no-undo.
+ define input  parameter p-silent        as   logical             no-undo .
+-
++define variable mSilent as logical no-undo.
++publish "IsAsyncProc" (output mSilent).
++if mSilent
++then
++   p-silent = yes.
+ define variable vss-revision    as char    no-undo init "$Revision$":U .
+ define variable vss-author      as char    no-undo init "$Author$":U .
+ define variable vss-date        as char    no-undo init "$Date$":U .
+@@ -37,6 +41,7 @@ define variable vss-description as char    no-undo init "Закрытие смены".
+ { gbl/getcntxt.i def }
+ { gbl/key-rec.i }
+ { rul/ruleset_.i }
++{ gbl/cur-time.i }
+ 
+ define variable s-date                  as date         no-undo.    /* дата начала смены для документа */
+ define variable e-date                  as date         no-undo.
+@@ -102,6 +107,7 @@ else do:
+     glog
+   }
+ end.
++
+ if not glog then do:
+   assign
+     v-err-msg = substitute( "Вы не имеете прав для работы со сменами.&1Объект: &2&3&1", {&new-line}, p-curr-obj-type, p-curr-obj-code )
+@@ -203,6 +209,7 @@ if p-check-cass = true then do:
+    end.
+ end.
+ 
++   
+ if p-silent <> true then do:
+   /* смена может быть закрыта произвольным временем */
+   run gbl/shift.w
+@@ -235,6 +242,8 @@ if p-silent <> true then do:
+     undo, return error.
+   end.
+ end.
++else
++   run cur-time (output s-date, output s-time).
+ 
+ run str/checknakl.p
+      ( input parparentproc
+@@ -319,6 +328,14 @@ on error undo stop-shift, return error r
+     .
+   end.
+   else do:
++     buf_shift-obj.close-date = s-date.
++     if s-time > 86400 then do:
++      assign
++        s-time = s-time - 86400.
++    end.
++    assign
++      buf_shift-obj.close-time = s-time       /* для проверки времени в триггере */
++      .
+     if buf_shift-obj.close-time = 0 then do:
+       assign
+         v-err-msg = substitute( "Не задано время закрытия смены.&1"
+diff --git a/gbl/sht-open-next.p b/gbl/sht-open-next.p
+new file mode 100644
+--- /dev/null
++++ b/gbl/sht-open-next.p
+@@ -0,0 +1,29 @@
++
++
++define output parameter oOk as logical no-undo. 
++/* Параметры из  sht-open.p
++define input parameter parparentproc as widget-handle no-undo .
++define input parameter p-curr-obj-type like ub.clients.obj-type no-undo .
++define input parameter p-curr-obj-code like ub.clients.obj-code no-undo .
++
++*/
++
++{gbl/sht-open.p &NextMode = yes &myputmes = yes}
++oOk = mOk.
++{ adm/auto-def.i }
++procedure put-mes:
++define input  parameter iVss    as logical   no-undo.
++define input  parameter iText   as character no-undo.
++define input  parameter iGetMes as logical   no-undo.
++define input  parameter iRetval as character no-undo.
++run write-to-log (substitute("&1  &2 &3 &4 &5 &6 &7"
++                         ,iText 
++                         ,if iGetMes then trim(error-status :get-message(1)) else ""  
++                         ,if iGetMes then trim(error-status :get-message(2)) else ""
++                         ,if iGetMes then trim(error-status :get-message(3)) else ""
++                         ,if iGetMes then trim(error-status :get-message(4)) else ""
++                         ,if iGetMes then trim(error-status :get-message(5)) else ""
++                         ,iRetval)
++  ).
++    
++end procedure.
+\ No newline at end of file
+diff --git a/gbl/sht-open.p b/gbl/sht-open.p
+--- a/gbl/sht-open.p
++++ b/gbl/sht-open.p
+@@ -23,11 +23,6 @@ define input parameter p-curr-obj-type l
+ define input parameter p-curr-obj-code like ub.clients.obj-code no-undo .
+ 
+ define variable mOk as logical no-undo.
+-define variable mBachMode as logical no-undo.
+-&if defined(BachMode) ne 0
+-&then
+-   mBachMode = yes.
+-&endif   
+ 
+ define variable vss-revision    as character no-undo init "$Revision$":U .
+ define variable vss-author      as character no-undo init "$Author$":U .
+@@ -187,7 +182,24 @@ if available open-shift then do:
+   ),no,"").
+   return error.
+ end.
+-
++&if defined(NextMode) ne 0
++    &then
++        s-date = today.
++        find last open-shift where
++           open-shift.obj-type = p-curr-obj-type and
++           open-shift.obj-code = p-curr-obj-code and
++           open-shift.shift-date = s-date
++          use-index pi no-error.
++        if     available open-shift
++           and open-shift.status_     ne {&sht-expected}
++        then  
++           s-num  = open-shift.shift-num  + 1.
++        else
++           s-num  = (if available open-shift then open-shift.shift-num else 1).
++        s-name = string(s-num).
++        s-time = time.
++        e-time = time.
++&else
+ /* ищем запланированную смену */
+ find first buf_shift-obj no-lock
+      where buf_shift-obj.obj-type = p-curr-obj-type
+@@ -240,8 +252,10 @@ then do:
+ end.
+ else do:
+     /* может быть начата произвольная смена */
+-    &if defined(BachMode) eq 0
+-&then
++    
++    &if  defined(BachMode) eq 0
++        
++    &then
+     run gbl/shift.w (
+                     input parparentproc
+                   , input p-curr-obj-type
+@@ -277,9 +291,10 @@ else do:
+         undo, return.
+     end.
+ end.
+-
+-if not mBachMode 
+-then do:
++&endif
++&if     defined(BachMode)  eq 0
++    and defined(NextMode) eq 0
++&then
+ glog = no.
+ message
+   "Начать новую смену по" p-curr-obj-type p-curr-obj-code skip
+@@ -288,9 +303,9 @@ message
+   "Номер смены:" s-name skip
+   "Порядок смены" s-num "?"
+ view-as alert-box question buttons OK-Cancel update glog.
+-end.
+-else
++&else
+    glog = yes.
++&endif
+ if not glog
+ then do:
+   return error.
+@@ -383,8 +398,10 @@ if available closed-shift then do:
+   end.
+   if (s-date - closed-shift.shift-date) > 1 then do:
+     /* дни не подряд */
+-    if not mbachMode
+-    then do:
++    &if     defined(BachMode)  eq 0
++    and defined(NextMode) eq 0
++    &then
++
+       glog = no .
+     
+     message
+@@ -392,9 +409,9 @@ if available closed-shift then do:
+       "Последняя смена закрыта не вчера." skip
+       "Открыть новую смену" s-date "Номер:" s-name "Порядок:" s-num "?" skip
+       view-as alert-box question buttons yes-no update glog.
+-    end.
+-    else  
++    &else  
+        glog = yes.
++    &endif
+     if not glog or
+        not is-super then
+       return error.
+@@ -432,8 +449,10 @@ if s-date < v-sys-date - 10 and
+    return error.
+ end.
+ 
+-if not mBachMode 
+-then do:
++&if     defined(BachMode)  eq 0
++    and defined(NextMode) eq 0
++&then
++
+ /* проверяем кассовые запреты */
+     run str/dskshtop.p (
+                      input parparentproc
+@@ -448,7 +467,7 @@ then do:
+       run put-mes(yes ,"Ошибка при проверке кассовых запретов",yes,return-value).
+       return error.
+     end.
+-end.
++&endif
+ if varobj-date - s-date > 4 then do:
+   run put-mes(no ,substitute("Календарная дата объекта &1~nСменная дата &2 ~nРазница &3~nРазница должна составлять не более 4 дней."
+                              ,varobj-date
+@@ -582,14 +601,20 @@ do transaction on error undo start-shift
+      end.
+   end.
+ end. /*end*/
+-if not mbachMode
+-then
++&if     defined(BachMode)  eq 0
++    and defined(NextMode) eq 0
++&then
++
+     message
+       "Новая смена открыта."
+     view-as alert-box.
++&else
++    run put-mes(no ,"Новая смена открыта.",no,"").
++&endif
+ end.
+ mOk =yes.
+-&if defined(BachMode) eq 0
++&if     defined(BachMode) eq 0
++    and defined(NextMode) eq 0
+ &then
+ run ref/shftpers.w ( INPUT parparentproc
+                    , INPUT p-curr-obj-type
+diff --git a/ibs/th/bge/aazs/import/salemake2.p b/ibs/th/bge/aazs/import/salemake2.p
+new file mode 100644
+--- /dev/null
++++ b/ibs/th/bge/aazs/import/salemake2.p
+@@ -0,0 +1,343 @@
++/*
++
++$Revision$
++$Author$
++$Date$
++$Workfile$
++$Archive$
++
++Создание продаж по шаблонам при работе по расписанию
++
++Автор: Бахтадзе Наталья Викторовна
++Дата создания: 03/24/05
++Author: Bakhtadze Natalya
++Creation date: 03/24/05
++
++*/
++
++define input parameter parparentproc as widget-handle no-undo .
++define input parameter p-parent-handle  as widget-handle no-undo .
++define input parameter p-log-handle  as handle no-undo .
++define input parameter p-parameter   as character no-undo .
++/*
++p-parameter включает
++define input parameter p-curr-obj-type like ub.clients.obj-type no-undo .
++define input parameter p-curr-obj-code like ub.clients.obj-code no-undo .
++define input parameter p-task-num    like ub.schedule.task-num no-undo .
++*/
++
++define variable p-curr-obj-type    like ub.clients.obj-type no-undo .
++define variable p-curr-obj-code    like ub.clients.obj-code no-undo .
++define variable p-cre-db-num       like ub.schedule.cre-db-num no-undo .
++define variable p-task-type        like ub.schedule.task-type no-undo .
++define variable p-task-num         like ub.schedule.task-num no-undo .
++
++
++define variable vss-revision    as character no-undo init "$Revision$":U .
++define variable vss-author      as character no-undo init "$Author$":U .
++define variable vss-date        as character no-undo init "$Date$":U .
++define variable vss-workfile    as character no-undo init "$Workfile$":U .
++define variable vss-archive     as character no-undo init "$Archive$":U .
++define variable vss-description as character no-undo init "".
++{ cmp/vssrevis.i "substitute('&1|&2|&3|&4':u,p-curr-obj-type,p-curr-obj-code,p-cre-db-num,p-task-type,p-task-num)" }
++{ cmp/trg-def.i  }
++{ str/trdcalib.i }
++{ ref/shd-attr.i }
++{ gbl/cur-time.i }
++{ cmp/strcodec.i }
++{ str/lib-trn.i  }
++{ str/doc-code.i }
++{ str/cre-sale.i }
++
++define variable v-input-error as logical no-undo .
++define variable v-view-log as logical no-undo .
++define variable v-esm as character no-undo .
++define variable log-file-name as character no-undo init 'ext-sale.log'.
++
++define shared temp-table temp-inkas no-undo like ub.inkas.
++
++&scop display-message   run write-log-and-file in p-log-handle (                             ~
++                                                                  input 1                    ~
++                                                                , input log-file-name        ~
++                                                                , input 1                    ~
++                                                                , input ~{&my-message~})
++
++
++if num-entries(p-parameter, {&delim-par}) <> 5
++then do:
++  assign
++  v-input-error = yes
++  v-esm         = substitute("Неверное количество ENTRY в составном параметре - &1, должно быть 5"
++                             , num-entries(p-parameter, {&delim-par})).
++  .
++end.
++else do:
++  assign
++  p-curr-obj-type = entry(1, p-parameter, {&delim-par})
++  p-curr-obj-code = integer(entry(2, p-parameter, {&delim-par}))
++  p-cre-db-num    = integer(entry(3, p-parameter, {&delim-par}))
++  p-task-type     = entry(4, p-parameter, {&delim-par})
++  p-task-num      = integer(entry(5, p-parameter, {&delim-par}))
++  no-error .
++  if error-status:error then do:
++    assign
++    v-esm = error-status:get-message(1)
++    v-input-error = yes
++    .
++  end.
++end.
++
++if v-input-error = yes then do:
++  run write-log-and-file in p-log-handle (
++        input 1
++      , input log-file-name
++      , input 1
++      , input substitute("Ошибка входных параметров &1:&2&3&4"
++                         , p-parameter
++                         , {&new-line}
++                         , v-esm
++                         , return-value
++                         )).
++  assign
++  v-view-log = yes.
++  return.
++end.
++
++run proc-main in this-procedure no-error .
++if error-status:error then do:
++  run write-log-and-file in p-log-handle (
++        input 1
++      , input log-file-name
++      , input 1
++      , input substitute("Ошибка при создании продаж по шаблонам - задача &1 &2&3:&4&5 &6"
++                         , p-task-num
++                         ,  p-curr-obj-type
++                         ,  p-curr-obj-code
++                         , {&new-line}
++                         , error-status:get-message(1)
++                         , return-value
++                         )).
++  assign
++  v-view-log = yes.
++  {&view-log}.
++  return "error":U.
++end.
++
++
++procedure proc-main :
++define variable v-shift-date-str as character no-undo.
++define variable v-shift-date-str-rus as character no-undo.
++define variable v-shift-date     as date no-undo .
++define variable v-shift-num      as integer no-undo.
++define variable v-filter-str     as character no-undo .
++define variable v-filter-str-rus as character no-undo .
++define variable v-filter-name    as character no-undo .
++define variable v-create         as logical no-undo .
++DEFINE VARIABLE v-time           as integer no-undo .
++define variable v-dop            as character no-undo .
++define variable v-dop1           as character no-undo .
++define variable v-dop2           as character no-undo .
++define variable v-dop3           as character no-undo .
++define variable v-dop-int        as integer   no-undo .
++define variable v-today          as date      no-undo .
++define variable v-filter-on      as logical no-undo .
++define variable cas-shft         as logical no-undo .
++define variable conf-attr        as character no-undo.                  /* для чтения параметра конфигурации */
++define variable conf-par         as character no-undo.                  /* для чтения параметра конфигурации */
++define variable par-type         as character no-undo.
++define variable v-where-phrase   as character no-undo .
++define variable v-where-phrase-rus as character no-undo .
++define variable v-rid            as recid no-undo .
++
++
++
++define buffer buf_schedule-attr for ub.schedule-attr.
++define buffer buf2_schedule-attr for ub.schedule-attr.
++define buffer buf_inkas for ub.inkas.
++define buffer buf_doc-attr for ub.doc-attr.
++
++
++  do
++  on error undo, return error return-value
++  :
++
++    run cur-time in this-procedure (output v-today, output v-time).
++    { gbl/cas-shft.i p-curr-obj-type p-curr-obj-code cas-shft }
++    /*
++    _buf_schedule-attr:
++    for each buf_schedule-attr where
++            buf_schedule-attr.cre-db-num = p-cre-db-num
++        AND buf_schedule-attr.task-type = {&btpr-type-autosale}
++        AND buf_schedule-attr.task-num = p-task-num
++        and buf_schedule-attr.attr-code begins ({&attr-schedule-date-list-h} + {&delim-par}):
++       find first buf2_schedule-attr no-lock where
++            buf2_schedule-attr.cre-db-num = p-cre-db-num
++        AND buf2_schedule-attr.task-type = {&btpr-type-autosale}
++        AND buf2_schedule-attr.task-num = p-task-num
++        and buf2_schedule-attr.attr-code =
++           ({&attr-schedule-filter-h} + {&delim-par} +
++           string(integer(entry(2, buf_schedule-attr.attr-code, {&delim-par})))
++           ) no-error.
++       assign
++       v-create = no
++       v-filter-str = "":U
++       v-filter-str-rus = "":U
++       v-where-phrase = "":U
++       v-where-phrase-rus = "":U
++       v-filter-name      = "":U
++       .
++&scop my-message substitute("!!!Ошибка при получении параметров даты и номера смены в шаблоне создания продажи:&1" + ~
++                             "&2 &3"                                                                                 ~
++                             , ~{&new-line~}                                                                         ~
++                             , error-status:get-message(1)                                                           ~
++                             , return-value )
++
++       assign
++       v-shift-date-str = entry(1, (entry(1, buf_schedule-attr.attr-value, {&delim-par})))
++       v-shift-date-str-rus = entry(1, (entry(2, buf_schedule-attr.attr-value, {&delim-par})))
++       v-shift-num      = integer(entry(2, (entry(1, buf_schedule-attr.attr-value, {&delim-par}))))
++       v-filter-name    = entry(3, buf_schedule-attr.attr-value, {&delim-par})
++       no-error .
++       if error-status:error then do:
++          assign
++          v-view-log = yes.
++         {&display-message}.
++         next _buf_schedule-attr.
++       end.
++
++      IF INDEX (v-shift-date-str, "today") = 0  THEN DO:
++        v-dop = str-decode(v-shift-date-str, "":U).
++        ASSIGN
++        v-dop = substring(v-dop, 6)
++        v-dop = TRIM(v-dop, ")")
++        v-dop1 = ENTRY(1, v-dop, {&comma-char})
++        v-dop2 = ENTRY(2, v-dop, {&comma-char})
++        v-dop3 = ENTRY(3, v-dop, {&comma-char}).
++        v-shift-date = DATE( INTEGER(v-dop1),
++                        INTEGER(v-dop2),
++                        INTEGER(v-dop3)
++                      )
++        no-error
++        .
++      END.
++      else do:
++        assign
++        v-dop = replace(v-shift-date-str, "today", "":U)
++        v-dop = replace(v-dop, "(", "":U)
++        v-dop = replace(v-dop, ")", "":U)
++        v-dop-int = integer(trim(v-dop))
++        v-shift-date = v-today + v-dop-int
++        no-error
++        .
++      end.
++      if error-status:error then do:
++        assign
++        v-view-log = yes.
++        {&display-message}.
++        next _buf_schedule-attr.
++      end.
++      if available buf2_schedule-attr then do:
++         assign
++         v-filter-str  = entry(1, buf2_schedule-attr.attr-value, {&delim-par})
++         v-filter-str-rus  = entry(2, buf2_schedule-attr.attr-value, {&delim-par})
++         .
++      end.
++      */
++      /*
++      v-create = yes.
++      _inkas:
++      for each buf_Inkas no-lock where
++                 buf_inkas.obj-type = p-curr-obj-type
++             AND buf_inkas.obj-code = p-curr-obj-code
++             and buf_inkas.shift-date = v-shift-date
++             and (cas-shft = no or buf_inkas.shift-num = v-shift-num)
++             and buf_inkas.status_ = {&g___new} :
++        if v-filter-str <> "":U then do:
++          assign
++          v-where-phrase = buf_inkas.sale-filter
++          v-where-phrase-rus = buf_Inkas.sale-filter-rus
++          .
++          if trim(v-where-phrase) = trim(v-filter-str)  then v-create = no.
++       end.
++       else do:
++          v-create = no.
++       end.
++       if v-create = no then leave _inkas.
++      end. /*for each buf_inkas*/
++      if v-create then do:
++      */
++      if not can-find (first buf_Inkas where
++                 buf_inkas.obj-type = p-curr-obj-type
++             AND buf_inkas.obj-code = p-curr-obj-code
++             and buf_inkas.shift-date = v-shift-date
++             and buf_inkas.shift-num = v-shift-num
++             and buf_inkas.status_ = {&g___new} ) then do :
++        run cre-docs in this-procedure (
++                                         input 2 /*p-auto*/
++                                        ,input p-curr-obj-type
++                                        ,input p-curr-obj-code
++                                        ,input v-shift-date
++                                        ,input (if cas-shft then v-shift-num else 0)
++                                        ,input v-filter-name
++                                        ,input v-filter-str
++                                        ,input v-filter-str-rus
++                                        ,input {&cash-desk}
++                                        ,output v-rid
++                                      ) no-error .
++        if error-status:error then do:
++&scop my-message substitute("Ошибка при создании отчета о продаже по шаблону <&1> с параметрами:&2" + ~
++                            "&3&4 дата смены &5 № смены &6&2" +                                ~
++                            "ДОП. фильтр по чекам &7:&2"                                       ~
++                            , entry(3, buf_schedule-attr.attr-value, ~{&delim-par~})           ~
++                            , ~{&new-line~}                                                    ~
++                            , p-curr-obj-type                                                  ~
++                            , p-curr-obj-code                                                  ~
++                            , v-shift-date-str-rus                                             ~
++                            , v-shift-num                                                      ~
++                            , v-filter-str-rus) +                                              ~
++                 substitute("&1 &2", error-status:get-message(1), return-value )
++          v-view-log = yes.
++/*          {&display-message}.     */
++/*          NEXT _buf_schedule-attr.*/
++        end.
++        find first buf_Inkas no-lock where
++                  recid(buf_inkas) = v-rid .
++        create temp-inkas.
++        buffer-copy buf_inkas to temp-inkas.
++&scop   my-message       substitute("Создан документ продажи &1 по шаблону <&2> с параметрами:&3" + ~
++                            "&4 дата смены &5 № смены &6&3" +                                ~
++                            "ДОП. фильтр по чекам &7&3"                                        ~
++                            , temp-inkas.inkas-code                                            ~
++                            , entry(3, buf_schedule-attr.attr-value, ~{&delim-par~})           ~
++                            , ~{&new-line~}                                                    ~
++                            , p-curr-obj-type + string(p-curr-obj-code)                        ~
++                            , v-shift-date-str-rus                                             ~
++                            , v-shift-num                                                      ~
++                            , v-filter-str-rus)
++
++/*        {&display-message}.*/
++      end.
++      else do:
++&scop my-message substitute("Не будет создан документ продажи по шаблону <&1> с параметрами:&2" + ~
++                            "&3&4 дата смены &5 № смены &6&2" +                                ~
++                            "ДОП. фильтр по чекам &7&2" +                                     ~
++                            "Уже есть документ продажи с такими параметрами"                    ~
++                            , entry(3, buf_schedule-attr.attr-value, ~{&delim-par~})           ~
++                            , ~{&new-line~}                                                    ~
++                            , p-curr-obj-type                                                  ~
++                            , p-curr-obj-code                                                  ~
++                            , v-shift-date-str-rus                                             ~
++                            , v-shift-num                                                      ~
++                            , v-filter-str-rus)
++
++        assign
++        v-view-log = yes.
++/*        {&display-message}.     */
++/*        NEXT _buf_schedule-attr.*/
++      end.
++/*      
++    end. /*for each buf_schedule-attr where*/
++*/    
++  end. /*doe*/
++
++end procedure. /* main */
+\ No newline at end of file
+diff --git a/ibs/th/str/CloseAndOpenShift.cls b/ibs/th/str/CloseAndOpenShift.cls
+new file mode 100644
+--- /dev/null
++++ b/ibs/th/str/CloseAndOpenShift.cls
+@@ -0,0 +1,438 @@
++ 
++ /*------------------------------------------------------------------------
++    File        : CloseAndOpenShift
++    Purpose     : 
++    Syntax      : 
++    Description : 
++    Author(s)   : Daru
++    Created     : Sat May 13 11:46:56 MSK 2023
++    Notes       : 
++  ----------------------------------------------------------------------*/
++
++using Progress.Lang.*.
++
++block-level on error undo, throw.
++&glob TimeOutSend 30
++&glob TimeOutRvs  50
++class ibs.th.str.CloseAndOpenShift: 
++   /*------------------------------------------------------------------------------
++    Purpose:
++    Notes:
++   ------------------------------------------------------------------------------*/
++   {cmp/str-glbl.i class}
++   define variable g#dbNum as integer no-undo.
++   
++   define variable parparentproc   as handle no-undo.
++   define variable WorkHandel      as handle no-undo.
++   define variable mTso            as ibs.th.str.tso_trg no-undo.
++   define variable mShiftState     as ibs.th.str.cash.ShiftState no-undo.
++   
++   method public void putLog(istr as character ):
++      run PutMesAsunc in WorkHandel(istr).
++      
++   end.
++   
++   constructor public CloseAndOpenShift ():
++      this-object (no).
++   end.
++      
++   constructor public CloseAndOpenShift (iDebug as logical):
++      super ().
++      run ibs/th/str/closeadnopenshiftproc.p persistent set WorkHandel (iDebug) .
++      mTso        = new ibs.th.str.tso_trg(WorkHandel,yes).
++      mShiftState = new ibs.th.str.cash.ShiftState().
++      mTso:setFirstStaff().
++      run gbl/getdbnum.p (output g#dbNum).
++      parparentproc = WorkHandel.
++   end constructor.
++   
++   destructor public CloseAndOpenShift ( ):
++      delete object mShiftState.
++      delete object mTso.
++   end destructor.
++
++   /*------------------------------------------------------------------------------
++    Purpose:
++    Notes:
++   ------------------------------------------------------------------------------*/
++
++   method public logical crRvsControl():
++      run str/rvs-auto.p (WorkHandel,
++                          WorkHandel,
++                          WorkHandel,
++                          g#dbnum,
++                          ?,
++                          ?,
++                          g#dbnum) no-error.
++      putLog(return-value).
++      return not (    error-status:error
++                   or index(return-value,"ОШИБКА!") > 0).
++   end method.
++   
++   method public logical crRvsControl(iCycle as integer):
++      return cycleOperThis(iCycle,"crRvsControl").
++   end.
++   
++   method public logical crRvsShift(iCycle as integer):
++      return cycleOperThis(iCycle,"crRvsShift").
++   end.
++   
++   method public logical crRvsShift():
++      define variable vOk as logical no-undo init yes.
++      for each clients where clients.db-num   eq g#dbnum
++                         and clients.obj-type eq {&shop}
++                         and clients.stts     eq 0
++      no-lock:
++         find last shift-obj where shift-obj.obj-type eq clients.obj-type
++                               and shift-obj.obj-code eq clients.obj-code
++                               and shift-obj.status_  eq {&sht-current}
++         no-lock no-error.
++         if available shift-obj
++         then do:
++            find first rvs-doc where rvs-doc.obj-type   eq shift-obj.obj-type
++                                 and rvs-doc.obj-code   eq shift-obj.obj-code
++                                 and rvs-doc.shift-date eq shift-obj.shift-date
++                                 and rvs-doc.shift-num  eq shift-obj.shift-num
++                                 and rvs-doc.status_    eq {&fact}
++            no-lock no-error.
++            if available rvs-doc
++            then do:
++               vOk = crRvsShiftForCtrl(recid(rvs-doc)).
++               
++            end.
++            else
++               vOk = false.
++         end.
++         else
++            vOk = false.
++      end.
++      return vOk.
++   end.
++   
++   method public logical crRvsShiftForCtrl(irecidRvsControl as recid):
++      define variable v-str as character no-undo.
++      define variable jj as integer no-undo.
++      run str/ctrc2sht.p
++            ( input parparentproc
++            ,input irecidRvsControl
++            ) no-error.
++      if error-status :error
++      then do:
++         assign 
++             v-str = return-value.
++         do jj = 1 to error-status :num-messages :
++             assign 
++                 v-str = v-str + ( if v-str = "":U then "":U else {&new-line} ) + error-status :get-message( jj ).
++         end.
++         assign 
++             v-str = v-str + ( if v-str = "":U then "":U else {&new-line} ) + return-value.
++             v-str =  "Ошибка создания сверки." + {&new-line} + v-str .
++         putLog(v-str).
++         return false.
++     end.
++     return true.
++     
++   end.
++   
++   method public logical OpenShiftTh(iCycle as integer):
++      return cycleOperThis(iCycle,"OpenShiftTh").
++   end.
++   
++   method public logical OpenShiftTh():
++      define variable vOk as logical no-undo init yes.
++      for each clients where clients.db-num   eq g#dbnum
++                         and clients.obj-type eq {&shop}
++                         and clients.stts     eq 0
++      no-lock:
++         find last shift-obj where shift-obj.obj-type eq clients.obj-type
++                               and shift-obj.obj-code eq clients.obj-code
++                               and shift-obj.status_  eq {&sht-current}
++         no-lock no-error.
++         if not available shift-obj
++         then do:
++            vOk = OpenShiftTh(clients.obj-type,clients.obj-code).
++            
++         end.
++         else
++            vOk = false.
++      end.
++      return vOk.
++   end.
++   
++   method public logical OpenShiftTh(iObjType as char,iObjCode as int):
++      define variable v-str as character no-undo.
++      define variable jj as integer no-undo.
++      define variable vOK as logical no-undo.
++      run gbl/sht-open-next.p ( output vOk,
++                                input parparentproc, 
++                                input iObjType, 
++                                input iObjCode ) no-error .
++      if error-status :error
++      then do:
++         assign 
++             v-str = "":U.
++         do jj = 1 to error-status :num-messages :
++             assign 
++                 v-str = v-str + ( if v-str = "":U then "":U else {&new-line} ) + error-status :get-message( jj ).
++         end.
++         assign 
++             v-str = v-str + ( if v-str = "":U then "":U else {&new-line} ) + return-value.
++             v-str =  "Ошибка создания сверки." + {&new-line} + v-str .
++         putLog(v-str).
++         return false.
++      end.
++      if vOk
++      then
++         vOk = addStaff(iObjType,iObjCode).
++      return vOk.
++   end.
++   
++   
++   method public logical addStaff (iObjType as char,iObjCode as int):
++      define variable vOk as logical no-undo.
++      define buffer shift-obj for ub.shift-obj.
++      define buffer buf_staff for ub.staff.
++      define buffer clients   for clients.
++      define buffer buf_shift-staff for shift-staff.
++      find last shift-obj where shift-obj.obj-type eq iObjType
++                            and shift-obj.obj-code eq iObjCode
++                            and shift-obj.status_  eq {&sht-current}
++         no-lock no-error.
++      if not available shift-obj
++      then do:
++         putLog(substitute ("Нет текущей смены на объекте &1&2",iObjType,iObjCode)).
++         return false.
++      end.
++      find first buf_staff no-lock where
++                       buf_staff.psn-code = 999 no-error.
++      if not avail buf_staff then do:
++         putLog(substitute("Не найден кассир - с кодом &1", 999)).
++         find first buf_staff no-lock  no-error.
++         if not available buf_staff
++         then do:
++            putLog(substitute("Нет ниодного кассира")).
++            return false.
++         end.
++         putLog(substitute("Вместо кассира 99 взят касиср &1", buf_staff.psn-code)).
++      end.
++      find first ub.person no-lock where
++                 ub.person.psn-code  = buf_staff.psn-code no-error.
++      if not avail person then do:
++         putLog(substitute("Не найден человек - с кодом &1", buf_staff.psn-code)).
++         return false.
++      end.
++      find first clients no-lock where
++                 clients.obj-type = {&prs} and
++                 clients.obj-code = person.psn-code no-error.
++      if not avail clients then do:
++         putLog(substitute("Не найден человек - с кодом &1&2",{&prs}, person.psn-code)).
++         return false.
++      end.
++           
++      find first buf_shift-staff where
++                 buf_shift-staff.OBJ-TYPE   = iObjType 
++             and buf_shift-staff.obj-code   = iObjCode 
++             and buf_shift-staff.shift-num  = shift-obj.shift-num 
++             and buf_shift-staff.shift-date = shift-obj.shift-date 
++             and buf_shift-staff.next-shift = no 
++             and buf_shift-staff.psn-num    = person.psn-code no-error.
++
++      if not avail buf_shift-staff then do:
++         create buf_shift-staff.
++         assign
++            buf_shift-staff.obj-type   = iObjType
++            buf_shift-staff.obj-code   = iObjCode
++            buf_shift-staff.shift-num  = shift-obj.shift-num
++            buf_shift-staff.shift-name = shift-obj.shift-name
++            buf_shift-staff.shift-date = shift-obj.shift-date
++            buf_shift-staff.psn-num    = person.psn-code
++            buf_shift-staff.next-shift = no
++         .
++      end.
++      if avail buf_shift-staff then do:
++         assign
++            buf_shift-staff.NAME = clients.obj-name + {&space-char} +
++                                   person.name1 + {&space-char} + person.name2
++            buf_shift-staff.cashier = buf_staff.staff-code
++            buf_shift-staff.staff-role = yes
++         .
++     end.
++            
++     return avail buf_shift-staff.
++   end.
++   
++   method public logical crSale():
++      run str/sal-shd.p
++                  (input parparentproc
++                  ,input ?
++                  ,input ?
++                  ,input ?
++                  ,input g#dbnum
++                  ) no-error.
++       return not error-status:error.
++   end.
++   
++   method public logical crSale(iCycle as integer):
++      return cycleOperThis(iCycle,"crSale").
++   end.
++   method public logical cycleOperTso(iCycle as integer,iOperation as character, iStList as character ):
++      define variable vi as integer no-undo.
++      do vi = 1 to iCycle:
++         if vi ne 1
++         then do:
++            myPause ( {&TimeOutSend}).
++         end.
++         dynamic-invoke (mTso,iOperation).
++         myPause ( 1 ).
++         mTso:tso-send-Stat().
++         mTso:waitReadSts().
++         if mTso:AllTsoInSts(iStList)
++         then
++            return yes.
++         
++      end.
++      return no.
++   end.
++   
++   method public logical cycleOperThis(iCycle as integer,iOperation as character):
++      define variable vi as integer no-undo.
++      
++      do vi = 1 to iCycle:
++         if vi ne 1
++         then
++            myPause ({&TimeOutSend} ).
++         myPause ( 1 ).
++         
++         if dynamic-invoke (this-object,iOperation)
++         then
++            return yes.
++         
++      end.
++      return no.
++   end.
++   
++   method public logical StopShift():
++      return StopShift(1).
++   end.
++   
++   method public logical StopShift(iCycle as integer):
++      define variable vList as character no-undo.
++      vList = substitute ("&1,&2,&3",
++                          mShiftState:Stopped:NameProp,
++                          mShiftState:DontWork:NameProp,
++                          mShiftState:Closed:NameProp).
++      return cycleOperTso(iCycle,"stopShift",vList).
++   end.
++
++   method public logical cycleOneInState(iCycle as integer, iStList as character ):
++      define variable vi as integer no-undo.
++      do vi = 1 to iCycle:
++         if vi ne 1
++         then
++            myPause ({&TimeOutRvs}).
++         mTso:tso-send-Stat().
++         mTso:waitReadSts().
++         if mTso:oneTsoInSts(iStList)
++         then
++            return yes.
++         
++      end.
++      return no.
++   end.
++
++   method public logical canCloseShift(iCycle as integer):
++      define variable vList as character no-undo.
++      vList = substitute ("&1,&2,&3",mShiftState:Stopped:NameProp,
++                                     mShiftState:DontWork:NameProp,
++                                     mShiftState:Closed:NameProp).
++      return cycleOneInState(iCycle,vList).
++   end.
++   
++   method public logical CloseShift():
++      return CloseShift(1).
++   end.
++   
++   method public logical CloseShift(iCycle as integer):
++      define variable vList as character no-undo.
++      vList = substitute ("&1,&2",mShiftState:Closed:NameProp,mShiftState:DontWork:NameProp).
++      return cycleOperTso(iCycle,"CloseShift",vList).
++   end.
++   
++   method public logical openShift():
++      return openShift(1).
++   end.
++   
++   method public logical openShift(iCycle as integer):
++      define variable vList as character no-undo.
++      vList = substitute ("&1,&2,&3",mShiftState:Running:NameProp,mShiftState:DontWork:NameProp,mShiftState:Stopped:NameProp).
++      return cycleOperTso(iCycle,"openShift",vList).
++   end.
++   
++   method public logical startShift():
++      return startShift(1).
++   end.
++   
++   method public logical startShift(iCycle as integer):
++      define variable vList as character no-undo.
++      vList = substitute ("&1,&2",mShiftState:Running:NameProp,mShiftState:DontWork:NameProp).
++      return cycleOperTso(iCycle,"startShift",vList).
++   end.
++   
++   method public void myPause(iTime as decimal):
++      run gbl/pause.p( iTime * 1000).
++   end.
++   
++   method public logical getSlips(iCycle as integer):
++      return cycleOperThis(iCycle,"getSlips").
++   end.
++   
++   method public logical getSlips():
++      define variable oOk as logical no-undo init yes.
++      define variable vOk as logical no-undo init yes.
++      define buffer clients   for ub.clients.
++      for each clients where clients.db-num   eq g#dbnum
++                         and clients.obj-type eq {&shop}
++                         and clients.stts     eq 0
++      no-lock:
++         run str/get-chk-slips.p(parparentproc,
++                                 WorkHandel,
++                                 WorkHandel,
++                                 "",
++                                 clients.obj-type,
++                                 clients.obj-code,
++                                 output vOk) no-error.
++         if    error-status:error
++            or not vOk
++         then
++            oOk = false.
++      end.
++      return oOk.
++   end.
++   
++   method public logical getTranFuel(iCycle as integer):
++      return cycleOperThis(iCycle,"getTranFuel").
++   end.
++   
++   method public logical getTranFuel():
++      define variable oOk as logical no-undo init yes.
++      define variable vOk as logical no-undo init yes.
++      define buffer clients   for ub.clients.
++      for each clients where clients.db-num   eq g#dbnum
++                         and clients.obj-type eq {&shop}
++                         and clients.stts     eq 0
++      no-lock:
++         run str/get-tran-fuel.p(parparentproc,
++                                 WorkHandel,
++                                 WorkHandel,
++                                 "",
++                                 clients.obj-type,
++                                 clients.obj-code,
++                                 output vOk) no-error.
++         if    error-status:error
++            or not vOk
++         then
++            oOk = false.
++      end.
++      return oOk.
++   end.
++end class.
+\ No newline at end of file
+diff --git a/ibs/th/str/cash/PumpStatus.cls b/ibs/th/str/cash/PumpStatus.cls
+new file mode 100644
+--- /dev/null
++++ b/ibs/th/str/cash/PumpStatus.cls
+@@ -0,0 +1,51 @@
++ 
++ /*------------------------------------------------------------------------
++    File        : PumpStatus
++    Purpose     : 
++    Syntax      : 
++    Description : 
++    Author(s)   : Daru
++    Created     : Sat May 20 17:28:54 MSK 2023
++    Notes       : 
++  ----------------------------------------------------------------------*/
++
++using Progress.Lang.*.
++using ibs.th.gbl.propmap.
++using ibs.th.gbl.TypeMap.
++
++block-level on error undo, throw.
++
++class ibs.th.str.cash.PumpStatus inherits TypeMap: 
++define override public property vss-revision    as character no-undo init "$Revision:$":U get .
++  define override public property vss-author      as character no-undo init "$Author:$":U get.
++  define override public property vss-date        as character no-undo init "$Date:$":U get.
++  define override public property vss-workfile    as character no-undo init "$Workfile:$":U get.
++  define override public property vss-archive     as character no-undo init "$Archive:$":U get.
++  define override public property vss-description as character no-undo init "Справлочник состояния pump" get.
++ 
++   define public property Idle            as class propmap no-undo get. protected set.
++   define public property Unreacable      as class propmap no-undo get. protected set.
++   define public property Inoperative     as class propmap no-undo get. protected set.
++   define public property Closed          as class propmap no-undo get. protected set.
++   define public property Calling         as class propmap no-undo get. protected set.
++   define public property Authorized      as class propmap no-undo get. protected set.
++   define public property Started         as class propmap no-undo get. protected set.
++   define public property Started_susp    as class propmap no-undo get. protected set.
++   define public property Fueling         as class propmap no-undo get. protected set.
++   define public property Fueling_susp    as class propmap no-undo get. protected set.
++   
++   constructor public PumpStatus ():
++      super(). 
++      Idle           = crProp(1,  "Idle",                   "Незанята").
++      Unreacable     = crProp(2,  "Unreacable",             "Недоступна").
++      Inoperative    = crProp(3,  "Inoperative",            "Не работает").
++      Closed         = crProp(4,  "Closed",                 "Закрыта").
++      Calling        = crProp(5,  "Calling",                "Вызов").
++      Authorized     = crProp(6,  "Authorized",             "Авторизована").
++      Started        = crProp(7,  "Started",                "Запущена").
++      Started_susp   = crProp(8,  "Started_susp",           "Приостановлена").
++      Fueling        = crProp(9,  "Fueling",                "Заправка").
++      Fueling_susp   = crProp(10, "Fueling_susp",           "Заправка приостановлена").
++      
++   end.
++end class.
+\ No newline at end of file
+diff --git a/ibs/th/str/cash/ShiftState.cls b/ibs/th/str/cash/ShiftState.cls
+new file mode 100644
+--- /dev/null
++++ b/ibs/th/str/cash/ShiftState.cls
+@@ -0,0 +1,40 @@
++ 
++ /*------------------------------------------------------------------------
++    File        : ShiftState
++    Purpose     : 
++    Syntax      : 
++    Description : 
++    Author(s)   : Daru
++    Created     : Sat May 20 17:22:38 MSK 2023
++    Notes       : 
++  ----------------------------------------------------------------------*/
++
++using Progress.Lang.*.
++using ibs.th.gbl.propmap.
++using ibs.th.gbl.TypeMap.
++
++block-level on error undo, throw.
++
++class ibs.th.str.cash.ShiftState  inherits TypeMap: 
++define override public property vss-revision    as character no-undo init "$Revision:$":U get .
++  define override public property vss-author      as character no-undo init "$Author:$":U get.
++  define override public property vss-date        as character no-undo init "$Date:$":U get.
++  define override public property vss-workfile    as character no-undo init "$Workfile:$":U get.
++  define override public property vss-archive     as character no-undo init "$Archive:$":U get.
++  define override public property vss-description as character no-undo init "Справлочник состояния смены автотанка" get.
++ 
++   define public property Running          as class propmap no-undo get. protected set.
++   define public property Closed           as class propmap no-undo get. protected set.
++   define public property Stopped          as class propmap no-undo get. protected set.
++   define public property DontWork         as class propmap no-undo get. protected set.
++   define public property OK               as class propmap no-undo get. protected set.
++   
++   constructor public ShiftState ():
++      super(). 
++      Running       = crProp(1,  "Running",               "Запущена и открыта").
++      Closed        = crProp(2,  "Closed",                "Закрыта").
++      Stopped       = crProp(3,  "Stopped",               "Остановлена и открыта").
++      DontWork      = crProp(4,  "DontWork",              "Не опрашивается").
++      ok            = crProp(5,  "OK",                    "OK").
++   end.
++end class.
+\ No newline at end of file
+diff --git a/ibs/th/str/closeadnopenshiftproc.p b/ibs/th/str/closeadnopenshiftproc.p
+new file mode 100644
+--- /dev/null
++++ b/ibs/th/str/closeadnopenshiftproc.p
+@@ -0,0 +1,127 @@
++define variable vss-revision    as character no-undo init "$Revision$":U .
++define variable vss-author      as character no-undo init "$Author$":U .
++define variable vss-date        as character no-undo init "$Date$":U .
++define variable vss-workfile    as character no-undo init "$Workfile$":U .
++define variable vss-archive     as character no-undo init "$Archive$":U .
++define variable vss-description as character no-undo init "Процедура для авто закрытия/открытия смены".
++
++define input  parameter iDebugMod as logical no-undo.
++{ adm/auto-def.i }
++{cmp\library.i}
++{ utl/proc-async.i proc_def }
++define variable mDebugMod as logical no-undo.
++mDebugMod = iDebugMod.
++subscribe   to "getObjList" anywhere run-procedure "ObjList".
++subscribe   to "RvsParam" anywhere run-procedure "ParamRvs".
++subscribe   to "SaleParam" anywhere .
++subscribe   to "SaleMakeProc" anywhere .
++subscribe   to "getSocetLog" anywhere .
++
++on delete of this-procedure do:
++   unsubscribe to "getObjList".
++   unsubscribe to "RvsParam".
++   unsubscribe to "SaleParam".
++   unsubscribe to "SaleMakeProc".
++   unsubscribe to "getSocetLog".
++   { utl/proc-async.i proc_end }
++end.
++
++define variable mObjType as character no-undo.
++define variable mOdjCode as integer   no-undo.
++define variable parstate as logical no-undo.
++
++run str/autoobj.p
++        (input  g#auto-user-login
++        ,output mObjType
++        ,output mOdjCode
++        ,output parstate
++        ) .
++if not parstate
++then 
++   return error substitute ("У пользователя &1 нет объекта для входа поумолчанию.", g#auto-user-login).
++
++procedure ObjList:
++   define output parameter oAnswer as char no-undo.
++   oAnswer = substitute("&1*&2",mObjType,mOdjCode).
++end procedure. 
++
++procedure SaleParam:
++   define output parameter oAnswer as char no-undo.
++   oAnswer = "1,,0,400,yes,yes".
++end procedure.
++
++procedure SaleMakeProc:
++   define output parameter oAnswer as char no-undo.
++   oAnswer = "ibs/th/bge/aazs/import/salemake2.p".
++end procedure.
++
++procedure ParamRvs:
++   define output parameter oAnswer as char no-undo.
++/*нулевая сверка,автоматическая*/
++   oAnswer = "no,no".
++end procedure.   
++
++procedure get-userid:
++
++  define output parameter pUserId as character no-undo.
++  assign
++    pUserId = g#auto-user-id.
++    .
++  
++end.
++
++procedure get-db-num:
++  define output parameter p-db-num like ub.sys-ctrl.db-num no-undo.
++  
++  define buffer buf_sys-ctrl for ub.sys-ctrl.
++  find first buf_sys-ctrl no-lock.
++  assign
++    p-db-num = buf_sys-ctrl.db-num
++  .
++  release buf_sys-ctrl.
++
++end.
++
++procedure getSocetLog:
++   define output parameter oLog as character no-undo.
++   if     mAsyncProc:myProcInfo()
++      and mDebugMod
++   then
++      oLog = "Async".
++end.
++
++procedure mainmenu_getcntxt :
++define output parameter p-cntxt-db-num                as integer   no-undo . /* текущая БД            */
++define output parameter p-cntxt-userid                as character no-undo . /* текущий пользователь  */
++define output parameter p-cntxt-level                 as character no-undo . /* уровень контекста     */
++define output parameter p-cntxt-host-code-obj         as integer   no-undo . /* текущая фирма         */
++define output parameter p-cntxt-obj-type              as character no-undo . /* тип текущего объекта  */
++define output parameter p-cntxt-obj-code              as integer   no-undo . /* код текущего объекта  */
++define output parameter p-cntxt-db-num-obj            as integer   no-undo . /* база текущего объекта */
++define output parameter p-cntxt-is-admin              as logical   no-undo . /* база текущего объекта */
++
++  do
++  on error undo, return error return-value
++  :
++  define variable vt-host-code as integer   no-undo .
++
++  { gbl/hostcode.i
++     mObjType
++     mOdjCode
++     vt-host-code
++     }
++ run get-db-num(output p-cntxt-db-num ).
++  assign
++   
++    p-cntxt-userid          =  g#auto-user-id
++    p-cntxt-level           =  "1"
++    p-cntxt-host-code-obj   =  vt-host-code
++    p-cntxt-obj-type        =  mObjType
++    p-cntxt-obj-code        =  mOdjCode
++    p-cntxt-is-admin        =  no
++  .
++
++  end.
++  
++  
++end procedure. /* mainmenu_getcntxt */
+\ No newline at end of file
+diff --git a/ibs/th/str/tso_trg.cls b/ibs/th/str/tso_trg.cls
+new file mode 100644
+--- /dev/null
++++ b/ibs/th/str/tso_trg.cls
+@@ -0,0 +1,938 @@
++ 
++ /*------------------------------------------------------------------------
++    File        : tso_trg
++    Purpose     : 
++    Syntax      : 
++    Description : 
++    Author(s)   : Daru
++    Created     : Sat May 20 10:24:32 MSK 2023
++    Notes       : 
++  ----------------------------------------------------------------------*/
++
++using Progress.Lang.*.
++
++block-level on error undo, throw.
++
++class ibs.th.str.tso_trg: 
++   /*------------------------------------------------------------------------------
++    Purpose:
++    Notes:
++   ------------------------------------------------------------------------------*/
++   define variable parparentproc as handle no-undo.
++   define variable SilentMode    as logical no-undo.
++   
++   { cmp/str-glbl.i class }
++   { ref/tso-tt.i}
++   define variable rid-list-tso as character no-undo.
++   
++   define variable g#dbNum as integer no-undo.
++   define variable mdevice        as class     ibs.th.str.cash.CashDevice
++            no-undo.
++   define variable mShiftState        as class     ibs.th.str.cash.ShiftState no-undo.
++   define variable mPumpStatus        as class     ibs.th.str.cash.PumpStatus no-undo.
++   { utl/proc-async.i proc_log parparentproc}
++   
++   method public void putLog(istr as character ):
++      PutMesAsunc (istr).
++   end.
++   
++   method public void putLogCommand(istr as character ):
++/*      putLog (istr).*/
++   end.
++   
++   method public void putMes(istr as character ):
++      if SilentMode
++      then
++         putLog (istr).
++      else
++         message istr
++            view-as alert-box.
++   end.
++   
++   constructor public tso_trg ():
++      this-object(?).
++      
++   end.
++   
++   constructor public tso_trg (input iparparentproc   as handle):
++      this-object(iparparentproc,no).
++   end.
++   
++   constructor public tso_trg (input iparparentproc   as handle,
++                               input iSilent          as logical  ):
++      super ().
++      parparentproc = iparparentproc.
++      SilentMode = iSilent.
++      run gbl/getdbnum.p (output g#dbNum).
++      
++      mdevice = new ibs.th.str.cash.CashDevice().
++      mShiftState = new ibs.th.str.cash.ShiftState().
++      mPumpStatus = new ibs.th.str.cash.PumpStatus().
++      init-tt({&all},?,?).
++   end constructor.
++
++   destructor public tso_trg ( ):
++      delete object mPumpStatus.
++      delete object mShiftState.
++      delete object mdevice.
++   end destructor.
++   
++   method public handle addSocet (iobjcode as integer, 
++                                  itsonum  as integer,
++                                  iMethod  as character  ):
++      define variable vWorkSocet as logical no-undo.
++      define variable vSocetHand as handle  no-undo.
++      define variable vNum       as integer no-undo.
++      for each tt-tso-socet where tt-tso-socet.obj-code eq iobjcode
++                              and tt-tso-socet.tso-num  eq itsonum: 
++         if not valid-handle(tt-tso-socet.tso-socet)
++         then do:
++            run bge/socet.p persistent set tt-tso-socet.tso-socet.
++            run setParam in tt-tso-socet.tso-socet ("addtimeOut","false").
++            run setParam in tt-tso-socet.tso-socet ("timeOut","5").
++         end.
++         run IsWorkSocet in tt-tso-socet.tso-socet (output vWorkSocet).
++         if not vWorkSocet
++         then do:
++            tt-tso-socet.tsomethodresp = iMethod.
++            return tt-tso-socet.tso-socet.
++         end.
++         vNum = tt-tso-socet.socet-num.
++      end.
++      vNum = vNum + 1.
++      if vNum > 1000
++      then
++         return error.
++      create tt-tso-socet.
++      assign
++         tt-tso-socet.obj-code      = iobjcode
++         tt-tso-socet.tso-num       = itsonum
++         tt-tso-socet.socet-num     = vNum
++         tt-tso-socet.tsomethodresp = iMethod
++      .
++      run bge/socet.p persistent set tt-tso-socet.tso-socet.
++      run setParam in tt-tso-socet.tso-socet ("addtimeOut","false").
++      run setParam in tt-tso-socet.tso-socet ("timeOut","5").
++      return tt-tso-socet.tso-socet.
++   end.
++   
++   method public void delSocet ():
++      for each tt-tso-socet : 
++         if valid-handle(tt-tso-socet.tso-socet)
++         then do:
++            def var libobjhndl as handle no-undo.
++            libobjhndl = tt-tso-socet.tso-socet.
++            apply 'delete' to libobjhndl.
++            delete procedure libobjhndl.
++         end.
++      end.
++   end.
++   
++   &scop xml-cmd-stat '<?xml version="1.0" encoding="UTF-8"?>~
++<control type="REQUEST">~
++  <Status ctrl="READ">~
++    <PumpStatus></PumpStatus>~
++    <PosStatus></PosStatus>~
++    <FiscalStatus></FiscalStatus>~
++    <ShiftStatus></ShiftStatus>~
++    <StatCashier></StatCashier>~
++  </Status>~
++</control>'
++
++&scop xml-cmd-open-shift '<?xml version="1.0" encoding="UTF-8"?>~
++<control type="REQUEST">~
++  <Command ctrl="ADD">~
++    <CommType>tsoOperate</CommType>~
++    <CommValue>shift_open</CommValue>~
++    <CashierCode>&1</CashierCode>~
++    <ShiftNumber>&2</ShiftNumber>~
++  </Command>~
++</control>'
++
++&scop xml-cmd-other '<?xml version="1.0" encoding="UTF-8"?>~
++<control type="REQUEST">~
++  <Command ctrl="ADD">~
++    <CommType>tsoOperate</CommType>~
++    <CommValue>&1</CommValue>~
++    <CashierCode>&2</CashierCode>~
++  </Command>~
++</control>'
++   
++
++
++   define variable mCashier as integer no-undo.
++   method public integer setFirstStaff():
++      define buffer X_staff for staff.
++      define variable v-today as date no-undo .
++      define variable v-time as integer no-undo .
++      v-today = today.
++        
++      for each X_staff no-lock where 
++                               X_staff.role = {&role-cashier}
++                           and X_staff.db-num = g#dbNum
++                           and X_staff.date-end >= v-today:
++         mCashier = X_staff.staff-code.
++         return mCashier.
++      end.
++      putLog(substitute ("Выбран кассир &1",mCashier)).
++   end.
++   
++   method public integer changeCashier ():
++      define variable cash-recids as character no-undo.
++      define buffer staff for ub.staff.
++      define variable ii as integer no-undo.
++      mCashier = ?.
++      run ref/staffs.w ( input parparentproc
++                 , input "b-sel"
++                 , input {&role-cashier}
++                 , input (if g#dbNum= 0 then ? else g#dbNum)
++                 , input 0
++                 , output cash-recids ) .
++      if cash-recids = "" then do:
++      end.
++      else do:
++         do ii = 1 to num-entries( cash-recids ) :
++            find first staff no-lock where
++                        recid( staff ) = integer( entry( ii, cash-recids ) ) .
++            mCashier = ub.staff.staff-code .
++         end.                
++      end.
++      putLog(substitute ("Выбран кассир &1",mCashier)).
++      return mCashier.
++   end.
++   
++   method public logical openShift():
++      return openShift(mCashier,"#NextShift#").
++   end.
++   
++   method public logical openShift(icashier as int):
++      if icashier = ? or icashier <= 0
++      then do :
++         putmes( "Сначала выберите кассира" ).
++         return no.
++      end.
++  
++      define variable v-shift-num as integer no-undo .
++      define variable v-ok as logical no-undo .
++  
++      run ref/tso-shift.w (input parparentproc,
++                       output v-shift-num,
++                       output v-ok) .
++      if not v-ok
++      then do :
++         return no.
++      end.
++      return openShift(icashier,string(v-shift-num)).
++   end.
++  
++   method public logical openShift(icashier as int, iShiftNum as character ):
++      return openShift(icashier,iShiftNum,rid-list-tso).
++   end.
++   
++   method public logical openShift(icashier as int, iShiftNum as character , rid-list as character ):
++      define variable v-command as character no-undo.
++      if icashier = ? or icashier <= 0
++      then do :
++         putmes( "Сначала выберите кассира" ) .
++         return no.
++      end.
++      if iShiftNum eq ? or trim(iShiftNum) eq  ""
++      then do :
++         putmes( "Смена не должна быть пустой" ) .
++         return no.
++      end.
++      else if iShiftNum ne  "#NextShift#"
++      then do:
++         iShiftNum = trim(iShiftNum).
++         define variable vShiftNum as integer no-undo.
++         vShiftNum = integer (iShiftNum) no-error.
++         if error-status:error
++         then do:
++            putmes( "Смена не должна быть пустой" ) .
++            return no.
++         end.
++         else if vShiftNum <= 0
++         then do:
++            putmes( "Смена не должна быть больше нуля" ) .
++            return no.
++         end.
++            
++      end.
++      else do:
++         v-command = "updCommand#".
++      end.
++      
++      v-command = v-command + substitute({&xml-cmd-open-shift}, icashier, iShiftNum). 
++      sendTsoCommand(v-command,?,?, no).
++      return yes.
++   end.
++   
++   method public logical closeShift():
++      return closeShift(mCashier,rid-list-tso).
++   end.
++   
++   method public logical closeShift(icashier as int, rid-list as character ):
++      if icashier = ? or icashier <= 0
++      then do :
++         putmes( "Сначала выберите кассира" ) .
++         return no.
++      end.
++      
++      define variable v-command as character no-undo.
++      
++      v-command = substitute({&xml-cmd-other}, "shift_close", icashier) . 
++      sendTsoCommand(v-command, ?, rid-list).
++      return yes.
++   end.
++   
++   method public logical startShift():
++      return startShift(mCashier,rid-list-tso).
++   end.
++   
++   method public logical startShift(icashier as int, rid-list as character ):
++      if icashier = ? or icashier <= 0
++      then do :
++         putmes( "Сначала выберите кассира" ) .
++         return no.
++      end.
++      
++      define variable v-command as character no-undo.
++      
++      v-command = substitute({&xml-cmd-other}, "shift_start", icashier) . 
++      sendTsoCommand(v-command,?, rid-list).
++      return yes.
++   end.
++   
++   method public logical stopShift():
++      return stopShift(mCashier,rid-list-tso).
++   end.
++   
++   method public logical stopShift(icashier as int, rid-list as character ):
++      if icashier = ? or icashier <= 0
++      then do :
++         putmes( "Сначала выберите кассира" ) .
++         return no.
++      end.
++      
++      define variable v-command as character no-undo.
++      
++      v-command = substitute({&xml-cmd-other}, "shift_stop", icashier). 
++      sendTsoCommand(v-command,?, rid-list).
++      return yes.
++   end.
++   
++   method public logical zShift():
++      return zShift(mCashier,rid-list-tso).
++   end.
++   
++   method public logical zShift(icashier as int, rid-list as character ):
++      if icashier = ? or icashier <= 0
++      then do :
++         putmes( "Сначала выберите кассира" ) .
++         return no.
++      end.
++      
++      define variable v-command as character no-undo.
++      
++      v-command = substitute({&xml-cmd-other}, "print_z_report", icashier).
++      sendTsoCommand(v-command,?, rid-list).
++      return yes.
++   end.
++   
++   method public void sendTsoCommand(v-command as character ):
++      sendTsoCommand(v-command,?,?).
++   end.
++   
++   method public void sendTsoCommand(v-command as character,imethod as character ):
++      sendTsoCommand(v-command,imethod,?).
++   end.
++   method public void sendTsoCommand(v-command as character ,imethod as character, rid-list as character ):
++      sendTsoCommand(v-command,imethod, rid-list ,yes).
++   end.
++   define variable mObjType as character no-undo init {&shop}.
++   define variable mObjCode as integer no-undo.
++   method public void sendTsoCommand(icommand as character ,imethod as character, rid-list as character, iSendRun as logical ):
++      define variable ii as integer no-undo.
++      define buffer tt-tso for tt-tso.
++      define variable vSocet as handle no-undo.
++      define variable vWiatresp as logical   no-undo.
++      define variable v-command as character no-undo.
++      vWiatresp = imethod ne "" and imethod ne ?.
++      if trim(rid-list) > ""
++      then do :
++         block-tso-rec:
++         do ii = 1 to num-entries(rid-list) :
++            find first tt-tso no-lock where recid(tt-tso) = integer( entry( ii, rid-list ) ) .
++            if    (    not iSendRun
++                    and  (   tt-tso.ShiftState = mShiftState:Running :NameProp 
++                          or tt-tso.ShiftState = mShiftState:ok      :NameProp )
++                  )
++               or tt-tso.ShiftState = mShiftState:DontWork:NameProp 
++            then 
++               next block-tso-rec.
++            mObjCode = tt-tso.obj-code.
++            if icommand begins "updCommand#"
++            then
++               v-command = UpdCommand(substring (icommand,12)).
++            else
++               v-command = icommand.
++            vSocet = addSocet(tt-tso.obj-code, tt-tso.tso-num,imethod).
++            if valid-handle (vSocet)
++            then do:
++               SendRec(
++                    vSocet,
++                    tt-tso.tso-host,
++                    tt-tso.tso-port,
++                    v-command,
++                    substitute ("Отправка команды на ТСО/заправщике &1. ",tt-tso.tso-addr),
++                    vWiatresp
++                    ).
++               putLogCommand(substitute ("Отправка команды на ТСО/заправщике &1: &2&3",tt-tso.tso-addr,{&new-line},v-command)).
++            end.
++         end.      
++      end.
++      else do :
++         block-tso:
++         for each tt-tso no-lock :
++            if     (    not iSendRun
++                    and  (   tt-tso.ShiftState = mShiftState:Running :NameProp 
++                          or tt-tso.ShiftState = mShiftState:ok      :NameProp )
++                  )
++               or tt-tso.ShiftState = mShiftState:DontWork:NameProp 
++            then 
++               next block-tso.
++            mObjCode = tt-tso.obj-code.
++            if icommand begins "updCommand#"
++            then
++               v-command = UpdCommand(substring (icommand,12)).
++            else
++               v-command = icommand.
++            
++            vSocet = addSocet(tt-tso.obj-code, tt-tso.tso-num,imethod).
++            if valid-handle (vSocet)
++            then do:
++               SendRec(
++                    vSocet,
++                    tt-tso.tso-host,
++                    tt-tso.tso-port,
++                    v-command,
++                    substitute ("Отправка команды на ТСО/заправщике &1. ",tt-tso.tso-addr),
++                    vWiatresp
++                    ).
++               putLogCommand(substitute ("Отправка команды на ТСО/заправщике &1: &2&3",tt-tso.tso-addr,{&new-line},v-command)).
++            end.
++         end.
++      end.
++   end.
++   
++   method public void SendRec(isocetHandle as handle,
++                              iHost        as character,
++                              iPort        as integer, 
++                              iCommand     as longchar, 
++                              iTitle as character,
++                              iWaitResp as logical ):
++      run SendReqSocet in isocetHandle
++                 (iHost, 
++                  iPort, 
++                  "", 
++                  iCommand, 
++                  "http", 
++                  'getResponse').
++      if not iWaitResp
++      then
++         run Disconect in isocetHandle.
++   end.
++   
++   method public void tso-send-Stat() :
++      sendTsoCommand({&xml-cmd-stat},"parse-xml").
++   end.
++   
++   method public logical waitReadSts ():
++      define variable vi as int64 no-undo.
++      do while tso-read-sts ():
++         vi = vi + 1.
++      end.
++   end.
++   
++   method public logical tso-read-sts ():
++      define buffer tt-tso-socet for tt-tso-socet.
++/*      define buffer tt-tso       for tt-tso.*/
++      define variable isRef as logical no-undo.
++      define variable vWorkSocet as logical no-undo.
++      define variable isWork as logical no-undo.
++      for each tt-tso-socet:
++         run IsWorkSocet in tt-tso-socet.tso-socet (output vWorkSocet).
++         if vWorkSocet
++         then do:
++            run WaitRespTestStop in tt-tso-socet.tso-socet.
++            run isEndWork in tt-tso-socet.tso-socet (output vWorkSocet).
++            if vWorkSocet
++            then do:
++               define variable vResult as memptr no-undo.
++               if     tt-tso-socet.tsomethodresp ne ""
++                  and tt-tso-socet.tsomethodresp ne ?
++               then do:
++                  find first tt-tso where tt-tso.obj-code eq tt-tso-socet.obj-code
++                                      and tt-tso.tso-num  eq tt-tso-socet.tso-num
++                  no-lock.
++                  tt-tso.FiscalStatus = "НЕ ОТВЕЧАЕТ" .
++                  run getResponceMemptr in tt-tso-socet.tso-socet (output vResult).
++                  if     vResult ne ?
++                  then do:
++                     define variable vreslong as longchar no-undo.
++                     copy-lob from  object vResult to vreslong.
++                     putLogCommand(substitute ("Получен ответ от ТСО/заправщике &1. &2",tt-tso.tso-addr,vreslong)).
++                     dynamic-invoke (this-object,tt-tso-socet.tsomethodresp,vResult) no-error.
++                     if error-status:error
++                     then
++                        tt-tso.FiscalStatus = "Плохой ответ" .
++                     putLog(substitute ("Статус ТСО/заправщике &4 &1: &2 &3 &5",tt-tso.tso-addr,tt-tso.FiscalStatus,tt-tso.PosStatus,tt-tso.tso-num, tt-tso.ShiftState)).
++                  end.
++                  else do:
++                     
++                  end.
++                  tt-tso-socet.tsomethodresp = "".
++                  isRef = yes.
++               end.
++            end.
++            else 
++               isWork = yes.
++         end.
++         else if     tt-tso-socet.tsomethodresp ne ""
++                 and tt-tso-socet.tsomethodresp ne ?
++         then do:
++            tt-tso-socet.tsomethodresp = "".
++            find first tt-tso where tt-tso.obj-code eq tt-tso-socet.obj-code
++                                      and tt-tso.tso-num  eq tt-tso-socet.tso-num
++                  no-lock.
++                 
++            tt-tso.FiscalStatus        = "НЕ ОТВЕЧАЕТ" .
++            isRef = yes.
++         end.
++         
++      end.
++      if isRef
++      then
++         refrash().
++      return isWork.
++   end. 
++   
++   method public void parse-xml (iMemptr as memptr):
++      define variable hDoc as handle no-undo.
++      define variable hRoot as handle no-undo.
++      create  x-document hDoc.
++      create  x-noderef  hRoot.
++     
++      hDoc:load("memptr",iMemptr,false) no-error.
++      if error-status:error
++      then do:
++         return error.
++      end.
++      hDoc:get-document-element(hRoot).
++      
++      getChildren(hRoot, 1).
++      delete object hDoc.
++      delete object hRoot.
++  
++   end .
++   define variable v-parsesub as character no-undo.
++   method public void getChildren(hParent as handle,level as integer):
++      define variable hNoderef as handle no-undo.
++      define variable hText    as handle no-undo.
++      define variable vi as integer no-undo.
++      define variable good as logical no-undo.
++      
++      create x-noderef hNoderef.
++      create x-noderef hText .
++      
++      block-pars:
++      repeat vi = 1 to hParent:num-children:
++         good = hParent:get-child(hNoderef,vi).
++         if not good 
++         then 
++            leave block-pars.
++         if hNoderef:subtype <> "element" 
++         then
++            next block-pars.
++    
++         hNoderef:get-child(hText, 1) no-error .    
++    
++        
++         if hNoderef:name = "PumpStatus"
++         then do :
++            v-parsesub = "Pump" .
++            find first tt-pump exclusive-lock where 
++                       tt-pump.pump-code = integer(hNoderef:get-attribute("num")) 
++                   and tt-pump.obj-type  = mObjType
++                   and tt-pump.obj-code  = mObjCode
++            no-error .
++         end.
++    
++         if      hNoderef:name = "PosStatus"
++         then 
++            tt-tso.PosStatus = hText:node-value no-error .
++         else if hNoderef:name = "FiscalStatus" 
++         then 
++            v-parsesub = "Fiscal" .
++         else if hNoderef:name = "ShiftState"
++         then do :
++            tt-tso.ShiftBegin = hNoderef:get-attribute("begin") no-error .
++            tt-tso.ShiftNum   = integer(hNoderef:get-attribute("num")) no-error .
++            tt-tso.ShiftState = hText:node-value no-error .
++            putLog(substitute ("Статус ТСО/заправщике tt-tso.ShiftState - &4 &3 &1: &2 ",tt-tso.tso-addr,tt-tso.ShiftState,tt-tso.tso-num,tt-tso.obj-code)).
++         end.
++         else if hNoderef:name = "StatCashier" 
++         then 
++            tt-tso.CashierNum = integer(hText:node-value) no-error .
++         else if hNoderef:name = "State"
++         then do :
++            case v-parsesub :
++               when "Pump"
++               then do :
++                  if available tt-pump
++                  then
++                     tt-pump.status_ = hText:node-value no-error .
++               end.
++               when "Fiscal"
++               then do:
++                  tt-tso.FiscalStatus = hText:node-value no-error .
++                  putLog(substitute ("Статус ТСО/заправщике fiscal - &4 &3 &1: &2 ",tt-tso.tso-addr,tt-tso.FiscalStatus,tt-tso.tso-num,tt-tso.obj-code)).
++               end.
++            end case .
++         end.
++         else if      hNoderef:name = "ErrorText"
++                  and v-parsesub = "Fiscal"
++                  and tt-tso.FiscalStatus = "Error"
++         then
++            tt-tso.FiscalStatus = hText:node-value no-error .
++         else if hNoderef:name = "LastZreportDate" 
++         then
++            tt-tso.zReportDate = hText:node-value no-error .
++         else if hNoderef:name = "QueueSize" 
++         then 
++            tt-tso.FiscalQueue = integer(hText:node-value) no-error .
++         else if     hNoderef:name = "NumTrans"
++                 and available tt-pump
++         then
++            tt-pump.numTr = integer(hText:node-value) no-error .
++         GetChildren(hNoderef, (level + 1)).
++      end.
++      delete object hNoderef.
++      delete object hText.
++   end.
++
++   method public void init-tt (iparref-mode as character,iObjType as character, iObjCode as integer ) :
++      define buffer buf_cash-desk-attr for ub.cash-desk-attr.
++      define buffer buf_cash-desk      for ub.cash-desk.
++      define buffer buf_pump           for ub.pump.
++      define buffer buf_clients        for ub.clients.
++      define buffer tt-tso for tt-tso.
++      case iparref-mode:
++         when {&all} then do:
++            for each buf_cash-desk-attr no-lock where ( buf_cash-desk-attr.attr-code          = "device-kind":U
++                                                  and buf_cash-desk-attr.attr-value-integer = mdevice:TCOAGC:KeyInt)
++                                                  or 
++                                                     ( buf_cash-desk-attr.attr-code          = "device-kind":U
++                                                  and buf_cash-desk-attr.attr-value-integer = mdevice:Tanker:KeyInt):
++               find first buf_cash-desk no-lock where buf_cash-desk.db-num   = buf_cash-desk-attr.db-num
++                                           and buf_cash-desk.obj-code = buf_cash-desk-attr.obj-code
++                                           and buf_cash-desk.pos-type = buf_cash-desk-attr.pos-type
++                                           and buf_cash-desk.cash-num = buf_cash-desk-attr.cash-num
++                                           and buf_cash-desk.is-del   = no 
++                                           no-error .
++               if available buf_cash-desk
++               then do :
++                  create tt-tso.
++                  assign
++                     tt-tso.db-num       = buf_cash-desk.db-num
++                     tt-tso.obj-code     = buf_cash-desk.obj-code
++                     tt-tso.tso-num      = buf_cash-desk.cash-num
++                     tt-tso.tso-addr     = replace(buf_cash-desk.addr-path, {&delim-par}, '://')
++                     tt-tso.tso-host     = entry(1,entry(2,buf_cash-desk.addr-path, {&delim-par}),":")
++                     tt-tso.tso-port     = int(entry(2,entry(2,buf_cash-desk.addr-path, {&delim-par}),":"))
++                     tt-tso.Tso-protocol = entry(1,buf_cash-desk.addr-path, {&delim-par})
++                     
++                  .
++                  if not buf_cash-desk.cash-on
++                  then
++                     tt-tso.ShiftState      = mShiftState:DontWork:NameProp.
++               end.                                                           
++            end.  
++            for each buf_pump no-lock :
++               create tt-pump .
++               assign
++                  tt-pump.pump-code = buf_pump.pump-code
++                  tt-pump.obj-type  = buf_pump.obj-type
++                  tt-pump.obj-code  = buf_pump.obj-code
++               .
++            end.
++         end. /*when {&all} then do:*/
++         when {&g___object} then do:
++            for each buf_cash-desk-attr no-lock where (buf_cash-desk-attr.obj-code = iObjCode
++                                            and buf_cash-desk-attr.attr-code = "device-kind"   
++                                            and buf_cash-desk-attr.attr-value-integer = mdevice:TCOAGC:KeyInt)
++                                            or
++                                            (buf_cash-desk-attr.obj-code = iObjCode
++                                            and buf_cash-desk-attr.attr-code = "device-kind"   
++                                            and buf_cash-desk-attr.attr-value-integer = mdevice:Tanker:KeyInt) :
++               find first buf_cash-desk no-lock where buf_cash-desk.db-num   = buf_cash-desk-attr.db-num
++                                           and buf_cash-desk.obj-code = buf_cash-desk-attr.obj-code
++                                           and buf_cash-desk.pos-type = buf_cash-desk-attr.pos-type
++                                           and buf_cash-desk.cash-num = buf_cash-desk-attr.cash-num
++                                           and buf_cash-desk.is-del   = no 
++                                           no-error .
++               if available buf_cash-desk
++               then do :
++                  create tt-tso.
++                  assign
++                     tt-tso.db-num       = buf_cash-desk.db-num
++                     tt-tso.obj-code     = buf_cash-desk.obj-code
++                     tt-tso.tso-num      = buf_cash-desk.cash-num
++                     tt-tso.tso-addr     = replace(buf_cash-desk.addr-path, {&delim-par}, '://')
++                     tt-tso.tso-host     = entry(1,entry(2,buf_cash-desk.addr-path, {&delim-par}),":")
++                     tt-tso.tso-port     = int(entry(2,entry(2,buf_cash-desk.addr-path, {&delim-par}),":"))
++                     tt-tso.Tso-protocol = entry(1,buf_cash-desk.addr-path, {&delim-par})
++                  .
++                  if not buf_cash-desk.cash-on
++                  then
++                     tt-tso.ShiftState      = mShiftState:DontWork:NameProp.
++               end.                                                           
++            end. 
++            for each buf_pump no-lock where buf_pump.obj-type = iobjtype
++                                        and buf_pump.obj-code = iobjcode :
++               create tt-pump .
++               assign
++                  tt-pump.pump-code = buf_pump.pump-code
++                  tt-pump.obj-type  = buf_pump.obj-type
++                  tt-pump.obj-code  = buf_pump.obj-code
++               .
++            end.
++         end.
++         when "db":U then do:
++            for each buf_cash-desk-attr no-lock where (buf_cash-desk-attr.db-num = g#dbNum
++                                            and buf_cash-desk-attr.attr-code = "device-kind"
++                                            and buf_cash-desk-attr.attr-value-integer = mdevice:TCOAGC:KeyInt)
++                                            or
++                                               (buf_cash-desk-attr.db-num = g#dbNum
++                                            and buf_cash-desk-attr.attr-code = "device-kind"
++                                            and buf_cash-desk-attr.attr-value-integer = mdevice:Tanker:KeyInt)  :
++               find first buf_cash-desk no-lock where buf_cash-desk.db-num   = buf_cash-desk-attr.db-num
++                                           and buf_cash-desk.obj-code = buf_cash-desk-attr.obj-code
++                                           and buf_cash-desk.pos-type = buf_cash-desk-attr.pos-type
++                                           and buf_cash-desk.cash-num = buf_cash-desk-attr.cash-num
++                                           and buf_cash-desk.is-del   = no 
++                                           no-error .
++               if available buf_cash-desk
++               then do :
++                  create tt-tso.
++                  assign
++                     tt-tso.db-num       = buf_cash-desk.db-num
++                     tt-tso.obj-code     = buf_cash-desk.obj-code
++                     tt-tso.tso-num      = buf_cash-desk.cash-num
++                     tt-tso.tso-addr     = replace(buf_cash-desk.addr-path, {&delim-par}, '://')
++                     tt-tso.tso-addr     = entry(1,entry(2,buf_cash-desk.addr-path, {&delim-par}),":")
++                     tt-tso.tso-port     = int(entry(2,entry(2,buf_cash-desk.addr-path, {&delim-par}),":"))
++                     tt-tso.Tso-protocol = entry(1,buf_cash-desk.addr-path, {&delim-par})
++                  .
++                  if not buf_cash-desk.cash-on
++                  then
++                     tt-tso.ShiftState      = mShiftState:DontWork:NameProp.
++               end.                                                           
++            end.  
++            for each buf_clients no-lock where buf_clients.db-num = g#dbNum :
++               for each buf_pump no-lock where buf_pump.obj-type = buf_clients.obj-type
++                                           and buf_pump.obj-code = buf_clients.obj-code :
++                  create tt-pump .
++                  assign
++                     tt-pump.pump-code = buf_pump.pump-code
++                     tt-pump.obj-type  = buf_pump.obj-type
++                     tt-pump.obj-code  = buf_pump.obj-code
++                  .
++               end.
++            end.                                      
++         end.
++      end case.
++   end.
++   
++   method public handle getQuery (input iNameQuery as character ) :
++        return getQuery(iNameQuery,no).
++   end.
++    define temp-table tt-query no-undo
++      field NameQuery as character 
++      field hQuery    as handle
++  index NameQuery NameQuery.
++  
++   method public handle getQuery (input iNameQuery as character,input iNewQuery as logical ) :
++      define variable hQuery   as handle  no-undo .
++      define variable vfirst   as logical no-undo init yes.
++      define variable vOpen    as logical no-undo init yes.
++      define variable vTblName as character no-undo .
++      define variable vOpenStr as character no-undo .
++    
++      find first tt-Query where tt-Query.NameQuery eq iNameQuery
++        no-error.
++      if     available tt-Query
++         and iNewQuery
++      then do:
++         delete object tt-Query.hQuery.
++         delete tt-Query.
++      end.      
++      if not available tt-Query
++      then 
++      do: 
++          create query hQuery.
++      end.
++      else
++         hQuery = tt-Query.hQuery.
++          
++          case iNameQuery:
++              when "tso"
++              then do:
++                  hQuery:set-buffers(buffer tt-tso:HANDLE). 
++                  hQuery:query-prepare("FOR EACH tt-tso by tt-tso.ShiftState"). 
++              end.
++             
++              when "pump"
++              then do:
++                 hQuery:set-buffers(buffer tt-pump:HANDLE). 
++                 hQuery:query-prepare("FOR EACH tt-pump ").
++              end.                   
++          end case.
++          if vOpen
++          then do:
++             hQuery:query-open.
++
++             if vFirst 
++             then
++                 hQuery:get-first () no-error .
++          end.
++              
++          if not available tt-Query
++          then 
++          do: 
++             create tt-Query.
++          
++          assign
++              tt-Query.NameQuery = iNameQuery
++              
++              tt-Query.hQuery    = hQuery
++          .         
++      end.
++      return hQuery.
++    end.
++   
++   method public void setTable(input iHandleSet as handle):
++      run settabletso  in iHandleSet (input table tt-tso).
++      run setTablePump in iHandleSet (input table tt-pump).
++   end.
++   
++   method public void markStr():
++      define variable vqry as handle no-undo.
++      if available tt-tso
++      then do:
++         define variable vrowid as rowid no-undo.
++         vrowid = rowid(tt-tso).
++         { gbl/markstrn.i tt-tso rid-list-tso }
++         vqry = getQuery("tso").
++         vqry:reposition-to-rowid(vrowid).
++         vqry:get-next().
++         if available tt-tso
++         then
++            vrowid = rowid(tt-tso).
++         vqry:reposition-to-rowid(vrowid).
++      end.
++      
++   end.
++   
++   method public character  isMark():
++      return ( if lookup( string( recid(tt-tso)), rid-list-tso ) > 0 then '*' else '':U ).
++   end.
++   
++   method public void refrash():
++      define variable vqry as handle no-undo.
++      define variable vrowid as rowid no-undo.
++         
++      if available tt-tso
++      then do:
++         vrowid = rowid(tt-tso).
++         vqry = getQuery("tso").
++         vqry:reposition-to-rowid(vrowid).
++      end.
++      else
++         getQuery("tso").
++      if available tt-pump
++      then do:
++         vrowid = rowid(tt-pump).
++         vqry = getQuery("pump").
++         vqry:reposition-to-rowid(vrowid).
++      end.
++      else
++         getQuery("pump").
++   end.
++   
++   method public char getShiftStateLable():
++      return if available tt-tso then getShiftStateLable(tt-tso.ShiftState) else "".
++   end.
++   
++   method public char getShiftStateLable(iShiftState as character ):
++      return mShiftState:GetLabel(iShiftState).
++   end.
++   
++   method public char getmPumpStatusLable():
++      return if available tt-pump then getmPumpStatusLable(tt-pump.status_) else "".
++   end.
++   
++   method public char getmPumpStatusLable(iPumpState as character ):
++      return mPumpStatus:GetLabel(iPumpState).
++   end.
++      
++   method public logical AllTsoInSts(iStsList as character):
++      define buffer tt-tso for tt-tso.
++      putLog(substitute ("Проверяем статус смены ТСО/заправщике  &1",iStsList)).
++            
++      for each tt-tso where tt-tso.ShiftState ne mShiftState:DontWork:NameProp: 
++         if lookup(tt-tso.ShiftState,iStsList) eq 0
++         then do:
++            putLog(substitute ("Статуса нет в списке ТСО/заправщике &1: '&2'",tt-tso.tso-addr,tt-tso.ShiftState)).
++            
++            return no.
++         end.
++      end.
++      return yes.
++   end.
++   method public logical oneTsoInSts(iStsList as character):
++      define buffer tt-tso for tt-tso.
++      
++      for each tt-tso where tt-tso.ShiftState ne mShiftState:DontWork:NameProp:
++         if lookup(tt-tso.ShiftState,iStsList) ne 0
++         then
++            return yes.
++      end.
++      return no.
++   end.
++   
++   method public character  updCommand(icommand as character  ):
++      define buffer shift-obj         for ub.shift-obj .
++      define variable s-num as integer no-undo.
++      find last shift-obj where
++                shift-obj.obj-type   = mObjType 
++           and  shift-obj.obj-code   = mObjCode 
++           and  shift-obj.shift-date = today
++      no-error.
++      if     available shift-obj
++         and shift-obj.status_     ne {&sht-expected}
++      then  
++         s-num  = shift-obj.shift-num  + 1.
++      else do:
++         find first shift-obj where
++                   shift-obj.obj-type   = mObjType 
++              and  shift-obj.obj-code   = mObjCode 
++              and  shift-obj.shift-date = today
++              and  shift-obj.status_    = {&sht-expected}
++         no-error.
++         s-num  = (if available shift-obj then shift-obj.shift-num else 1).
++      end.
++      icommand = replace(icommand,"#NextShift#",string(s-num)).
++      return icommand.
++   end.
++end class.
+\ No newline at end of file
+diff --git a/ref/tso-ctrl.w b/ref/tso-ctrl.w
+--- a/ref/tso-ctrl.w
++++ b/ref/tso-ctrl.w
+@@ -31,104 +31,17 @@ define input parameter parref-mode as ch
+ 
+ { gbl/getcntxt.i def }
+ { cmp/str-glbl.i }
+-{ gbl/cd-attr.i  }
+ { gbl/windows.i  }
+-{ gbl/runrepid.i }
+-{ cmp/mrk-strf.i }
+-
+ 
+-&scop xml-cmd-stat '<?xml version="1.0" encoding="UTF-8"?>~
+-<control type="REQUEST">~
+-  <Status ctrl="READ">~
+-    <PumpStatus></PumpStatus>~
+-    <PosStatus></PosStatus>~
+-    <FiscalStatus></FiscalStatus>~
+-    <ShiftStatus></ShiftStatus>~
+-    <StatCashier></StatCashier>~
+-  </Status>~
+-</control>'
+-
+-&scop xml-cmd-open-shift '<?xml version="1.0" encoding="UTF-8"?>~
+-<control type="REQUEST">~
+-  <Command ctrl="ADD">~
+-    <CommType>tsoOperate</CommType>~
+-    <CommValue>shift_open</CommValue>~
+-    <CashierCode>&1</CashierCode>~
+-    <ShiftNumber>&2</ShiftNumber>~
+-  </Command>~
+-</control>'
++{ ref/tso-tt.i}
+ 
+-&scop xml-cmd-other '<?xml version="1.0" encoding="UTF-8"?>~
+-<control type="REQUEST">~
+-  <Command ctrl="ADD">~
+-    <CommType>tsoOperate</CommType>~
+-    <CommValue>&1</CommValue>~
+-    <CashierCode>&2</CashierCode>~
+-  </Command>~
+-</control>'
++define variable mtrg as ibs.th.str.tso_trg no-undo.
+ 
+-define temp-table tt-tso no-undo
+-  field db-num        as integer
+-  field obj-code      as integer
+-  field tso-num       as integer
+-  field tso-addr      as character
+-  field PosStatus     as character
+-  field FiscalStatus  as character
+-  field zReportDate   as character
+-  field FiscalQueue   as integer
+-  field ShiftNum      as integer
+-  field ShiftState    as character
+-  field ShiftBegin    as character
+-  field CashierNum    as integer
+-  index pi as primary unique
+-    tso-num obj-code
+-.
+-
+-define temp-table tt-pump no-undo
+-  field pump-code   as integer
+-  field obj-type    as character
+-  field obj-code    as integer 
+-  field status_     as character
+-  field numTr       as integer
+-  index pi as primary unique
+-    pump-code obj-type obj-code
+-.
+-
+-define temp-table tt-pids no-undo
+-  field pid as integer
+-  index pi as primary unique
+-    pid
+-.
++mtrg = new ibs.th.str.tso_trg(parparentproc).
+ 
+ define variable log-exit          as logical    no-undo .
+-define variable curl-path         as character  no-undo .
+-define variable v-post-file-name  as character  no-undo .
+-define variable v-cmd-file-name   as character  no-undo .
+-define variable v-command         as character  no-undo .
+-define variable v-out-str         as character  no-undo .
+-define variable v-pid-list        as character  no-undo .
+-define variable v-time-str        as character  no-undo .
+-define variable v-del-file        as character  no-undo .
+ 
+-define variable v-parsesub        as character  no-undo .
+-define variable hDoc              as handle     no-undo .
+-define variable hRoot             as handle     no-undo .
+-define variable good              as logical    no-undo .
+-
+-define variable v-temp-dir        as character  no-undo .
+-
+-define variable rv                as integer    no-undo .
+-
+-define variable cash-recids       as character  no-undo .
+-define variable ii                as integer    no-undo .
+-
+-define variable rid-list          as character  no-undo .
+-
+-define buffer buf_cash-desk for ub.cash-desk .
+-define buffer buf_cash-desk-attr for ub.cash-desk-attr .
+-define buffer buf_clients for ub.clients .
+-define buffer buf_pump for ub.pump .
+-
++define variable v-time-str        as character no-undo.
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+@@ -204,37 +117,40 @@ DEFINE VARIABLE f-cashier AS INTEGER FOR
+ DEFINE BUTTON b-mark
+      LABEL "&*"
+      SIZE 3 BY 1.
+-
++DEFINE BUTTON b-help 
++     LABEL "Помощь" 
++     SIZE 18 BY 1
++     BGCOLOR 8 .
+ 
+ define query br-tso for tt-tso scrolling .
+-
++/*query br-tso :handle = br-tso-hend.*/
+ define browse br-tso
+   query br-tso no-lock display
+-    mark-string ( INPUT RECID( tt-tso ), INPUT rid-list) format "X(1)" label "*"
++    mtrg:isMark() format "*/"
+     tt-tso.db-num format "999" label "БД"
+     tt-tso.obj-code format "99999" label "Магазин"
+     tt-tso.tso-num format ">>>>9" label "№ ТСО"
+     tt-tso.tso-addr format "X(27)" label "Адрес ТСО"
+ /*    tt-tso.PosStatus format "X(11)" label "Статус ТСО"*/
+-    tt-tso.FiscalStatus format "X(11)" label "Статус ФР"
++    tt-tso.FiscalStatus  format "X(15)" label "Статус ФР"
+     tt-tso.zReportDate format "X(20)" label "Посл. Z-отчет"
+     tt-tso.FiscalQueue format ">>>9" label "Очередь ФР"
+     tt-tso.ShiftNum format ">>9" label "№ Смены"
+-    tt-tso.ShiftState format "X(11)" label "Статус Смены"
++    mtrg:getShiftStateLable() format "X(20)" label "Статус Смены"
+     tt-tso.ShiftBegin format "X(20)" label "Начало Смены"
+     tt-tso.CashierNum format ">>>>>>9" label "Кассир"
+-WITH NO-ROW-MARKERS SEPARATORS SIZE 143 BY 6
++with no-row-markers SEPARATORS SIZE 146 BY 6
+          TITLE "ТСО" FIT-LAST-COLUMN.
+-    
++
+ define query br-pump for tt-pump scrolling .
+ 
+ define browse br-pump
+   query br-pump no-lock display
+     tt-pump.obj-code format "99999" label "Магазин"
+     tt-pump.pump-code format ">>9" label "№ ТРК"
+-    tt-pump.status_ format "X(24)" label "Статус"
++    mtrg:getmPumpStatusLable() format "X(24)" label "Статус"
+     tt-pump.numTr   format ">>>>>>9" label "Кол-во транзакций" 
+-WITH NO-ROW-MARKERS SEPARATORS SIZE 143 BY 8
++WITH NO-ROW-MARKERS SEPARATORS SIZE 146 BY 8
+          TITLE "ТРК" FIT-LAST-COLUMN.
+ 
+ 
+@@ -247,6 +163,7 @@ DEFINE FRAME Dialog-Frame
+      b-start AT ROW 1.24 COL 39 WIDGET-ID 4
+      b-close AT ROW 1.24 COL 57 WIDGET-ID 6
+      b-open AT ROW 1.24 COL 75 WIDGET-ID 8
++     b-help AT ROW 1.24 COL 85
+      b-z-report AT ROW 1.24 COL 93 WIDGET-ID 10
+      f-cashier at row 1.24 col 118
+      b-cashier at row 1.24 col 130
+@@ -258,7 +175,6 @@ DEFINE FRAME Dialog-Frame
+          TITLE "Управление ТСО"
+          CANCEL-BUTTON b-exit WIDGET-ID 100.
+ 
+-
+ /* *********************** Procedure Settings ************************ */
+ 
+ &ANALYZE-SUSPEND _PROCEDURE-SETTINGS
+@@ -303,23 +219,9 @@ END.
+ &ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL b-cashier Dialog-Frame
+ ON CHOOSE OF b-cashier IN FRAME Dialog-Frame 
+ DO:
+-  cash-recids = "" .
+-  run ref/staffs.w ( input parparentproc
+-              , input "b-sel"
+-              , input {&role-cashier}
+-              , input (if v-cntxt-db-num = 0 then ? else v-cntxt-db-num)
+-              , input 0
+-              , output cash-recids ) .
+-  if cash-recids = "" then do:
+-  end.
+-  else do:
+-    do ii = 1 to num-entries( cash-recids ) :
+-       FIND FIRST ub.staff no-lock WHERE
+-                    recid( ub.staff ) = integer( entry( ii, cash-recids ) ) .
+-       f-cashier = ub.staff.staff-code .
+-       display f-cashier with frame {&frame-name}.          
+-    end.                
+-  end. 
++   f-cashier = mtrg:changeCashier().
++   display f-cashier with frame {&frame-name}.
++  
+ END.
+ 
+ /* _UIB-CODE-BLOCK-END */
+@@ -329,55 +231,9 @@ END.
+ &ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL b-open Dialog-Frame
+ ON CHOOSE OF b-open IN FRAME Dialog-Frame 
+ DO:
+-  assign f-cashier .
+-  if f-cashier = ? or f-cashier <= 0
+-  then do :
+-    message "Сначала выберите кассира" view-as alert-box .
+-    return no-apply .
+-  end.
+-  
+-  define variable v-shift-num as integer no-undo .
+-  define variable v-ok as logical no-undo .
+-  
+-  run ref/tso-shift.w (input parparentproc,
+-                       output v-shift-num,
+-                       output v-ok) .
+-  if not v-ok
+-  then do :
+-    return no-apply .
+-  end.
+-  
+-  v-cmd-file-name = "tso-shift-open.xml" .
+-  v-command = substitute({&xml-cmd-open-shift}, string(f-cashier), string(v-shift-num)) .
+-  output to value (v-cmd-file-name) .
+-  put unformatted v-command skip .
+-  output close .
+-  
+-  if trim(rid-list) > ""
+-  then do :
+-    do ii = 1 to num-entries(rid-list) :
+-      find first tt-tso no-lock where recid(tt-tso) = integer( entry( ii, rid-list ) ) .
+-      if tt-tso.ShiftState = "Running" or tt-tso.ShiftState = "ОК" then next .
+-      v-command = substitute('&1 -0 --connect-timeout 5 -X POST -H "Content-Type: text/xml" -d @"&2" &3 >&4'
+-                        , curl-path
+-                        , v-cmd-file-name
+-                        , tt-tso.tso-addr
+-                        , "tso-temp.xml") + {&new-line}  .
+-      os-command silent value (v-command) .
+-    end.      
+-  end.
+-  else do :
+-    for each tt-tso no-lock :
+-      if tt-tso.ShiftState = "Running" or tt-tso.ShiftState = "ОК" then next .
+-      v-command = substitute('&1 -0 --connect-timeout 5 -X POST -H "Content-Type: text/xml" -d @"&2" &3 >&4'
+-                        , curl-path
+-                        , v-cmd-file-name
+-                        , tt-tso.tso-addr
+-                        , "tso-temp.xml") .
+-      os-command silent value (v-command) .
+-    end.
+-  end.
+-  run tso-send-cmd .                  
++   if mtrg:openShift(f-cashier)
++   then
++      mtrg:tso-send-Stat().
+ END.
+ 
+ /* _UIB-CODE-BLOCK-END */
+@@ -387,42 +243,9 @@ END.
+ &ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL b-close Dialog-Frame
+ ON CHOOSE OF b-close IN FRAME Dialog-Frame 
+ DO:
+-  assign f-cashier .
+-  if f-cashier = ? or f-cashier <= 0
+-  then do :
+-    message "Сначала выберите кассира" view-as alert-box .
+-    return no-apply .
+-  end.
+-  
+-  v-cmd-file-name = "tso-shift-close.xml" .
+-  v-command = substitute({&xml-cmd-other}, "shift_close", string(f-cashier)) .
+-  output to value (v-cmd-file-name) .
+-  put unformatted v-command skip .
+-  output close .
+-  
+-  if trim(rid-list) > ""
+-  then do :
+-    do ii = 1 to num-entries(rid-list) :
+-      find first tt-tso no-lock where recid(tt-tso) = integer( entry( ii, rid-list ) ) .
+-      v-command = substitute('&1 -0 --connect-timeout 5 -X POST -H "Content-Type: text/xml" -d @"&2" &3 >&4'
+-                        , curl-path
+-                        , v-cmd-file-name
+-                        , tt-tso.tso-addr
+-                        , "tso-temp.xml") .
+-      os-command silent value (v-command) .
+-    end.      
+-  end.
+-  else do :
+-    for each tt-tso no-lock :
+-      v-command = substitute('&1 -0 --connect-timeout 5 -X POST -H "Content-Type: text/xml" -d @"&2" &3 >&4'
+-                        , curl-path
+-                        , v-cmd-file-name
+-                        , tt-tso.tso-addr
+-                        , "tso-temp.xml") .
+-      os-command silent value (v-command) .
+-    end.
+-  end.
+-  run tso-send-cmd .
++   if mtrg:closeShift()
++   then
++      mtrg:tso-send-Stat().
+ END.
+ 
+ /* _UIB-CODE-BLOCK-END */
+@@ -432,42 +255,9 @@ END.
+ &ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL b-start Dialog-Frame
+ ON CHOOSE OF b-start IN FRAME Dialog-Frame 
+ DO:
+-  assign f-cashier .
+-  if f-cashier = ? or f-cashier <= 0
+-  then do :
+-    message "Сначала выберите кассира" view-as alert-box .
+-    return no-apply .
+-  end.
+-  
+-  v-cmd-file-name = "tso-shift-start.xml" .
+-  v-command = substitute({&xml-cmd-other}, "shift_start", string(f-cashier)) .
+-  output to value (v-cmd-file-name) .
+-  put unformatted v-command skip .
+-  output close .
+-  
+-  if trim(rid-list) > ""
+-  then do :
+-    do ii = 1 to num-entries(rid-list) :
+-      find first tt-tso no-lock where recid(tt-tso) = integer( entry( ii, rid-list ) ) .
+-      v-command = substitute('&1 -0 --connect-timeout 5 -X POST -H "Content-Type: text/xml" -d @"&2" &3 >&4'
+-                        , curl-path
+-                        , v-cmd-file-name
+-                        , tt-tso.tso-addr
+-                        , "tso-temp.xml") .
+-      os-command silent value (v-command) .
+-    end.      
+-  end.
+-  else do :
+-    for each tt-tso no-lock :
+-      v-command = substitute('&1 -0 --connect-timeout 5 -X POST -H "Content-Type: text/xml" -d @"&2" &3 >&4'
+-                        , curl-path
+-                        , v-cmd-file-name
+-                        , tt-tso.tso-addr
+-                        , "tso-temp.xml") .
+-      os-command silent value (v-command) .
+-    end.
+-  end.
+-  run tso-send-cmd .
++   if mtrg:startShift()
++   then
++      mtrg:tso-send-Stat().
+ END.
+ 
+ /* _UIB-CODE-BLOCK-END */
+@@ -477,42 +267,9 @@ END.
+ &ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL b-stop Dialog-Frame
+ ON CHOOSE OF b-stop IN FRAME Dialog-Frame 
+ DO:
+-  assign f-cashier .
+-  if f-cashier = ? or f-cashier <= 0
+-  then do :
+-    message "Сначала выберите кассира" view-as alert-box .
+-    return no-apply .
+-  end.
+- 
+-  v-cmd-file-name = "tso-shift-stop.xml" .
+-  v-command = substitute({&xml-cmd-other}, "shift_stop", string(f-cashier)) .
+-  output to value (v-cmd-file-name) .
+-  put unformatted v-command skip .
+-  output close .
+-  
+-  if trim(rid-list) > ""
+-  then do :
+-    do ii = 1 to num-entries(rid-list) :
+-      find first tt-tso no-lock where recid(tt-tso) = integer( entry( ii, rid-list ) ) .
+-      v-command = substitute('&1 -0 --connect-timeout 5 -X POST -H "Content-Type: text/xml" -d @"&2" &3 >&4'
+-                        , curl-path
+-                        , v-cmd-file-name
+-                        , tt-tso.tso-addr
+-                        , "tso-temp.xml") .
+-      os-command silent value (v-command) .
+-    end.      
+-  end.
+-  else do :
+-    for each tt-tso no-lock :
+-      v-command = substitute('&1 -0 --connect-timeout 5 -X POST -H "Content-Type: text/xml" -d @"&2" &3 >&4'
+-                        , curl-path
+-                        , v-cmd-file-name
+-                        , tt-tso.tso-addr
+-                        , "tso-temp.xml") .
+-      os-command silent value (v-command) .
+-    end.
+-  end.
+-  run tso-send-cmd .
++   if mtrg:stopShift()
++   then
++      mtrg:tso-send-Stat().
+ END.
+ 
+ /* _UIB-CODE-BLOCK-END */
+@@ -522,42 +279,9 @@ END.
+ &ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL b-z-report Dialog-Frame
+ ON CHOOSE OF b-z-report IN FRAME Dialog-Frame 
+ DO:
+-  assign f-cashier .
+-  if f-cashier = ? or f-cashier <= 0
+-  then do :
+-    message "Сначала выберите кассира" view-as alert-box .
+-    return no-apply .
+-  end.
+- 
+-  v-cmd-file-name = "tso-z-report.xml" .
+-  v-command = substitute({&xml-cmd-other}, "print_z_report", string(f-cashier)) .
+-  output to value (v-cmd-file-name) .
+-  put unformatted v-command skip .
+-  output close .
+-  
+-  if trim(rid-list) > ""
+-  then do :
+-    do ii = 1 to num-entries(rid-list) :
+-      find first tt-tso no-lock where recid(tt-tso) = integer( entry( ii, rid-list ) ) .
+-      v-command = substitute('&1 -0 --connect-timeout 5 -X POST -H "Content-Type: text/xml" -d @"&2" &3 >&4'
+-                        , curl-path
+-                        , v-cmd-file-name
+-                        , tt-tso.tso-addr
+-                        , "tso-temp.xml") .
+-      os-command silent value (v-command) .
+-    end.      
+-  end.
+-  else do :
+-    for each tt-tso no-lock :
+-      v-command = substitute('&1 -0 --connect-timeout 5 -X POST -H "Content-Type: text/xml" -d @"&2" &3 >&4'
+-                        , curl-path
+-                        , v-cmd-file-name
+-                        , tt-tso.tso-addr
+-                        , "tso-temp.xml") .
+-      os-command silent value (v-command) .
+-    end.
+-  end.
+-  run tso-send-cmd .
++   if mtrg:zShift()
++   then
++      mtrg:tso-send-Stat().
+ END.
+ 
+ /* _UIB-CODE-BLOCK-END */
+@@ -568,15 +292,7 @@ END.
+ ON CHOOSE OF b-mark IN FRAME Dialog-Frame /* * */
+ DO:
+ define variable glog as logical no-undo .
+-if available tt-tso then  do:
+-  { gbl/markstrn.i tt-tso rid-list }
+-  glog = br-tso:refresh() .
+-  if last-event:function <> "MOUSE-SELECT-DBLCLICK"
+-  then do:
+-    glog = br-tso:select-next-row ().
+-    apply "iteration-changed" to br-tso in frame {&frame-name}.
+-  end.
+-end.
++mtrg:markStr().
+ apply "entry" to br-tso in frame {&frame-name}.
+ END.
+ 
+@@ -588,24 +304,6 @@ END.
+ ON CHOOSE OF b-exit IN FRAME Dialog-Frame /* Выход */
+ DO:
+   
+-  for each tt-tso no-lock :
+-    v-del-file = v-temp-dir + "\tsoresp_" + string(tt-tso.db-num) + "_" + string(tt-tso.obj-code) + "_" + string(tt-tso.tso-num) + ".xml" .
+-    v-del-file = search(v-del-file) .
+-    if v-del-file = ? or trim(v-del-file) = ""
+-    then next .
+-                   
+-    os-delete value(v-del-file) . 
+-    
+-    v-del-file = v-temp-dir + "\tsoreq_" + string(tt-tso.db-num) + "_" + string(tt-tso.obj-code) + "_" + string(tt-tso.tso-num) + ".bat" . 
+-    v-del-file = search(v-del-file) .
+-    if v-del-file = ? or trim(v-del-file) = ""
+-    then next .
+-                   
+-    os-delete value(v-del-file) .             
+-  end.
+-  pause 1 .
+-  os-delete value (search(v-temp-dir)) recursive .
+-  
+   assign
+     log-exit = true
+   .
+@@ -633,31 +331,22 @@ MAIN-BLOCK:
+ DO ON ERROR   UNDO MAIN-BLOCK, LEAVE MAIN-BLOCK
+    ON END-KEY UNDO MAIN-BLOCK, LEAVE MAIN-BLOCK:
+   { gbl/getcntxt.i get }
+-  
+-  v-temp-dir = "TSO_temp-cmd" .
+-  os-delete value (v-temp-dir) recursive no-error .
+-  os-create-dir value(v-temp-dir) .
+-  
+-  empty temp-table tt-pids .
+-  
+-  assign
+-    curl-path = search("exe/curl.exe")
+-  .
+-  
+-  v-post-file-name = "tso-stat.xml" .
+-  v-out-str = {&xml-cmd-stat} .
+-  output to value (v-post-file-name) .
+-  put unformatted v-out-str skip .
+-  output close .
+-  
+-  run init-tt .
+-  
+-  run tso-send-cmd .
++  mtrg:setTable (this-procedure).
++
++  browse br-tso  :handle:query = mtrg:getQuery("tso").
++  browse br-pump :handle:query = mtrg:getQuery("pump").
+   
+   RUN enable_UI.
+-  open query br-tso for each tt-tso indexed-reposition .
+-  open query br-pump for each tt-pump indexed-reposition .
++  mtrg:tso-send-Stat() .
++  mtrg:tso-read-sts() .
+   
++ &Scoped-define BROWSE-NAME br-pump
++   { gbl/app_help.i }
++   run diasize_add_browse in this-procedure
++     (input  'width':u
++     ,input  browse br-tso :handle
++     ) .
++ 
+   do while not log-exit
+   on error undo, return error
+   :
+@@ -673,10 +362,10 @@ DO ON ERROR   UNDO MAIN-BLOCK, LEAVE MAI
+     v-time-str = string(time, "HH:MM:SS") .
+     if substring(v-time-str, 7) = "01"
+     then do :
+-      run tso-send-cmd .
++      mtrg:tso-send-Stat() .
+     end.
+     
+-    run tso-read-sts .
++    mtrg:tso-read-sts() .
+ 
+   end.
+ END.
+@@ -688,287 +377,12 @@ RUN disable_UI.
+ 
+ /* **********************  Internal Procedures  *********************** */
+ 
+-procedure tso-send-cmd :
+-  define variable bat-file              as character    no-undo .
+-  define variable cmd                   as character    no-undo .
+-  define variable v-response-file-name  as character    no-undo .
+-  define variable v-pid                 as integer      no-undo .
+-  for each tt-tso no-lock :
+-    v-response-file-name = v-temp-dir + "\tsoresp_" + string(tt-tso.db-num) + "_" + string(tt-tso.obj-code) + "_" + string(tt-tso.tso-num) + ".xml" .
+-    cmd = substitute('"&1" -0 --connect-timeout 5 -X POST -H "Content-Type: text/xml" -d @"&2" &3 >&4'
+-                    , curl-path
+-                    , v-post-file-name
+-                    , tt-tso.tso-addr
+-                    , v-response-file-name) .
+-                    
+-    bat-file = v-temp-dir + "\tsoreq_" + string(tt-tso.db-num) + "_" + string(tt-tso.obj-code) + "_" + string(tt-tso.tso-num) + ".bat" .  
+-    output to value(bat-file) .
+-    put unformatted cmd skip .
+-    output close .         
+-    run gbl/run-gpid.p (  input bat-file
+-                         ,input '':U
+-                         ,output v-pid). 
+-    pause 1 no-message .
+-    rv = IsProcessRunning(v-pid). 
+-    if rv >= 0 then do :
+-    end.
+-    else do :
+-      os-delete value(bat-file) .
+-    end.                     
+-    find first tt-pids no-lock where tt-pids.pid = v-pid no-error .
+-    if not available tt-pids
+-    then do :
+-      create tt-pids.
+-      tt-pids.pid = v-pid .
+-    end.                      
+-  end.
+-end procedure .
+-
+-procedure tso-read-sts :
+-  define variable v-file    as character no-undo .
+-  for each tt-tso exclusive-lock :
+-    v-file = v-temp-dir + "\tsoresp_" + string(tt-tso.db-num) + "_" + string(tt-tso.obj-code) + "_" + string(tt-tso.tso-num) + ".xml" .
+-    v-file = search(v-file) .
+-    if v-file = ? or trim(v-file) = ""
+-    then next .
+-    file-info:file-name = v-file .
+-    if file-info:file-size = 0
+-    then do :
+-      tt-tso.FiscalStatus = "НЕ ОТВЕЧАЕТ" .
+-      os-delete value(v-file) .
+-      next.
+-    end.
+-    
+-    run parse-xml (input v-file,
+-                   input-output table tt-tso) .
+-                   
+-    os-delete value(v-file) .
+-  end.
+-  define buffer buf_tt-tso for tt-tso .
+-  find first buf_tt-tso no-error .
+-  if available buf_tt-tso
+-  then
+-  br-tso:refresh () in frame Dialog-Frame . 
+-  br-pump:refresh () in frame Dialog-Frame .
+-end procedure .
+-
+-procedure parse-xml :
+-  define input parameter p-file as character .
+-  define input-output parameter table for tt-tso .
+-  
+-  CREATE X-DOCUMENT hDoc.
+-  CREATE X-NODEREF hRoot.
+-     
+-  hDoc:LOAD("file",p-file,FALSE).
+-     
+-  hDoc:GET-DOCUMENT-ELEMENT(hRoot).
+-      
+-  RUN GetChildren(hRoot, 1).
+-  
+-  DELETE OBJECT hDoc.
+-  DELETE OBJECT hRoot.
+-  
+-end procedure .
+-
+-PROCEDURE GetChildren:
+-DEFINE INPUT PARAMETER hParent AS HANDLE NO-UNDO.
+-DEFINE INPUT PARAMETER level AS INTEGER NO-UNDO.
+-
+-DEFINE VARIABLE i AS INTEGER NO-UNDO.
+-DEFINE VARIABLE hNoderef AS HANDLE NO-UNDO.
+-DEFINE VARIABLE hText AS HANDLE NO-UNDO.
+-define variable client as character no-undo.
+-
+-CREATE X-NODEREF hNoderef.
+-CREATE X-NODEREF hText .
+-
+-
+-REPEAT i = 1 TO hParent:NUM-CHILDREN:
+-    good = hParent:GET-CHILD(hNoderef,i).
+-    IF NOT good THEN 
+-        LEAVE.
+-    IF hNoderef:SUBTYPE <> "element" THEN
+-        NEXT.
+-    
+-    hNoderef:GET-CHILD(hText, 1) no-error .    
+-    
+-        
+-    IF hNoderef:NAME = "PumpStatus"
+-    then do :
+-      assign v-parsesub = "Pump" .
+-      find first tt-pump exclusive-lock where tt-pump.pump-code = integer(hNoderef:get-attribute("num")) 
+-                                          and tt-pump.obj-type  = v-cntxt-obj-type
+-                                          and tt-pump.obj-code  = v-cntxt-obj-code
+-                                          no-error .
+-    end.
+-    
+-    IF hNoderef:NAME = "PosStatus" then assign tt-tso.PosStatus = hText:node-value no-error .
+-    
+-    IF hNoderef:NAME = "FiscalStatus" then assign v-parsesub = "Fiscal" .
+-    
+-    IF hNoderef:NAME = "ShiftState"
+-    then do :
+-      tt-tso.ShiftBegin = hNoderef:get-attribute("begin") no-error .
+-      tt-tso.ShiftNum   = integer(hNoderef:get-attribute("num")) no-error .
+-      tt-tso.ShiftState = hText:node-value no-error .
+-      if tt-tso.ShiftState = "Running" then tt-tso.ShiftState = "Запущена и открыта" .
+-      if tt-tso.ShiftState = "Unknown" then tt-tso.ShiftState = "?" .
+-      if tt-tso.ShiftState = "Closed"  then tt-tso.ShiftState = "Закрыта" .
+-      if tt-tso.ShiftState = "Stopped" then tt-tso.ShiftState = "Остановлена и открыта" .
+-    end.
+-    
+-    IF hNoderef:NAME = "StatCashier" then assign tt-tso.CashierNum = integer(hText:node-value) no-error .
+-    
+-    IF hNoderef:NAME = "State"
+-    then do :
+-      case v-parsesub :
+-        when "Pump"
+-        then do :
+-          if available tt-pump
+-          then do :
+-            tt-pump.status_ = hText:node-value no-error .
+-            if tt-pump.status_ = 'Idle' then tt-pump.status_ = 'Незанята' .
+-            if tt-pump.status_ = 'Unreacable' then tt-pump.status_ = 'Недоступна' .
+-            if tt-pump.status_ = 'Inoperative' then tt-pump.status_ = 'Не работает' .
+-            if tt-pump.status_ = 'Closed' then tt-pump.status_ = 'Закрыта' .
+-            if tt-pump.status_ = 'Calling' then tt-pump.status_ = 'Вызов' .
+-            if tt-pump.status_ = 'Authorized' then tt-pump.status_ = 'Авторизована' .
+-            if tt-pump.status_ = 'Started' then tt-pump.status_ = 'Запущена' .
+-            if tt-pump.status_ = 'Started_susp' then tt-pump.status_ = 'Приостановлена' .
+-            if tt-pump.status_ = 'Fueling' then tt-pump.status_ = 'Заправка' .
+-            if tt-pump.status_ = 'Fueling_susp' then tt-pump.status_ = 'Заправка приостановлена' .
+-          end.
+-        end.
+-        when "Fiscal"
+-        then do :
+-          tt-tso.FiscalStatus = hText:node-value no-error .
+-        end.
+-      end case .
+-    end.
+-    
+-    IF hNoderef:NAME = "ErrorText"
+-    and v-parsesub = "Fiscal"
+-    and tt-tso.FiscalStatus = "Error"
+-    then do :
+-      tt-tso.FiscalStatus = hText:node-value no-error .
+-    end.
+-    
+-    IF hNoderef:NAME = "LastZreportDate" then assign tt-tso.zReportDate = hText:node-value no-error .
+-    
+-    IF hNoderef:NAME = "QueueSize" then assign tt-tso.FiscalQueue = integer(hText:node-value) no-error .
+-    
+-    IF hNoderef:NAME = "NumTrans"
+-    and available tt-pump
+-    then assign tt-pump.numTr = integer(hText:node-value) no-error .
+-           
+-    RUN GetChildren(hNoderef, (level + 1)).
+-END.
+-
+-DELETE OBJECT hNoderef.
+-DELETE OBJECT hText.
+-END PROCEDURE.
+-
+-procedure init-tt :
+-  CASE parref-mode:
+-    when {&all} then do:
+-      for each buf_cash-desk-attr no-lock where  buf_cash-desk-attr.attr-code       = "device-kind":U
+-
+-/*buf_cash-desk-attr.attr-code = {&cd-attr-device-kind}   */
+-                                            and buf_cash-desk-attr.attr-value-integer = 2 :
+-        find first buf_cash-desk no-lock where buf_cash-desk.db-num   = buf_cash-desk-attr.db-num
+-                                           and buf_cash-desk.obj-code = buf_cash-desk-attr.obj-code
+-                                           and buf_cash-desk.pos-type = buf_cash-desk-attr.pos-type
+-                                           and buf_cash-desk.cash-num = buf_cash-desk-attr.cash-num
+-                                           and buf_cash-desk.is-del   = no 
+-                                           no-error .
+-        if available buf_cash-desk
+-        then do :
+-          create tt-tso.
+-          assign
+-            tt-tso.db-num       = buf_cash-desk.db-num
+-            tt-tso.obj-code     = buf_cash-desk.obj-code
+-            tt-tso.tso-num      = buf_cash-desk.cash-num
+-            tt-tso.tso-addr     = replace(buf_cash-desk.addr-path, {&delim-par}, '://')
+-          .
+-        end.                                                           
+-      end.  
+-      for each buf_pump no-lock :
+-        create tt-pump .
+-        assign
+-          tt-pump.pump-code = buf_pump.pump-code
+-          tt-pump.obj-type  = buf_pump.obj-type
+-          tt-pump.obj-code  = buf_pump.obj-code
+-        .
+-      end.
+-    end. /*when {&all} then do:*/
+-    when {&g___object} then do:
+-      for each buf_cash-desk-attr no-lock where buf_cash-desk-attr.obj-code = v-cntxt-obj-code
+-                                            and buf_cash-desk-attr.attr-code = "device-kind"   
+-                                            and buf_cash-desk-attr.attr-value-integer = 2 :
+-        find first buf_cash-desk no-lock where buf_cash-desk.db-num   = buf_cash-desk-attr.db-num
+-                                           and buf_cash-desk.obj-code = buf_cash-desk-attr.obj-code
+-                                           and buf_cash-desk.pos-type = buf_cash-desk-attr.pos-type
+-                                           and buf_cash-desk.cash-num = buf_cash-desk-attr.cash-num
+-                                           and buf_cash-desk.is-del   = no 
+-                                           no-error .
+-        if available buf_cash-desk
+-        then do :
+-          create tt-tso.
+-          assign
+-            tt-tso.db-num       = buf_cash-desk.db-num
+-            tt-tso.obj-code     = buf_cash-desk.obj-code
+-            tt-tso.tso-num      = buf_cash-desk.cash-num
+-            tt-tso.tso-addr     = replace(buf_cash-desk.addr-path, {&delim-par}, '://')
+-          .
+-        end.                                                           
+-      end. 
+-      for each buf_pump no-lock where buf_pump.obj-type = v-cntxt-obj-type
+-                                  and buf_pump.obj-code = v-cntxt-obj-code :
+-        create tt-pump .
+-        assign
+-          tt-pump.pump-code = buf_pump.pump-code
+-          tt-pump.obj-type  = buf_pump.obj-type
+-          tt-pump.obj-code  = buf_pump.obj-code
+-        .
+-      end.
+-    end.
+-    when "db":U then do:
+-      for each buf_cash-desk-attr no-lock where buf_cash-desk-attr.db-num = v-cntxt-db-num
+-                                            and buf_cash-desk-attr.attr-code = "device-kind"
+-                                            and buf_cash-desk-attr.attr-value-integer = 2 :
+-        find first buf_cash-desk no-lock where buf_cash-desk.db-num   = buf_cash-desk-attr.db-num
+-                                           and buf_cash-desk.obj-code = buf_cash-desk-attr.obj-code
+-                                           and buf_cash-desk.pos-type = buf_cash-desk-attr.pos-type
+-                                           and buf_cash-desk.cash-num = buf_cash-desk-attr.cash-num
+-                                           and buf_cash-desk.is-del   = no 
+-                                           no-error .
+-        if available buf_cash-desk
+-        then do :
+-          create tt-tso.
+-          assign
+-            tt-tso.db-num       = buf_cash-desk.db-num
+-            tt-tso.obj-code     = buf_cash-desk.obj-code
+-            tt-tso.tso-num      = buf_cash-desk.cash-num
+-            tt-tso.tso-addr     = replace(buf_cash-desk.addr-path, {&delim-par}, '://')
+-          .
+-        end.                                                           
+-      end.  
+-      for each buf_clients no-lock where buf_clients.db-num = v-cntxt-db-num :
+-        for each buf_pump no-lock where buf_pump.obj-type = buf_clients.obj-type
+-                                    and buf_pump.obj-code = buf_clients.obj-code :
+-          create tt-pump .
+-          assign
+-            tt-pump.pump-code = buf_pump.pump-code
+-            tt-pump.obj-type  = buf_pump.obj-type
+-            tt-pump.obj-code  = buf_pump.obj-code
+-          .
+-        end.
+-      end.                                      
+-    end.
+-  END CASE.
+-  
+-end procedure.
+-
++procedure setTableTSo:
++   define input  parameter table    for tt-tso bind .
++end.
++procedure setTablePump:
++   define input  parameter table    for tt-pump bind .
++end.
+ &ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE disable_UI Dialog-Frame  _DEFAULT-DISABLE
+ PROCEDURE disable_UI :
+ /*------------------------------------------------------------------------------
+diff --git a/ref/tso-tt.i b/ref/tso-tt.i
+new file mode 100644
+--- /dev/null
++++ b/ref/tso-tt.i
+@@ -0,0 +1,42 @@
++   define temp-table tt-tso no-undo
++      field db-num        as integer
++      field obj-code      as integer
++      field tso-num       as integer
++      field tso-addr      as character
++      field PosStatus     as character
++      field FiscalStatus  as character
++      field zReportDate   as character
++      field FiscalQueue   as integer
++      field ShiftNum      as integer
++      field ShiftState    as character
++      field ShiftBegin    as character
++      field CashierNum    as integer
++      field tso-host      as character
++      field tso-port      as integer
++      field Tso-protocol  as character
++      
++   index pi as primary unique
++      tso-num obj-code
++      
++   .
++   
++   define temp-table tt-tso-socet no-undo
++      field obj-code      as integer
++      field tso-num       as integer
++      field socet-num     as integer
++      field tso-socet     as handle
++      field tsomethodresp as character
++   index pi as primary unique
++      tso-num obj-code socet-num
++      
++   .
++
++define temp-table tt-pump no-undo
++  field pump-code   as integer
++  field obj-type    as character
++  field obj-code    as integer 
++  field status_     as character
++  field numTr       as integer
++  index pi as primary unique
++    pump-code obj-type obj-code
++.
+\ No newline at end of file
+diff --git a/str/ctrc2sht.p b/str/ctrc2sht.p
+--- a/str/ctrc2sht.p
++++ b/str/ctrc2sht.p
+@@ -37,6 +37,7 @@ define variable vss-description as character no-undo initial "Добавление сменной сверки на основе контрольной":U .
+ { ref/gds-attr.i }
+ { str/is-gas.i }
+ { str/placelib.i }
++{ cmp/trg-def.i }
+ define variable rec-rvs-shift as recid         no-undo .
+ define variable p-db-num      as integer       no-undo .
+ define variable p-userid      as character     no-undo .
+@@ -98,7 +99,7 @@ define temp-table tt_pmp-nzzl no-undo
+     
+   run str/deskshft.p
+     ( input parparentproc
+-    , input no
++    , input g#auto
+     , input ctrl_rvs-doc.obj-type
+     , input ctrl_rvs-doc.obj-code
+     , input ctrl_rvs-doc.shift-date
+diff --git a/str/proc-startNewShiftTso.p b/str/proc-startNewShiftTso.p
+new file mode 100644
+--- /dev/null
++++ b/str/proc-startNewShiftTso.p
+@@ -0,0 +1,61 @@
++define variable vss-revision    as character no-undo init "$Revision$":U .
++define variable vss-author      as character no-undo init "$Author$":U .
++define variable vss-date        as character no-undo init "$Date$":U .
++define variable vss-workfile    as character no-undo init "$Workfile$":U .
++define variable vss-archive     as character no-undo init "$Archive$":U .
++define variable vss-description as character no-undo init "Процедура закрытия смены и отпрытия новой".
++define variable mcicle as integer no-undo init 1.
++{ utl/proc-async.i proc_def}
++{ adm/auto-def.i}
++do  on error  undo, return error:
++   define variable mWorkShift as ibs.th.str.CloseAndOpenShift no-undo.
++   define variable mDebug as logical no-undo.
++   mDebug = logical (GetPARAMAsunc(1)) no-error.
++   if mDebug eq ?
++   then
++      mDebug = false.
++   mWorkShift = new ibs.th.str.CloseAndOpenShift(mDebug).
++   
++   current-window:hidden = yes.
++   run PutStatAsunc("Останавливаем смены").
++   if not mWorkShift:StopShift(mcicle)
++   then
++      run PutMesAsunc("Не удалось остановить смены").
++
++   run PutStatAsunc("Ожидаем разрещение на закрытие смены").
++
++   if not mWorkShift:canCloseShift(mcicle)
++   then
++      run PutMesAsunc("Не получена информация овозможности закрытия смены").
++   
++   run PutStatAsunc("Закрываем смены").
++   if not mWorkShift:closeShift(mcicle)
++   then
++      run PutMesAsunc("Не удалось закрыть смены").
++   run PutStatAsunc("Создаем продажу").
++   if not mWorkShift:crSale(mcicle)
++   then
++      run PutMesAsunc("Не удалось создать продажу").
++
++   run PutStatAsunc("Создаем контрольную сверку").
++   if not mWorkShift:crRvsControl(mcicle)
++   then
++      run PutMesAsunc("Не удалось создать контрольную сверку").
++   
++   run PutStatAsunc("Открываем смены").
++   if not mWorkShift:openShift(mcicle)
++   then
++      run PutMesAsunc("Не удалось открыть новую смену ТСО").
++   run PutStatAsunc("Запускаем смены").
++   if not mWorkShift:startShift(mcicle)
++   then
++      run PutMesAsunc("Не удалось запустить новую смену ТСО").
++   
++   run PutStatAsunc("Создаем сменную сверку").
++   if not mWorkShift:crRvsShift(mcicle)
++   then
++      run PutMesAsunc("Не удалось создать сменную сверку").
++   
++end.
++
++{ utl/proc-async.i proc_end}
+\ No newline at end of file
+diff --git a/str/rvs-auto.p b/str/rvs-auto.p
+--- a/str/rvs-auto.p
++++ b/str/rvs-auto.p
+@@ -36,10 +36,13 @@ define variable vss-archive     as chara
+ define variable vss-description as character no-undo initial "Автоматическое создание контрольной сверки":U.
+ DEFINE VARIABLE mParam AS CHARACTER NO-UNDO.
+ DEFINE VARIABLE mRVSNull AS LOGICAL no-undo init no.
++define variable mRVSAuto as logical no-undo init yes.
+ publish "RVSParam" (output mParam).
+ 
+ mRVSNull = logical (entry(1,mParam)) no-error.
+ if mRVSNull eq ? then mRVSNull = no.
++mRVSAuto = logical (entry(2,mParam)) no-error.
++if mRVSAuto eq ? then mRVSAuto = no.
+ 
+ { cmp/vssrevis.i }
+ { cmp/trg-def.i  }
+@@ -303,7 +306,13 @@ on error undo Main-Block, return error s
+   for each thbjattr_thbj-attr :    
+         if thbjattr_thbj-attr.prop-code = {&attr-petrol_autopump-izm} then assign v-full = thbjattr_thbj-attr.property-value-logical .
+ end.
+-
++     if not v-full 
++     then
++        run add-msg in this-procedure
++        ( input false
++        , input substitute( 'Резервуары не автоматически измеряемые, сверка будет не полной.'
++                          )
++        ) .
+ 
+     assign
+       v-wrkr  = (if v-wrkr = 0 then ? else v-wrkr)
+@@ -401,14 +410,15 @@ end.
+                           )
+         ) . 
+     end.
+-
+-    create buf_doc-attr.
+-    assign
+-      buf_doc-attr.doc-code = buf_rvs-doc.rvs-code
+-      buf_doc-attr.attr-code = "rvs-auto"
+-      buf_doc-attr.attr-value = "Yes"
+-    .
+-    
++    if mRVSAuto
++    then do:
++       create buf_doc-attr.
++       assign
++         buf_doc-attr.doc-code = buf_rvs-doc.rvs-code
++         buf_doc-attr.attr-code = "rvs-auto"
++         buf_doc-attr.attr-value = "Yes"
++       .
++    end.
+       { str/place-sh.i
+       buf_rvs-doc.obj-type
+       buf_rvs-doc.obj-code
+@@ -571,7 +581,6 @@ end.
+          end.
+             
+     end. 
+-
+     if ptrlprop-autopump = true then do:
+       { str/pump-sh.i
+         buf_rvs-doc.obj-type
+@@ -620,6 +629,7 @@ end.
+ /*        undo block_obj, next block_obj .*/
+       end.
+ 
++
+       find first tt-pump-nozzle no-error .
+       if     can-find( first tt-pump-nozzle )
+          and not mRVSNull      
+diff --git a/str/rvs-stat.p b/str/rvs-stat.p
+--- a/str/rvs-stat.p
++++ b/str/rvs-stat.p
+@@ -39,6 +39,7 @@ define variable vss-description as character no-undo initial "Переход по статусам в документах сверки":U .
+ { str/placelib.i }
+ { str/autorvs.i  }
+ { gbl/getsect.i def }
++{ cmp/trg-def.i }
+ { ref/gds-attr.i }
+ { str/is-sug.i   }
+ 
+@@ -458,7 +459,11 @@ do transaction
+                     ) no-error.
+                 if error-status :error
+                 then do:
+-                  message return-value + error-status:get-message(1) view-as alert-box title "Ошибка записи истории действий пользователя".
++                  undo, return error substitute( "&2&1Ошибка при записи истории пользователя&1&3&1&4"
++                                                 , {&new-line}
++                                                 , vss-workfile
++                                                 , return-value
++                                                 , error-status :get-message ( 1 ) ).
+                 end.
+               end . 
+             end.
+@@ -477,11 +482,19 @@ do transaction
+               end.
+               if v-dif-res-count = 1
+               then do :
+-                message "В сменной сверке есть расхождения массы в резервуаре"  v-dif-res  view-as alert-box.
++                if g#auto
++                then /* Попробуем записать в лог в parparentproc так как ничего другого нет, auto-def.i использовать нельзя так как шариный контекст очень редко объявлен выше */
++                   run write-to-log in parparentproc (substitute ("В сменной сверке есть расхождения массы в резервуаре &1",   v-dif-res)) no-error.
++                else
++                   message "В сменной сверке есть расхождения массы в резервуаре"  v-dif-res  view-as alert-box.
+               end.
+               if v-dif-res-count > 1
+               then do :
+-                message "В сменной сверке есть расхождения массы в резервуарах"  v-dif-res  view-as alert-box.
++                if g#auto
++                then /* Попробуем записать в лог в parparentproc так как ничего другого нет, auto-def.i использовать нельзя так как шариный контекст очень редко объявлен выше */
++                   run write-to-log in parparentproc (substitute ("В сменной сверке есть расхождения массы в резервуарах &1",   v-dif-res)) no-error.
++                else
++                   message "В сменной сверке есть расхождения массы в резервуарах"  v-dif-res  view-as alert-box.
+               end.
+             end.
+           end.
+diff --git a/str/sal-shd.p b/str/sal-shd.p
+--- a/str/sal-shd.p
++++ b/str/sal-shd.p
+@@ -95,14 +95,19 @@ on error undo, return error
+                         ) .
+         return error.
+     end.
+-    run schedule-attr-value in this-procedure (
+-          input p-cre-db-num
+-        , input p-task-type
+-        , input p-task-num
+-        , input {&attr-schedule-param-list-h}
+-        , output v-param-list
+-        , output v-param-type
+-    ).
++    define variable mProcSaleMake as character no-undo.
++    publish "SaleParam" (output v-param-list).
++    publish "SaleMakeProc" (output mProcSaleMake).
++    if v-param-list = "":U then do:
++       run schedule-attr-value in this-procedure (
++             input p-cre-db-num
++           , input p-task-type
++           , input p-task-num
++           , input {&attr-schedule-param-list-h}
++           , output v-param-list
++           , output v-param-type
++       ).
++    end.
+     if v-param-list = "":U then do:
+         run write-to-log( substitute("!!!Не заданы параметры обработки продаж в задаче &1&2"
+                                      , p-task-num
+@@ -117,7 +122,7 @@ on error undo, return error
+         v-start-state = (if num-entries(v-param-list) > 2 then integer(entry(3, v-param-list)) else 0)
+         v-end-state = (if num-entries(v-param-list) > 3 then integer(entry(4, v-param-list)) else 0)
+         v-finalize-100  = (if num-entries(v-param-list) > 4 then logical(entry(5, v-param-list)) else no)
+-        v-finalize-200  = (if num-entries(v-param-list) > 4 then logical(entry(6, v-param-list)) else no)
++        v-finalize-200  = (if num-entries(v-param-list) > 5 then logical(entry(6, v-param-list)) else no)
+ 
+     .
+     if v-range = 2
+@@ -280,18 +285,27 @@ on error undo, return error
+         v-process-only-new = yes.
+         /*надо создавать продажи*/
+         assign
+-        v-parameter =
+-                      temp-obj.obj-type         + {&delim-par} +
+-                      string(temp-obj.obj-code) + {&delim-par} +
+-                      string(p-cre-db-num) + {&delim-par} +
+-                      string(p-task-type) + {&delim-par} +
+-                      string(p-task-num).
++        v-parameter = substitute ("&2&1&3&1&4&1&5&1&6", {&delim-par},
++                                                        temp-obj.obj-type,
++                                                        string(temp-obj.obj-code),
++                                                        string(p-cre-db-num),
++                                                        string(p-task-type),
++                                                        string(p-task-num)).
+         run write-to-log in this-procedure (
+               input substitute( "Создание документов продаж по шаблонам в &1&2..........."
+                               , temp-obj.obj-type
+                               , temp-obj.obj-code
+                               )            ).
+-        run str/salemake.p (
++        if     mProcSaleMake ne ""
++           and mProcSaleMake ne ?
++        then
++           run value(mProcSaleMake)(
++                       input this-procedure  /*parparentproc*/
++                      ,input this-procedure /*p-parent-handle*/
++                      ,input this-procedure /*p-log-handle*/
++                      ,input v-parameter /*p-parameter*/ ) no-error .
++        else
++           run str/salemake.p (
+                        input this-procedure  /*parparentproc*/
+                       ,input this-procedure /*p-parent-handle*/
+                       ,input this-procedure /*p-log-handle*/
+diff --git a/str/saleincl.p b/str/saleincl.p
+--- a/str/saleincl.p
++++ b/str/saleincl.p
+@@ -301,7 +301,7 @@ then do:
+   /*получим значение фильтра и в Myenable покажем его*/
+   assign
+   v-filter-name = ink-doc.sale-filter-name
+-  v-where-phrase = ink-doc.sale-filter
++  v-where-phrase = ink-doc.sale-filter when ink-doc.sale-filter ne ?
+   p-filter-rus = ink-doc.sale-filter-rus
+   .
+ end.
+diff --git a/str/startNewShiftTso.p b/str/startNewShiftTso.p
+new file mode 100644
+--- /dev/null
++++ b/str/startNewShiftTso.p
+@@ -0,0 +1,29 @@
++define variable vss-revision    as character no-undo init "$Revision$":U .
++define variable vss-author      as character no-undo init "$Author$":U .
++define variable vss-date        as character no-undo init "$Date$":U .
++define variable vss-workfile    as character no-undo init "$Workfile$":U .
++define variable vss-archive     as character no-undo init "$Archive$":U .
++define variable vss-description as character no-undo init "Процедура закрытия смены и отпрытия новой".
++define input  parameter IMode as character no-undo.
++define variable mAsyncHelper as ibs.th.file.AsyncHelperth no-undo.
++{ adm/auto-def.i }
++{utl/asuncprocauto.i &starterasunc = yes}
++
++mAsyncHelper = new ibs.th.file.AsyncHelperth().
++mAsyncHelper:mProcPublish = this-procedure.
++mAsyncHelper:setCurrentUserPasswd().
++mAsyncHelper:MyBachMode = no.
++mAsyncHelper:SaveFile = yes.
++run addtask("ShiftTSO","str/proc-startNewShiftTso.p",IMode).
++if mAsyncHelper:isWorkShed()
++then do:
++   run gbl/dbdiscon.p no-error.
++   if error-status :error then do:
++       run write-to-log (  substitute( "&1. Не удалось отсоединиться от БД&2&3&2&4", vss-workfile, {&new-line}, return-value, error-status :get-message(1) ) ) no-error.
++       if error-status:error
++       then do:
++          run write-to-screen (return-value).
++       end.
++   end.
++   run waitproc ("Закрытие смены").
++end.
+\ No newline at end of file

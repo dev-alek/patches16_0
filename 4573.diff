@@ -1,0 +1,336 @@
+# HG changeset patch
+# User PGridchina
+# Parent  cd802cd2df47506c41f2c05508b6d474957ea9ec
+refs #4573 Длина поля Состав в настраиваемых полях
+
+http://exp-rm/redmine/issues/4573
+
+diff -r cd802cd2df47 gbl/attr-lib.p
+--- a/gbl/attr-lib.p	Thu Apr 26 09:44:47 2018 +0300
++++ b/gbl/attr-lib.p	Thu Apr 26 09:48:53 2018 +0300
+@@ -5839,8 +5839,8 @@
+ 
+ &glob type-attr-8x50 {&type-char}
+ &glob format-attr-8x50  "X(255)"
+-&glob label-attr-8x50   "Текст поля СОСТАВ 8x50 (CAS_LP-16x,SHTRIH-M)"
+-&glob tooltip-attr-8x50   "Текст поля СОСТАВ для этикетки 8x50 (CAS_LP-16x,SHTRIH-M)"
++&glob label-attr-8x50   "Текст поля СОСТАВ 8x50 (CAS_LP-16x/SHTRIH-M)"
++&glob tooltip-attr-8x50   "Текст поля СОСТАВ для этикетки 8x50 (CAS_LP-16/SHTRIH-M)"
+ &glob user-can-edit-attr-8x50  true
+ &glob output-display-attr-8x50  true
+ &glob other-attr-8x50  "spr-ext=ref\struct-i.w/spr-param=8x50/init=gds-attr_init-8x50"
+diff -r cd802cd2df47 gbl/updprint.w
+--- a/gbl/updprint.w	Thu Apr 26 09:44:47 2018 +0300
++++ b/gbl/updprint.w	Thu Apr 26 09:48:53 2018 +0300
+@@ -33,13 +33,13 @@
+ define input parameter  list-fields as character no-undo .
+ define input parameter  list-labels as character no-undo .
+ define input parameter  list-spr    as character no-undo .
+-define input parameter  list-size    as character no-undo .
+-define input parameter  list-format    as character no-undo .
++define input parameter  list-size   as character no-undo .
++define input parameter  list-format as character no-undo .
+ define input parameter  list-dim    as character no-undo .
+ define input parameter  kl          as integer   no-undo .
+ define output parameter ident       as recid     no-undo .
+-define output parameter P-LENGTH       as INTEGER     no-undo .
+-define output parameter P-NUM-CLMN       as INTEGER     no-undo .
++define output parameter P-LENGTH    as INTEGER   no-undo .
++define output parameter P-NUM-CLMN  as INTEGER   no-undo .
+ 
+ def var vss-revision    as character no-undo init "$Revision$":U .
+ def var vss-author      as character no-undo init "$Author$":U .
+@@ -55,28 +55,29 @@
+ 
+ def new shared var undo_ as logical initial no.
+ 
+-DEF VAR select3 AS CHARACTER INITIAL "" no-undo.
+-def var select3-size as character no-undo .
+-def var select3-format as character no-undo .
+-def var select3-type as character no-undo .
+-def var select3-label as character no-undo .
++define variable select3        AS CHARACTER INITIAL "" no-undo.
++define variable select3-size   as character no-undo .
++define variable select3-format as character no-undo .
++define variable select3-type   as character no-undo .
++define variable select3-label  as character no-undo .
+ 
+ /* Local Variable Definitions ---                                       */
+ 
+ { gbl/prtmpldt.i }
+ 
+ define buffer sel_t-f for t-f.
+-def var v-rb as character no-undo.
+-DEF VAR ii AS INTEGER no-undo.
+-DEF VAR jj AS INTEGER no-undo.
+-DEF VAR kk AS INTEGER no-undo.
+-DEF VAR ll AS INTEGER no-undo.
+-DEF VAR id AS RECID no-undo.
+-DEF VAR file-name LIKE _FILE-NAME no-undo.
+-define variable v-new as logical no-undo .
+-define variable v-length as integer no-undo.
+-define variable v-num-clmn as integer no-undo.
+-
++define variable v-rb       as character    no-undo.
++define variable ii         as integer      no-undo.
++define variable jj         as integer      no-undo.
++define variable kk         as integer      no-undo.
++define variable ll         as integer      no-undo.
++define variable mm         as integer      no-undo.
++define variable id         as recid        no-undo.
++define variable v-new      as logical      no-undo.
++define variable v-length   as integer      no-undo.
++define variable v-num-clmn as integer      no-undo.
++define variable file-name  LIKE _FILE-NAME no-undo.
++define variable v-file-name as character no-undo.
+ 
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+@@ -232,7 +233,7 @@
+ &ANALYZE-SUSPEND _UIB-CODE-BLOCK _DISPLAY-FIELDS BR-fields DIALOG-1 _FREEFORM
+   QUERY BR-fields DISPLAY
+       t-f.field-label format "X(30)" column-label "Название поля"
+-t-f.field-size format "X(3)":U column-label "Длина!поля"
++t-f.field-size format "X(4)":U column-label "Длина!поля"
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+     WITH NO-ROW-MARKERS SEPARATORS SIZE 40 BY 13.17
+@@ -242,7 +243,7 @@
+ &ANALYZE-SUSPEND _UIB-CODE-BLOCK _DISPLAY-FIELDS BR-sel-fields DIALOG-1 _FREEFORM
+   QUERY BR-sel-fields DISPLAY
+       sel_t-f.field-label format "X(30)" column-label "Название поля"
+-sel_t-f.field-size format "X(3)":U column-label "Длина!поля"
++sel_t-f.field-size format "X(4)":U column-label "Длина!поля"
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+     WITH NO-ROW-MARKERS SEPARATORS SIZE 40 BY 13.25
+@@ -369,7 +370,7 @@
+ ON CHOOSE OF b-down IN FRAME DIALOG-1 /* Вниз */
+ DO:
+ define variable v-order as integer no-undo.
+-define variable v-rec as recid no-undo.
++define variable v-rec   as recid   no-undo.
+ define buffer buf_sel-t-f for t-f.
+   if not available sel_t-f then do:
+     return no-apply.
+@@ -412,7 +413,7 @@
+ ON CHOOSE OF b-up IN FRAME DIALOG-1 /* Вверх */
+ DO:
+ define variable v-order as integer no-undo.
+-define variable v-rec as recid no-undo.
++define variable v-rec   as recid   no-undo.
+ define buffer buf_sel-t-f for t-f.
+   if not available sel_t-f then do:
+     return no-apply.
+@@ -464,7 +465,7 @@
+ DO:
+ define variable v-max-order as integer no-undo.
+ define buffer buf_t-f for t-f.
+-if not avail t-f then return no-apply.
++if not available t-f then return no-apply.
+ find last buf_t-f no-lock use-index iorder no-error.
+ if avail buf_t-f then do:
+     assign
+@@ -497,7 +498,7 @@
+ ON CHOOSE OF btn-remove IN FRAME DIALOG-1 /* Убрать */
+ DO:
+ define variable v-order as integer no-undo.
+-define buffer buf_t-f for t-f.
++define buffer buf_t-f  for t-f.
+ define buffer buf1_t-f for t-f.
+ 
+ if not available sel_t-f then do:
+@@ -536,7 +537,6 @@
+ &ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL Btn_OK DIALOG-1
+ ON CHOOSE OF Btn_OK IN FRAME DIALOG-1 /* Сохранить */
+ DO:
+-define variable v-file-name as character no-undo.
+ define buffer buf_sel-t-f for t-f.
+ if (can-find(ubflt.filter where ubflt.filter.call-point = c-point
+        and ubflt.filter.naim = input frame {&frame-name} ubflt.filter.naim) and v-new) or
+@@ -562,7 +562,7 @@
+          buf_sel-t-f.field-order > 0 :
+ assign
+ v-file-name = "":U.
+-do ii = 1 to num-entries(buf_sel-t-f.field-name, '{&delim-flt}':U):
++do ii = 1 to num-entries(buf_sel-t-f.field-name, '{&delim-flt}':U) :
+     assign
+     v-file-name = v-file-name + '{&delim-flt}':U + buf_sel-t-f.table-name + ".":U + entry(ii, buf_sel-t-f.field-name, '{&delim-flt}':U)
+     .
+@@ -636,23 +636,11 @@
+ IF Kl <> 0 THEN DO:
+    FIND FIRST ubflt.filter WHERE Num-flt = Kl.
+    assign
+-   select3 = ubflt.filter.Fields-sort
+-   select3-label = ubflt.filter.Fields-sort-rus
+-   select3-size = ubflt.filter.Where-ysl
++   select3        = ubflt.filter.Fields-sort
++   select3-label  = ubflt.filter.Fields-sort-rus
++   select3-size   = ubflt.filter.Where-ysl
+    select3-format = ubflt.filter.Where-ysl-rus
+-   select3-type = ubflt.filter.lst-cend
+-   /*
+-   List-Tabls = ubflt.filter.Tbl
+-  ubflt.filter.Flds = List-Fields
+-  ubflt.filter.Fields-sort = left-trim(SELECT3, {&comma-char})
+-  ubflt.filter.Fields-sort-rus = left-trim(SELECT3-label, {&comma-char})
+-  ubflt.filter.Where-ysl = left-trim(select3-size, {&comma-char})
+-  ubflt.filter.Where-ysl-rus = left-trim(select3-format, {&delim-par})
+-  ubflt.filter.lst-cend = left-trim(select3-type, {&comma-char})
+-
+-     */
+-
+-
++   select3-type   = ubflt.filter.lst-cend
+    .
+ END.
+ ELSE DO:
+@@ -660,8 +648,8 @@
+    assign
+    ubflt.filter.call-point = c-point
+    Kl = Num-flt
++   v-new = yes
+    .
+-   v-new = yes.
+ END.
+ assign
+ jj             = 0
+@@ -758,7 +746,8 @@
+   Parameters:  <none>
+   Notes:
+ ------------------------------------------------------------------------------*/
+-define variable v-label as character no-undo .
++define variable v-label     as character no-undo .
++
+ list-tabls_block:
+ do ii = 1 to num-entries(List-Buf):
+   assign
+@@ -768,13 +757,13 @@
+     if file-name = "function":U OR index(entry(1, entry(kk, list-spr), '.'), "ATTR":u) > 0 then do:
+       create t-f.
+       assign
+-      t-f.table-name = file-name
+-      t-f.field-name = entry(kk, List-Fields)
+-      t-f.field-type  = entry(2, entry(kk, list-spr), '.')
+-      t-f.field-label = entry(kk,List-Labels)
++      t-f.table-name   = file-name
++      t-f.field-name   = entry(kk, List-Fields)
++      t-f.field-type   = entry(2, entry(kk, list-spr), '.')
++      t-f.field-label  = entry(kk,List-Labels)
+       t-f.field-clabel = t-f.field-label
+-      t-f.field-spr = "":U
+-      t-f.field-size = entry(kk,List-Size)
++      t-f.field-spr    = "":U
++      t-f.field-size   = entry(kk,List-Size)
+       t-f.field-format = entry(kk,List-format, {&delim-par})
+       t-f.field-table-order = kk
+       .
+@@ -849,11 +838,19 @@
+         .
+       end. /*do ll = 1 to num-entries(entry(kk, List-Fields),'{&delim-flt}'):*/
+     end.
+-    if avail t-f then do:
++    if available t-f then do:
++      assign v-file-name = "".
++      do mm = 1 to num-entries(t-f.field-name, '{&delim-flt}':U) :
++          assign
++          v-file-name = v-file-name + '{&delim-flt}':U + t-f.table-name + ".":U + entry(mm, t-f.field-name, '{&delim-flt}':U)
++          .
++      end.
++      assign v-file-name = left-trim(v-file-name , '{&delim-flt}':U)   .
++
+       assign
+-      t-f.field-order =  lookup(t-f.table-name + ".":U + t-f.field-name, select3)
+-      v-num-clmn = v-num-clmn +  (if   t-f.field-order > 0 then 1 else 0)
+-      v-length = v-length + (if   t-f.field-order > 0 then integer(entry(t-f.field-order, ubflt.filter.where-ysl)) else 0)
++        t-f.field-order =  lookup(v-file-name, select3)
++        v-num-clmn = v-num-clmn +  (if   t-f.field-order > 0 then 1 else 0)
++        v-length = v-length + (if   t-f.field-order > 0 then integer(entry(t-f.field-order, ubflt.filter.where-ysl)) else 0)
+       .
+       assign
+       t-f.field-clabel = entry(kk,Select3-Label)
+@@ -862,14 +859,6 @@
+   end. /** do k **/
+   jj = jj + int(entry(ii,List-dim)).
+ end. /** do i **/
+-/*
+-output to hh.txt.
+-for each t-f no-lock:
+-display t-f.table-name t-f.field-name t-f.field-label t-f.field-table-order t-f.field-order.
+-end.
+-output close.
+-*/
+-
+ END PROCEDURE.
+ 
+ /* _UIB-CODE-BLOCK-END */
+@@ -888,7 +877,6 @@
+ v-rb = v-rb +
+            (if v-rb = "":U then "":U else {&comma-char}) +
+             entry(ii, list-buf) + {&comma-char} + entry(ii, list-tabls) .
+-.
+ end.
+ assign rs-tabs:radio-buttons in frame {&frame-name}= v-rb.
+ 
+diff -r cd802cd2df47 ref/gdsreffi.i
+--- a/ref/gdsreffi.i	Thu Apr 26 09:44:47 2018 +0300
++++ b/ref/gdsreffi.i	Thu Apr 26 09:48:53 2018 +0300
+@@ -147,36 +147,6 @@
+ end.
+ return v-value.
+ end FUNCTION.
+-FUNCTION gdsreffi_in-doc-cli-name returns character ( buffer buf_goods for ub.goods
+-                                          ,input p-obj-type as character
+-                                          ,input p-obj-code as integer):
+-define buffer buf_gds-obj for ub.gds-obj.
+-define buffer buf_trn-doc for ub.trn-doc.
+-define buffer buf_clients for ub.clients.
+-define buffer buf_parts for ub.parts.
+-define variable v-value as decimal no-undo .
+-
+-for first buf_gds-obj no-lock where
+-            buf_gds-obj.gds-code = buf_goods.gds-code
+-      AND  buf_gds-obj.obj-type = p-obj-type
+-      AND  buf_gds-obj.obj-code = p-obj-code ,  
+-          first buf_trn-doc no-lock where buf_trn-doc.doc-code = buf_gds-obj.in-code,
+-          first buf_clients no-lock where buf_clients.obj-type = buf_trn-doc.cli-type and  buf_clients.obj-code = buf_trn-doc.cli-code:  
+-        return buf_clients.obj-name .      
+-end.
+-/* Если докуммента не нашли, а это может быть в случае обрезания, то берем из партии */
+-for first buf_parts no-lock where
+-           buf_parts.artic = buf_goods.artic
+-      and  buf_parts.prod-type = buf_goods.prod-type
+-      and  buf_parts.prod-code = buf_goods.prod-code
+-      AND  buf_parts.obj-type = p-obj-type
+-      AND  buf_parts.obj-code = p-obj-code
+-      and  buf_parts.out-code = {&free-code} ,  
+-          
+-          first buf_clients no-lock where buf_clients.obj-type = buf_parts.supp-type and  buf_clients.obj-code = buf_parts.supp-code:  
+-        return buf_clients.obj-name .      
+-end.
+-end FUNCTION.
+ 
+ 
+ PROCEDURE gds-ref-fi:
+@@ -368,6 +338,21 @@
+       {&j-plus}
+       if jj = 9 then LEAVE.
+     end.
++  
++      else if entry(1, entry-ii, ".") = {&table_goods-attr} then  do: /* Если не глобальных атрибутов нет в настраиваемых полях не вижу смысла не выгружать их */
++        vvalue = "[!!Ошибка]".
++                run gds-attr-value in this-procedure ( fi-goods.gds-code
++                                                      ,input entry(2, entry(2, entry-ii, "."), "_")
++                                                      ,output vvalue
++                                                      ,output vtype) no-error.
++                                                      
++                myfi[jj] = vvalue.
++                /*
++                &if "{5}" <> "anyl-xls" &then
++                buf_usr-flt_custom-labels.custom-label  + {&space-char} +
++                &Endif
++                           native-string(vvalue, buf_usr-flt_custom-labels.fld-data-type, buf_usr-flt_custom-labels.custom-format).*/
++      end.  
+   END.
+   end.
+   assign

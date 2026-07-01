@@ -1,0 +1,16 @@
+# HG changeset patch
+# Parent  73912080d45862ea835cc4147d3323c621a6e2bf
+1c erp версия 14
+
+diff --git a/bge/oxmloutx.p b/bge/oxmloutx.p
+--- a/bge/oxmloutx.p
++++ b/bge/oxmloutx.p
+@@ -861,7 +861,7 @@ on error undo, return error return-value
+         
+         sw:start-element ("GC-ERPRN") .
+         
+-        sw:insert-attribute ("xmlns", "http://www.rosneft.ru/GasComplex/Retail/13.0") .
++        sw:insert-attribute ("xmlns", "http://www.rosneft.ru/GasComplex/Retail/14.0") .
+         sw:insert-attribute ("xmlns:xs", "http://www.w3.org/2001/XMLSchema") .
+         sw:insert-attribute ("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance") .
+ 

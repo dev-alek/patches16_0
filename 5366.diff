@@ -1,0 +1,18 @@
+# HG changeset patch
+# User EShklyar
+# Parent  8308ba516692759de5c5b0f7a57198cad82c3197
+refs #5366 Ошибки при формировании сменного отчета
+
+http://exp-rm1.expertek.local/issues/5366
+
+diff -r 8308ba516692 rep/icm-2df.i
+--- a/rep/icm-2df.i	Mon Oct 07 20:37:40 2019 +0300
++++ b/rep/icm-2df.i	Tue Oct 08 09:44:27 2019 +0300
+@@ -61,6 +61,7 @@
+ INDEX pi IS UNIQUE PRIMARY
+       gds-code
+       doc-code-trn
++      doc-code
+       supp-code
+ INDEX vi IS UNIQUE
+       gds-code

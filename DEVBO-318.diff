@@ -1,0 +1,104 @@
+# HG changeset patch
+# User ARostovtsev
+# Parent  681e8766ba735a3f20e6220e2c81adc9fbf1236d
+refs #DEVBO-318 Выверка формата обмена с 1С
+Исправления:
+1. Проверка обязательности тега stts в теге mark сообщения edi-doc
+2. Проверка обязательности тегов name-prov inn-prov в сообщении payment-agent
+3. Заполнение stts = 0 по умолчанию, если не передан тег del-f в сообщении cashier
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-318
+
+diff --git a/ibs/th/bge/1crn/subjects/mark.cls b/ibs/th/bge/1crn/subjects/mark.cls
+--- a/ibs/th/bge/1crn/subjects/mark.cls
++++ b/ibs/th/bge/1crn/subjects/mark.cls
+@@ -1,10 +1,10 @@
+ /*
+ 
+-$Revision$
+-$Author$
+-$Date$
+-$Workfile$
+-$Archive$
++$Revision: b10ceb95d184, 3329, rls $
++$Author: DRuban $
++$Date: 2023/05/19 13:37:08 $
++$Workfile: mark.cls $
++$Archive: ibs/th/bge/1crn/subjects/mark.cls $
+ 
+ kass-book:payment-agent - Секция с параметрами платежного агента из 1С
+ c 21/V-2019 самостоятельная сущность Платежные агента/Банковские платежные агенты
+@@ -90,14 +90,14 @@ class ibs.th.bge.1crn.subjects.mark inhe
+ 
+   method override protected void CheckData ():
+     def var v-str as char no-undo.
+-    
++
+     assign
+       v-str = v-str + ",mark-code"          when mark-code         = ? 
+ /*      v-str = v-str + ",unit-ext"           when unit-ext          = ? and obj-load eq "mark"    */
+       v-str = v-str + ",qnty-box"           when qnty-box          = ? and obj-load eq "mark"
+ /*      v-str = v-str + ",GTIN"               when GTIN              = ? and obj-load eq "mark" */
+ /*      v-str = v-str + ",gds-code"           when gds-code          = ? and obj-load eq "mark"*/
+-/*      v-str = v-str + ",stts"               when stts              = ?  */
++      v-str = v-str + ",stts"               when stts              = ? and obj-load eq "utd-mark"
+     .
+    
+     v-str = substring(v-str, 2).
+diff --git a/ibs/th/bge/1crn/subjects/payment-agent.cls b/ibs/th/bge/1crn/subjects/payment-agent.cls
+--- a/ibs/th/bge/1crn/subjects/payment-agent.cls
++++ b/ibs/th/bge/1crn/subjects/payment-agent.cls
+@@ -1,10 +1,10 @@
+ /*
+ 
+-$Revision$
+-$Author$
+-$Date$
+-$Workfile$
+-$Archive$
++$Revision: b10ceb95d184, 3329, rls $
++$Author: DRuban $
++$Date: 2023/05/19 13:37:08 $
++$Workfile: payment-agent.cls $
++$Archive: ibs/th/bge/1crn/subjects/payment-agent.cls $
+ 
+ kass-book:payment-agent - Секция с параметрами платежного агента из 1С
+ c 21/V-2019 самостоятельная сущность Платежные агента/Банковские платежные агенты
+@@ -140,6 +140,8 @@ class ibs.th.bge.1crn.subjects.payment-a
+       v-str = v-str + ",oper-pa"        when oper-pa        = ? and type-calc-repl ne 1
+       v-str = v-str + ",sign-pa"        when sign-pa        = ?
+       v-str = v-str + ",sign-pa-subj"   when sign-pa-subj   = ?
++      v-str = v-str + ",name-prov"      when sign-pa-subj   = ?
++      v-str = v-str + ",inn-prov"       when sign-pa-subj   = ?
+       v-str = v-str + ",type-calc-repl" when type-calc-repl = ?
+       v-str = v-str + ",max-sum"        when max-sum        = ?
+     .
+diff --git a/ref/imp-cashiers-1c-RN.p b/ref/imp-cashiers-1c-RN.p
+--- a/ref/imp-cashiers-1c-RN.p
++++ b/ref/imp-cashiers-1c-RN.p
+@@ -21,11 +21,11 @@ define input parameter p-Cashiers as cla
+ 
+ 
+ 
+-define variable vss-revision    as character no-undo init "$Revision$":U .
+-define variable vss-author      as character no-undo init "$Author$":U .
+-define variable vss-date        as character no-undo init "$Date$":U .
+-define variable vss-workfile    as character no-undo init "$Workfile$":U .
+-define variable vss-archive     as character no-undo init "$Archive$":U .
++define variable vss-revision    as character no-undo init "$Revision: 07968b41871b, 1804, rls $":U .
++define variable vss-author      as character no-undo init "$Author: EShklyar $":U .
++define variable vss-date        as character no-undo init "$Date: Tue Mar 05 16:32:36 2019 +0300 $":U .
++define variable vss-workfile    as character no-undo init "$Workfile: imp-cashiers-1c-RN.p $":U .
++define variable vss-archive     as character no-undo init "$Archive: ref/imp-cashiers-1c-RN.p $":U .
+ define variable vss-description as character no-undo init "Загрузка переоценки из ERP 1C RN".
+ { cmp/vssrevis.i }
+ { cmp/trg-def.i }
+@@ -220,7 +220,7 @@ do:
+       if p-Cashiers:del-l = 1 then buf_staff.date-end = v-today. 
+       else buf_staff.date-end = date("31/12/9999")  .
+       
+-      if p-Cashiers:del-f = 0 then bf_clients.stts = 0 .
++      if p-Cashiers:del-f = 0 or p-Cashiers:del-f = ? then bf_clients.stts = 0 .
+       
+     end.
+   end.  

@@ -1,0 +1,92 @@
+# HG changeset patch
+# User BelovaMM
+# Parent  66ef6aa44adaefce0359ce917936eb1e6fc2518f
+refs #DEVBO-753 Необходимо исключить из передачи на текстовую кассу параметр NeedUserSimpleAgeConfirm #BTS-2588
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-753
+https://msk-exp-jira.expertek.local/browse/BTS-2588
+
+diff --git a/str/send-all-work-gismt.p b/str/send-all-work-gismt.p
+--- a/str/send-all-work-gismt.p
++++ b/str/send-all-work-gismt.p
+@@ -27,6 +27,9 @@ define variable mObjType  as character n
+ define variable mObjCode  as integer   no-undo.
+ define variable mPostType as character no-undo.
+ define variable mCashNum  as integer   no-undo.
++define variable mCashDevice      as ibs.th.str.cash.CashDevice no-undo.
++define variable mCashTxt as log no-undo. /* текстовая касса */
++define variable mCashUI as log no-undo. /* графическая касса */
+ 
+ { gbl/cd-attr.i}
+ { str/def-thbjattr-list.i "shared" }  
+@@ -92,6 +95,10 @@ procedure putc :
+    define variable vAgeConfirm     as integer   no-undo.
+    define variable v-reg-code      as integer   no-undo.
+    
++   /* если не текстовая и не графическая, то не посылаем */
++   if not mCashUI and not mCashTxt 
++   then return. 
++   
+    assign
+       vAll = yes   
+       vMACC_IP = ""
+@@ -212,6 +219,7 @@ procedure putc :
+            run put-xml-data(iSAXWriter,"MaxApiToken",buf_thbj-attr.property-value-character,"Токен авторизации MAX").                      
+         end.
+         when {&attr-gisMT_AgeConfirm} then do:
++            if mCashUI then
+             run put-xml-data-ui(iSAXWriter,"NeedUserSimpleAgeConfirm",buf_thbj-attr.property-value-integer,"Проверка возраста при продаже НП").            
+         end.    
+      end case. 
+@@ -307,7 +315,7 @@ procedure putc :
+       if vResp_TH_requiredr <> ? then   
+       run put-xml-data(iSAXWriter,"Resp_TH_required",string(vResp_TH_requiredr),"Обязательность получения результатов проверки КМ в ТН").      
+       run put-xml-data(iSAXWriter,"MaxApiToken",vMaxApiToken,"Токен авторизации MAX").   
+-      if vAgeConfirm <> ? then                   
++      if vAgeConfirm <> ? and mCashUI then                   
+       run put-xml-data-ui(iSAXWriter,"NeedUserSimpleAgeConfirm",string(vAgeConfirm),"Проверка возраста при продаже НП").   
+    end.                                   
+    
+@@ -353,6 +361,10 @@ procedure set-cash-info:
+    define input         parameter iObjCode       as integer     no-undo.
+    define input         parameter iPostType      as character   no-undo.
+    define input         parameter iCashNum       as integer     no-undo.
++   
++   define variable v-device-kind as integer no-undo.
++   define buffer buf_cash-desk-attr for ub.cash-desk-attr .
++   
+    assign
+       mDB-num       = iDB-num
+       mObjType      = iObjType
+@@ -360,6 +372,31 @@ procedure set-cash-info:
+       mPostType     = iPostType
+       mCashNum      = iCashNum
+    .
++   
++   /* определяем тип кассы */
++   
++   find first buf_cash-desk-attr no-lock
++       where buf_cash-desk-attr.db-num   = mDB-num 
++         and buf_cash-desk-attr.obj-code = mObjCode         
++         and buf_cash-desk-attr.pos-type = mPostType
++         and buf_cash-desk-attr.cash-num = mCashNum
++         and buf_cash-desk-attr.upper-attr-code = mPostType + "_operative":U
++         and buf_cash-desk-attr.attr-code       = "device-kind":U no-error .
++   if available buf_cash-desk-attr then
++       v-device-kind = buf_cash-desk-attr.attr-value-integer .
++   else 
++      v-device-kind = 0 .              
++  
++   mCashDevice      = new ibs.th.str.cash.CashDevice().
++   assign
++      mCashTxt = v-device-kind eq mCashDevice:Standard:keyint
++      mCashUI = v-device-kind eq mCashDevice:GrafCash:keyint
++      .   
++   delete object mCashDevice.
++end.
++
++procedure get-cash-types:
++   define output parameter otypes as character no-undo init "{&bef-cd-type-IBM-XML}".
+ end.
+ 
+ procedure get-root-teg:

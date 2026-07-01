@@ -1,0 +1,56 @@
+# HG changeset patch
+# User ARostovtsev
+# Parent  c9a1dac23d878612baa98c03d09e5d0815b8dbbf
+refs #DEVBO-266 КМ групповой упаковки остается в статусе Проверен
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-266
+
+diff --git a/trg/partcopy.i b/trg/partcopy.i
+--- a/trg/partcopy.i
++++ b/trg/partcopy.i
+@@ -268,6 +268,7 @@ procedure partcopy :
+           and ub.goods.prod-type = buf_parts.prod-type
+           and ub.goods.prod-code = buf_parts.prod-code.
+         def buffer buf_orig_ml for ub.marking-lines.
++        def buffer buf_marking_orig for ub.marking.
+ 
+         for each buf_orig_ml where buf_orig_ml.gds-code = ub.goods.gds-code
+           and buf_orig_ml.obj-type = buf_orig_parts.obj-type
+@@ -275,7 +276,9 @@ procedure partcopy :
+           and buf_orig_ml.in-code = buf_orig_parts.in-code
+           and buf_orig_ml.out-code = buf_orig_parts.out-code
+           and buf_orig_ml.part-code = buf_orig_parts.part-code
+-          and buf_orig_ml.prt-code = buf_orig_parts.prt-code:
++          and buf_orig_ml.prt-code = buf_orig_parts.prt-code,
++            first buf_marking_orig where buf_marking_orig.mark = buf_orig_ml.mark no-lock 
++          break by buf_marking_orig.mark-parent:
+ 
+           if available pri_trn-doc
+           and pri_trn-doc.ext-doc-type = {&TDEDT_Pri_Perem}
+@@ -338,7 +341,25 @@ procedure partcopy :
+ /*            end.                                                                                                  */
+               validate buf_marking.
+           end .
+-
++          if pri_trn-doc.ext-doc-type = {&TDEDT_Pri_Vnesh} and 
++             last-of(buf_marking_orig.mark-parent) and 
++             buf_marking_orig.mark-parent <> "" then
++          do:  /* для внешнего прихода, если это последняя марка упаковки, то меняем статус упаковки */
++            MARK_CHILDS:
++            for each buf_marking-childs no-lock where buf_marking-childs.mark-parent = buf_marking_orig.mark-parent break by buf_marking-childs.mark:
++              if first(buf_marking-childs.mark) then 
++                v-parent-mark-sts = buf_marking-childs.sts.
++              if v-parent-mark-sts <> buf_marking-childs.sts then
++              do:  /* если статусы потребительских упаковок разные, то статус групповой упаковки будет разгруппирован */
++                v-parent-mark-sts = objSrv:Env:Marking:Sts:Mark:Ungrouped:KeyIntDB .
++                leave MARK_CHILDS. 
++              end.
++            end .
++            for first buf_marking-pack exclusive-lock where buf_marking-pack.mark = buf_marking_orig.mark-parent :
++              buf_marking-pack.sts = v-parent-mark-sts .
++              validate buf_marking-pack.
++            end.
++          end.
+         end .
+         end.    /*if avail buf_trn-doc and buf_trn-doc.doc-type <> {&inventory}*/
+       end .

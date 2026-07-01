@@ -1,0 +1,30 @@
+# HG changeset patch
+# User VSpiridonov
+# Parent  f2a70ef962fa3ce536cf531b63e04ec46003e3f5
+refs #DEVBO-315 BTS-1226 Ошибка при разборе пакета из 1С ERP на УБД. РН-СЗ.
+
+откат изменений по BTS-706, изменен в imp-goods-1C-RN.p
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-315
+https://msk-exp-jira.expertek.local/browse/BTS-1226
+
+diff --git a/ref/imp-goods-1C-RN.p b/ref/imp-goods-1C-RN.p
+--- a/ref/imp-goods-1C-RN.p
++++ b/ref/imp-goods-1C-RN.p
+@@ -529,7 +529,7 @@ end.
+        end.                                
+   end.   
+   
+-  
++/* откат изменений по BTS-707 devbo-203   
+   
+   if p-GdsObj:gds-type = {&gds-goods} then do:   /* атрибут товар, если до него был атрибут блюдо */ 
+        for each buf-clients no-lock where buf-clients.db-num = g#db-num
+@@ -576,6 +576,7 @@ end.
+ /*           par-recid-fbr    =  if available fbr-gds-obj then recid(fbr-gds-obj) else ?.    */
+        end.                                
+   end.   
++откат изменений по BTS-707 devbo-203    */
+ 
+   /* ----- баркоды товара ----- */
+   v-barcode-list = "" .

@@ -1,0 +1,285 @@
+# HG changeset patch
+# User DRuban
+# Parent  9dc289a2f737f7e9fffa724bfc213e2264df91ba
+refs #DISP-718 Создание скрипта для автоматического закрытия смен ТН на несколькихААЗС
+Выгрузка статуса
+http://exp-jira.expertek.local:8080/browse/DISP-718
+
+diff --git a/bge/dispsetting.xml b/bge/dispsetting.xml
+new file mode 100644
+--- /dev/null
++++ b/bge/dispsetting.xml
+@@ -0,0 +1,7 @@
++<?xml version="1.0" encoding="windows-1251"?>
++<System>
++  <disp>
++    <port>8080</port>
++  </disp>
++</System>
++
+diff --git a/ibs/th/bge/disp/dispStatus.cls b/ibs/th/bge/disp/dispStatus.cls
+new file mode 100644
+--- /dev/null
++++ b/ibs/th/bge/disp/dispStatus.cls
+@@ -0,0 +1,60 @@
++ 
++/*
++  $Revision:$
++  $Author:$
++  $Date:$
++  $Workfile:$
++  $Archive:$
++  
++  Автор: Рубан Дмитрий Андреевич 
++  Дата создания: 9 янв. 2023 г.
++  Author:  Ruban Dmitriy Andreevich
++  Creation date: 9 янв. 2023 г.
++  
++  */
++
++USING Progress.Lang.*.
++
++CLASS ibs.th.bge.disp.dispstatus INHERITS   ibs.th.gbl.sys.objth :
++   DEFINE OVERRIDE PUBLIC PROPERTY vss-revision    AS CHARACTER NO-UNDO INIT "$Revision:$":U GET .
++   DEFINE OVERRIDE PUBLIC PROPERTY vss-author      AS CHARACTER NO-UNDO INIT "$Author:$":U GET.
++   DEFINE OVERRIDE PUBLIC PROPERTY vss-date        AS CHARACTER NO-UNDO INIT "$Date:$":U GET.
++   DEFINE OVERRIDE PUBLIC PROPERTY vss-workfile    AS CHARACTER NO-UNDO INIT "$Workfile:$":U GET.
++   DEFINE OVERRIDE PUBLIC PROPERTY vss-archive     AS CHARACTER NO-UNDO INIT "$Archive:$":U GET.
++   DEFINE OVERRIDE PUBLIC PROPERTY vss-description AS CHARACTER NO-UNDO INIT "Статус для диспектчерской" GET.
++    
++    
++   DEFINE PUBLIC PROPERTY pMessage AS CHARACTER NO-UNDO 
++   GET.
++   SET.
++    
++   DEFINE PUBLIC PROPERTY shiftUTC AS DATETIME NO-UNDO 
++   GET.
++   SET.
++   
++   DEFINE PUBLIC PROPERTY shiftNumber AS CHARACTER NO-UNDO 
++   GET.
++   SET.
++   
++   DEFINE PUBLIC PROPERTY Order AS INT NO-UNDO 
++   GET.
++   SET.
++
++
++
++   DEFINE PUBLIC PROPERTY isError AS LOGICAL NO-UNDO 
++   GET.
++   SET.
++   
++   method public longchar getjson():
++       DEFINE VARIABLE mesjson AS LOngchar NO-UNDO.
++       mesjson = SUBSTITUTE ('~{"message":"&1","shiftUTC":"&2","shiftNuber":&3,"order":&4,"isError":&5}',
++       pMessage,
++       shiftUTC,
++       shiftNumber,
++       Order,
++       isError).
++       return mesjson.  
++   end.
++   
++END CLASS.
+\ No newline at end of file
+diff --git a/ibs/th/bge/disp/dispsetting.cls b/ibs/th/bge/disp/dispsetting.cls
+new file mode 100644
+--- /dev/null
++++ b/ibs/th/bge/disp/dispsetting.cls
+@@ -0,0 +1,74 @@
++ 
++/*
++  $Revision:$
++  $Author:$
++  $Date:$
++  $Workfile:$
++  $Archive:$
++  
++  Автор: Рубан Дмитрий Андреевич 
++  Дата создания: 9 янв. 2023 г.
++  Author:  Ruban Dmitriy Andreevich
++  Creation date: 9 янв. 2023 г.
++  
++  */
++
++using Progress.Lang.*.
++
++class ibs.th.bge.disp.dispsetting inherits   ibs.th.gbl.sys.objth :
++   define override public property vss-revision    as character no-undo init "$Revision:$":U get .
++   define override public property vss-author      as character no-undo init "$Author:$":U get.
++   define override public property vss-date        as character no-undo init "$Date:$":U get.
++   define override public property vss-workfile    as character no-undo init "$Workfile:$":U get.
++   define override public property vss-archive     as character no-undo init "$Archive:$":U get.
++   define override public property vss-description as character no-undo init "Настройки разработчиков" get.
++    
++    
++   { cmp/str-glbl.i class }  
++   { GBL/xmldom.i   class }
++   { cmp/library.i class }
++   define public property LoginAuth as character no-undo 
++   get.
++   private set.
++    
++   define public property PswdAuth as character no-undo 
++   get.
++   private set.
++   
++   define public property hostdisp as character no-undo 
++   get.
++   private set.
++   
++   define public property PortDisp as int no-undo init 8092 
++   get.
++   private set.
++   
++   
++   constructor public dispsetting ():
++      define variable vFilesetting as character no-undo.
++      define variable vFound as logical no-undo.
++      define variable vText as character no-undo.
++       
++      vFilesetting = SearchFile("bge/dispsetting.xml").
++      if      vFileSetting ne ?
++      then do:
++         
++         xmldom-load(vFileSetting).
++         xmldom-read-unique("disp","PswdAuth",output PswdAuth, output vFound).
++         xmldom-read-unique("disp","LoginAuth",output LoginAuth, output vFound).
++         xmldom-read-unique("disp","host",output hostdisp, output vFound).
++         if hostdisp eq ""
++            or hostdisp eq ?
++         then hostdisp = "127.0.0.1".
++         xmldom-read-unique("disp","port",output vtext, output vFound).
++         if    vtext ne ""
++            and vtext ne ?
++         then
++            portDisp = int(vText) no-error.
++         
++      end.
++   end constructor.
++  
++    
++    { utl/search.i class }
++end class.
+\ No newline at end of file
+diff --git a/ibs/th/str/CloseAndOpenShift.cls b/ibs/th/str/CloseAndOpenShift.cls
+--- a/ibs/th/str/CloseAndOpenShift.cls
++++ b/ibs/th/str/CloseAndOpenShift.cls
+@@ -435,4 +435,46 @@ class ibs.th.str.CloseAndOpenShift:
+       end.
+       return oOk.
+    end.
++   method public datetime format_datetime (
++    input v-date as date,
++    input v-time as integer
++    ):
++    return datetime(
++    month(v-date),
++    day(v-date),
++    year(v-date),
++    int(entry(1,string(v-time, "HH:MM:SS:000"),":")),
++    int(entry(2,string(v-time, "HH:MM:SS:000"),":")),
++    int(entry(3,string(v-time, "HH:MM:SS:000"),":"))).
++   end.
++   
++   method public ibs.th.bge.disp.dispstatus getStatusObj():
++      def var oobj as class ibs.th.bge.disp.dispstatus no-undo.
++      oobj = new ibs.th.bge.disp.dispstatus().
++      for each clients where clients.db-num   eq g#dbnum
++                         and clients.obj-type eq {&shop}
++                         and clients.stts     eq 0
++      no-lock:
++         find last shift-obj where shift-obj.obj-type eq clients.obj-type
++                               and shift-obj.obj-code eq clients.obj-code
++                               and shift-obj.status_  eq {&sht-current}
++         no-lock no-error.
++         if avail shift-obj
++         then do:
++            oobj:shiftutc = format_datetime(shift-obj.open-date,shift-obj.open-time).
++            oobj:shiftNumber = shift-obj.shift-name.
++            oobj:order       = shift-obj.shift-num.
++            return oobj.
++         end.
++     end.
++     return oobj.
++  end.
++  def var dispSetting as ibs.th.bge.disp.dispsetting no-undo.
++   method public ibs.th.bge.disp.dispsetting getDispSet():
++      if not VALID-OBJECT (dispSetting)
++      then
++         dispSetting = new ibs.th.bge.disp.dispSetting().
++      
++      return dispSetting.
++  end. 
+ end class.
+\ No newline at end of file
+diff --git a/str/proc-startNewShiftTso.p b/str/proc-startNewShiftTso.p
+--- a/str/proc-startNewShiftTso.p
++++ b/str/proc-startNewShiftTso.p
+@@ -9,8 +9,21 @@ define variable mcicle as integer no-und
+ { adm/auto-def.i }
+ { cmp/trg-def.i }
+ { gbl/getcntxa.i }
++{ bge/socet.i }
++mFileLogSocet = "Async".
+ define variable parparentproc as handle no-undo.
+ parparentproc = this-procedure.
++DEFINE VARIABLE mERRtest AS CHARACTER NO-UNDO.
++DEFINE VARIABLE mERRflag AS logical   NO-UNDO.
++
++procedure PutMesAsuncErr:
++    DEFINE INPUT  PARAMETER itext AS CHARACTER NO-UNDO.
++    if mERRtest eq ""
++    then
++       mERRtest = itext.
++    mERRflag = yes.
++    run PutStatAsunc(itext).
++end.
+ 
+ define new shared variable oxml-exch-dir as character no-undo .
+ define new shared variable oxml-heap-dir as character no-undo .
+@@ -45,12 +58,12 @@ do  on error  undo, return error:
+    run PutStatAsunc("Создаем продажу").
+    if not mWorkShift:crSale(mcicle)
+    then
+-      run PutMesAsunc("Не удалось создать продажу").
++      run PutMesAsuncErr("Не удалось создать продажу").
+ 
+    run PutStatAsunc("Создаем контрольную сверку").
+    if not mWorkShift:crRvsControl(mcicle)
+    then
+-      run PutMesAsunc("Не удалось создать контрольную сверку").
++      run PutMesAsuncErr("Не удалось создать контрольную сверку").
+    
+    run PutStatAsunc("Открываем смены").
+    if not mWorkShift:openShift(mcicle)
+@@ -64,13 +77,26 @@ do  on error  undo, return error:
+    run PutStatAsunc("Создаем сменную сверку").
+    if not mWorkShift:crRvsShift(mcicle)
+    then
+-      run PutMesAsunc("Не удалось создать сменную сверку").
++      run PutMesAsuncErr("Не удалось создать сменную сверку").
+    run PutStatAsunc("Открывем новую смену").
+    
+    if not mWorkShift:OpenShiftTh(3)
+    then
+-      run PutMesAsunc("Не удалось открыть смену TH").
++      run PutMesAsuncErr("Не удалось открыть смену TH").
+    
++   run PutStatAsunc("Отправляем статус ").
++   DEFINE VARIABLE dispStat AS ibs.th.bge.disp.dispstatus NO-UNDO.
++   dispStat = mWorkShift:getStatusObj().
++   dispStat:pMessage = mERRtest.
++   dispStat:isError = mERRflag.
++   run ConectSocet(mWorkShift:getDispSet():hostdisp,
++                   mWorkShift:getDispSet():portdisp,
++                   "THController/message",
++                   dispStat:getjson(),
++                   "",
++                   ?,
++                   yes,
++                   "Отправка статуса в диспетчерскую").
+    run PutStatAsunc("Выгружаем данные в 1С").
+    
+    /*    выгрузка в 1С-Erp*/

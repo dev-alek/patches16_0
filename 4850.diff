@@ -1,0 +1,91 @@
+# HG changeset patch
+# User SSlivenko
+# Parent  9c6be9e14b3d43f687fd63314c8948d90d34bdea
+refs #4850 Запуск стартап-процедуры extexcel.p
+
+http://exp-rm1.expertek.local/issues/4850
+перед запуском extexcel.p добалено и потом исключено сообщение с просьбой прислать ini-файлы
+
+diff -r 9c6be9e14b3d gbl/syn3.p
+--- a/gbl/syn3.p	Вт мар 15 12:20:13 2022 +0300
++++ b/gbl/syn3.p	Вт мар 15 12:20:42 2022 +0300
+@@ -34,7 +34,6 @@
+ define variable vss-archive     as character no-undo init "$Archive$":U .
+ define variable vss-description as character no-undo init "Запуск на выполнение командной строки без экрана".
+ { cmp/vssrevis.i }
+-{ gbl/waitfram.i }
+ 
+ 
+ do
+@@ -44,7 +43,6 @@
+   define variable bat-file as char no-undo.
+   run gbl/_tmpfile.p ("", "bat", output bat-file) .
+ 
+-  run waitfram-show in this-procedure ( mess ).
+   Result = ''.
+   OS-DELETE value(err-file).
+ 
+@@ -52,7 +50,6 @@
+   PUT  UNFORMATTED cmd SKIP.
+   output close.
+ 
+-  run waitfram-show in this-procedure ( mess ).
+   OS-COMMAND silent value(bat-file).
+ 
+   /* время ожидания в секундах */
+@@ -75,7 +72,6 @@
+       import unformatted result no-error.
+       input close.
+       if error-status:error then do:
+-          run waitfram-hide in this-procedure .
+           OS-DELETE value(err-file).
+           OS-DELETE value(bat-file).
+           return error.
+@@ -87,7 +83,6 @@
+     end.
+   END.
+ 
+-  run waitfram-hide in this-procedure .
+ 
+   if v-err-file-found <> true then do:
+     message vss-workfile vss-revision vss-description skip
+diff -r 9c6be9e14b3d rep/runexcel.p
+--- a/rep/runexcel.p	Вт мар 15 12:20:13 2022 +0300
++++ b/rep/runexcel.p	Вт мар 15 12:20:42 2022 +0300
+@@ -149,7 +149,7 @@
+       run gbl/syn3.p
+         (input v-cmdln
+         ,input err-file
+-        ,input "Ждите! Идет форматирование файла..."
++        ,input "" /* "Ждите! Идет форматирование файла..." */
+         ,output res
+         ) no-error .
+ 
+diff -r 9c6be9e14b3d str/runtekka.p
+--- a/str/runtekka.p	Вт мар 15 12:20:13 2022 +0300
++++ b/str/runtekka.p	Вт мар 15 12:20:42 2022 +0300
+@@ -36,6 +36,7 @@
+ define variable vss-description as character no-undo init "Запуск дополнительной сессии для коммуникации с кассой МАРИЯ".
+ { cmp/vssrevis.i }
+ { cmp/str-glbl.i }
++{ gbl/waitfram.i }
+ 
+ define variable tempfile     as character no-undo.
+ define variable tempfile-tsk as character no-undo .
+@@ -123,13 +124,15 @@
+ 
+   /* запуск второй сессии с ожиданием завершения */
+   if not p-is-script then do:
++    run waitfram-show in this-procedure ( "Ждите! Идет обмен информацией с ТЭККА..." ).
+     run gbl/syn3.p
+       (
+        input v-cmdln
+       ,input err-file
+-      ,input "Ждите! Идет обмен информацией с ТЭККА..."
++      ,input ""
+       ,output res
+       ) no-error .
++    run waitfram-hide in this-procedure .
+   end.
+   else do:
+     assign

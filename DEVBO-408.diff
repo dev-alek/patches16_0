@@ -1,0 +1,634 @@
+# HG changeset patch
+# User ARostovtsev
+# Parent  ce3e6d2929ce414d361dea4f51f13de255b3e715
+refs #DEVBO-408 Нет утилиты по пересчету фин архивов
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-408
+
+diff --git a/utl/rclcfarh1.w b/utl/rclcfarh1.w
+new file mode 100644
+--- /dev/null
++++ b/utl/rclcfarh1.w
+@@ -0,0 +1,621 @@
++&ANALYZE-SUSPEND _VERSION-NUMBER AB_v10r12 GUI
++&ANALYZE-RESUME
++&Scoped-define WINDOW-NAME CURRENT-WINDOW
++&Scoped-define FRAME-NAME Dialog-Frame
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CUSTOM _DEFINITIONS Dialog-Frame
++/*
++
++$Revision: f7f4e950f623, 0, rls $
++$Author: expertek $
++$Date: 2012/10/22 17:03:47 $
++$Workfile: rclcfarh1.w $
++$Archive: utl/rclcfarh1.w $
++
++Утилита пересчёта финансовых архивов.
++
++Автор: Сливенко Сергей Андреевич
++Дата создания: 13/03/12
++Author: Sergey Slivenko
++Creation date: 13/03/12
++
++*/
++
++define variable vss-revision    as character no-undo init "$Revision: f7f4e950f623, 0, rls $":U .
++define variable vss-author      as character no-undo init "$Author: expertek $":U .
++define variable vss-date        as character no-undo init "$Date: 2012/10/22 17:03:47 $":U .
++define variable vss-workfile    as character no-undo init "$Workfile: rclcfarh1.w $":U .
++define variable vss-archive     as character no-undo init "$Archive: utl/rclcfarh1.w $":U .
++define variable vss-description as character no-undo init "Утилита пересчёта финансовых архивов".
++{ cmp/vssrevis.i }
++{ cmp/str-glbl.i }
++{ cmp/tblfname.i }
++{ gbl/userhsts.i }
++{ gbl/userobjs.i }
++{ gbl/twowin.i   }
++{ gbl/getcntxt.i def }
++
++/* ***************************  Definitions  ************************** */
++
++/* Parameters Definitions ---                                           */
++
++define input parameter parParentProc  as widget-handle no-undo.
++
++/* Local Variable Definitions ---                                       */
++
++define variable v-user-select      as logical   no-undo .
++define variable v-select-host-code as integer   no-undo .
++define variable v-obj-count        as integer   no-undo .
++define variable v-sel-type         as logical   no-undo .
++define variable v-list             as character no-undo .
++
++define buffer buf_clients for ub.clients.
++
++
++define temp-table temp_obj-list no-undo
++    field obj-type as character
++    field obj-code as integer
++    index pi is primary unique obj-type obj-code
++.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++&ANALYZE-SUSPEND _UIB-PREPROCESSOR-BLOCK
++
++/* ********************  Preprocessor Definitions  ******************** */
++
++&Scoped-define PROCEDURE-TYPE Dialog-Box
++&Scoped-define DB-AWARE no
++
++/* Name of designated FRAME-NAME and/or first browse and/or first query */
++&Scoped-define FRAME-NAME Dialog-Frame
++
++/* Standard List Definitions                                            */
++&Scoped-Define ENABLED-OBJECTS x-date x-mode b-firm b-obj b-doc-type ~
++x-doc-type Btn_OK Btn_Cancel x-fin-ob
++&Scoped-Define DISPLAYED-OBJECTS x-date x-mode x-doc-type x-fin-ob
++
++/* Custom List Definitions                                              */
++/* List-1,List-2,List-3,List-4,List-5,List-6                            */
++
++/* _UIB-PREPROCESSOR-BLOCK-END */
++&ANALYZE-RESUME
++
++
++
++/* ***********************  Control Definitions  ********************** */
++
++/* Define a dialog box                                                  */
++
++/* Definitions of the field level widgets                               */
++DEFINE BUTTON b-doc-type
++     LABEL "Изменить"
++     SIZE 20 BY .95.
++
++DEFINE BUTTON b-firm
++     LABEL "Выбор фирмы"
++     SIZE 20 BY .95.
++
++DEFINE BUTTON b-obj
++     LABEL "Выбор объектов"
++     SIZE 20 BY .95.
++
++DEFINE BUTTON Btn_Cancel AUTO-END-KEY
++     LABEL "Отмена"
++     SIZE 15 BY 1.14
++     BGCOLOR 8 .
++
++DEFINE BUTTON Btn_OK AUTO-GO
++     LABEL "Выполнить"
++     SIZE 15 BY 1.14
++     BGCOLOR 8 .
++
++DEFINE VARIABLE x-date AS DATE FORMAT "99/99/9999":U INITIAL TODAY
++     LABEL "Дата"
++     VIEW-AS FILL-IN
++     SIZE 14 BY 1 TOOLTIP "Дата, с которой будут пересчитаны финансовые архивы (до сегодняшнего дня)" NO-UNDO.
++
++DEFINE VARIABLE x-mode AS CHARACTER
++     VIEW-AS RADIO-SET VERTICAL
++     RADIO-BUTTONS
++          "По фирме", "firm",
++"По объектам", "obj"
++     SIZE 18 BY 2.62 NO-UNDO.
++
++DEFINE VARIABLE x-doc-type AS CHARACTER
++     VIEW-AS SELECTION-LIST SINGLE NO-DRAG SCROLLBAR-VERTICAL
++     LIST-ITEM-PAIRS "< ВСЕ > "," ''"
++     SIZE 43 BY 6 NO-UNDO.
++
++DEFINE VARIABLE x-fin-ob AS LOGICAL INITIAL no
++     LABEL "Учитывать архивы по фин. обязательствам"
++     VIEW-AS TOGGLE-BOX
++     SIZE 43 BY 1 NO-UNDO.
++
++/* ************************  Frame Definitions  *********************** */
++
++DEFINE FRAME Dialog-Frame
++     x-date AT ROW 1.95 COL 9 COLON-ALIGNED WIDGET-ID 2
++     x-mode AT ROW 3.67 COL 5 NO-LABEL WIDGET-ID 4
++     b-firm AT ROW 3.81 COL 28 WIDGET-ID 8
++     b-obj AT ROW 5.1 COL 28 WIDGET-ID 10
++     b-doc-type AT ROW 6.86 COL 28 WIDGET-ID 16
++     x-doc-type AT ROW 7.9 COL 5 NO-LABEL WIDGET-ID 12
++     x-fin-ob   AT ROW 14.3 COL 5.1 WIDGET-ID 18
++     Btn_OK AT ROW 16 COL 7
++     Btn_Cancel AT ROW 16 COL 30
++     "Типы архивов:" VIEW-AS TEXT
++          SIZE 16 BY .62 AT ROW 6.95 COL 5 WIDGET-ID 14
++          FGCOLOR 4
++     SPACE(30.19) SKIP(10.37)
++    WITH VIEW-AS DIALOG-BOX KEEP-TAB-ORDER
++         SIDE-LABELS NO-UNDERLINE THREE-D  SCROLLABLE
++         TITLE "Утилита пересчета фин. архивов"
++         DEFAULT-BUTTON Btn_OK CANCEL-BUTTON Btn_Cancel WIDGET-ID 100.
++
++
++/* *********************** Procedure Settings ************************ */
++
++&ANALYZE-SUSPEND _PROCEDURE-SETTINGS
++/* Settings for THIS-PROCEDURE
++   Type: Dialog-Box
++   Allow: Basic,Browse,DB-Fields,Query
++   Other Settings: COMPILE
++ */
++&ANALYZE-RESUME _END-PROCEDURE-SETTINGS
++
++
++
++/* ***********  Runtime Attributes and AppBuilder Settings  *********** */
++
++&ANALYZE-SUSPEND _RUN-TIME-ATTRIBUTES
++/* SETTINGS FOR DIALOG-BOX Dialog-Frame
++   FRAME-NAME                                                           */
++ASSIGN
++       FRAME Dialog-Frame:SCROLLABLE       = FALSE
++       FRAME Dialog-Frame:HIDDEN           = TRUE.
++
++/* _RUN-TIME-ATTRIBUTES-END */
++&ANALYZE-RESUME
++
++
++
++
++
++/* ************************  Control Triggers  ************************ */
++
++&Scoped-define SELF-NAME Dialog-Frame
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL Dialog-Frame Dialog-Frame
++ON WINDOW-CLOSE OF FRAME Dialog-Frame /* Утилита пересчета фин. архивов */
++DO:
++  APPLY "END-ERROR":U TO SELF.
++END.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL x-mode Dialog-Frame
++ON value-changed OF x-mode IN FRAME Dialog-Frame
++DO:
++  if x-mode:screen-value = "firm" then do :
++    enable  b-firm with frame {&frame-name}.
++    disable b-obj  with frame {&frame-name}.
++    display b-firm b-obj with frame {&frame-name}.
++  end.
++  if x-mode:screen-value = "obj" then do :
++    enable  b-obj  with frame {&frame-name}.
++    disable b-firm with frame {&frame-name}.
++    display b-firm b-obj with frame {&frame-name}.
++  end.
++  if v-sel-type then do :
++    message "Для фирм и объектов список типов архивов разный." {&new-line} "Проверьте, что выбраны нужные типы архивов." view-as alert-box information.
++    v-sel-type = false.
++  end.
++END.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL Btn_Ok Dialog-Frame
++ON CHOOSE OF Btn_Ok IN FRAME Dialog-Frame
++DO:
++  define variable glog as logical no-undo .
++  assign x-date x-mode x-fin-ob.
++  if x-date > TODAY then do :
++    message "Неверная дата!" view-as alert-box.
++    return no-apply.
++  end.
++  if x-mode = "firm" then do :
++    if v-select-host-code = 0 or v-select-host-code = ? then do :
++      message "Выберите фирму!" view-as alert-box.
++      return no-apply.
++    end.
++    run utl/rclcfarh.p(
++      input v-select-host-code,
++      input x-fin-ob,
++      input v-list)
++    .
++  end.
++  if x-mode = "obj"  then do :
++    find first temp_obj-list no-lock no-error.
++    if not available temp_obj-list then do :
++      message "Не выбран ни один объект!" view-as alert-box.
++      return no-apply.
++    end.
++    for each temp_obj-list no-lock :
++      find first buf_clients no-lock where buf_clients.obj-type = temp_obj-list.obj-type and buf_clients.obj-code = temp_obj-list.obj-code no-error.
++      run utl/rclcfarh.p(
++        input buf_clients.host-code,
++        input x-fin-ob,
++        input v-list)
++      .
++    end.
++  end.
++
++  message "Готово!" view-as alert-box.
++END.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL b-firm Dialog-Frame
++ON CHOOSE OF b-firm IN FRAME Dialog-Frame
++DO:
++  { gbl/stdbtn.i }
++
++  run proc-sel-host in this-procedure no-error.
++  if error-status:error then do:
++    return no-apply.
++  end.
++
++END.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL b-obj Dialog-Frame
++ON CHOOSE OF b-obj IN FRAME Dialog-Frame
++DO:
++  { gbl/stdbtn.i }
++
++  run userobjs_clear in this-procedure no-error.
++  if error-status:error then do:
++    return no-apply.
++  end.
++
++  { gbl/uobjsman.i
++    parparentproc
++    v-cntxt-db-num
++    v-cntxt-userid
++    v-cntxt-host-code-obj
++    v-cntxt-obj-type
++    v-cntxt-obj-code
++    v-user-select
++  }
++  if v-user-select = true
++  then do:
++      empty temp-table temp_obj-list.
++  end.
++  else do:
++      message
++          "Не выбрано ни одного объекта"
++      view-as alert-box information
++      title "Выбор объекта".
++      return no-apply .
++  end.
++
++  define buffer buf_userobjs_temp-user-obj for userobjs_temp-user-obj .
++
++  for each buf_userobjs_temp-user-obj
++  on error undo, return no-apply
++  :
++    create temp_obj-list .
++    assign
++      temp_obj-list.obj-type = buf_userobjs_temp-user-obj.obj-type
++      temp_obj-list.obj-code = buf_userobjs_temp-user-obj.obj-code
++    .
++  end.
++
++  run userobjs_object-count in this-procedure (output v-obj-count) no-error.
++  if error-status:error then do:
++    return no-apply.
++  end.
++
++      message
++          "Выбрано объектов: " string(v-obj-count)
++      view-as alert-box information
++      title "Выбор объекта".
++      return no-apply .
++END.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL b-doc-type Dialog-Frame
++ON CHOOSE OF b-doc-type IN FRAME Dialog-Frame
++DO:
++  { gbl/stdbtn.i }
++
++  run select-doc-type in this-procedure no-error.
++  if error-status:error then do:
++    return no-apply.
++  end.
++
++  v-sel-type = true.
++
++END.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++&UNDEFINE SELF-NAME
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CUSTOM _MAIN-BLOCK Dialog-Frame
++
++
++/* ***************************  Main Block  *************************** */
++
++/* Parent the dialog-box to the ACTIVE-WINDOW, if there is no parent.   */
++IF VALID-HANDLE(ACTIVE-WINDOW) AND FRAME {&FRAME-NAME}:PARENT eq ?
++THEN FRAME {&FRAME-NAME}:PARENT = ACTIVE-WINDOW.
++
++{ gbl/ed_date.i x-date }
++{ gbl/getcntxt.i get }
++
++
++/* Now enable the interface and wait for the exit condition.            */
++/* (NOTE: handle ERROR and END-KEY so cleanup code will always fire.    */
++MAIN-BLOCK:
++DO ON ERROR   UNDO MAIN-BLOCK, LEAVE MAIN-BLOCK
++   ON END-KEY UNDO MAIN-BLOCK, LEAVE MAIN-BLOCK:
++  RUN enable_UI.
++  WAIT-FOR GO OF FRAME {&FRAME-NAME}.
++END.
++RUN disable_UI.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++/* **********************  Internal Procedures  *********************** */
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE disable_UI Dialog-Frame  _DEFAULT-DISABLE
++PROCEDURE disable_UI :
++/*------------------------------------------------------------------------------
++  Purpose:     DISABLE the User Interface
++  Parameters:  <none>
++  Notes:       Here we clean-up the user-interface by deleting
++               dynamic widgets we have created and/or hide
++               frames.  This procedure is usually called when
++               we are ready to "clean-up" after running.
++------------------------------------------------------------------------------*/
++  /* Hide all frames. */
++  HIDE FRAME Dialog-Frame.
++END PROCEDURE.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE enable_UI Dialog-Frame  _DEFAULT-ENABLE
++PROCEDURE enable_UI :
++/*------------------------------------------------------------------------------
++  Purpose:     ENABLE the User Interface
++  Parameters:  <none>
++  Notes:       Here we display/view/enable the widgets in the
++               user-interface.  In addition, OPEN all queries
++               associated with each FRAME and BROWSE.
++               These statements here are based on the "Other
++               Settings" section of the widget Property Sheets.
++------------------------------------------------------------------------------*/
++  DISPLAY x-date x-mode x-doc-type x-fin-ob
++      WITH FRAME Dialog-Frame.
++  ENABLE x-date x-mode b-firm b-obj b-doc-type x-doc-type Btn_OK Btn_Cancel x-fin-ob
++      WITH FRAME Dialog-Frame.
++  VIEW FRAME Dialog-Frame.
++  {&OPEN-BROWSERS-IN-QUERY-Dialog-Frame}
++  apply "value-changed":U to x-mode in FRAME Dialog-Frame.
++END PROCEDURE.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE proc-sel-host W-Win
++PROCEDURE proc-sel-host :
++/* -----------------------------------------------------------
++  Purpose:
++  Parameters:  <none>
++  Notes:
++-------------------------------------------------------------*/
++
++  do
++  on error undo, return error return-value
++  :
++    { gbl/uhstsone.i
++      parparentproc
++      v-cntxt-db-num
++      v-cntxt-userid
++      v-cntxt-host-code-obj
++      v-user-select
++      v-select-host-code
++    }
++  end.
++
++END PROCEDURE.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE select-doc-type s-object
++PROCEDURE select-doc-type :
++/*------------------------------------------------------------------------------
++  Purpose:
++  Parameters:  <none>
++  Notes:
++------------------------------------------------------------------------------*/
++
++    define variable v-counter       as integer      no-undo.
++    define variable v-label         as character    no-undo.
++    define variable v-value         as character    no-undo.
++    define variable v-changed       as logical    no-undo.
++    define variable v-accepted      as logical    no-undo.
++    define variable v-list-edt      as character    no-undo.
++    define variable v-list-edt-full as character    no-undo.
++do
++with frame {&frame-name}
++on error undo, return error
++:
++    if x-mode:screen-value = "firm" then do :
++      assign
++          v-list-edt  = {&table_arh-fin-doc-an}
++              + ",":U + {&table_arh-fin-doc-an-nal}
++              + ",":U + {&table_arh-fin-doc-an-nal-obj}
++              + ",":U + {&table_arh-fin-doc-an-obj}
++              + ",":U + {&table_arh-fin-doc-c-s-tax-nal-obj}
++              + ",":U + {&table_arh-fin-doc-c-schet-tax-nal}
++              + ",":U + {&table_arh-fin-doc-contr-s-nal-obj}
++              + ",":U + {&table_arh-fin-doc-contr-s-tax-obj}
++              + ",":U + {&table_arh-fin-doc-contr-schet}
++              + ",":U + {&table_arh-fin-doc-contr-schet-nal}
++              + ",":U + {&table_arh-fin-doc-contr-schet-obj}
++              + ",":U + {&table_arh-fin-doc-contr-schet-tax}
++              + ",":U + {&table_arh-fin-doc-s-tax-nal-obj}
++              + ",":U + {&table_arh-fin-doc-schet}
++              + ",":U + {&table_arh-fin-doc-schet-nal}
++              + ",":U + {&table_arh-fin-doc-schet-nal-obj}
++              + ",":U + {&table_arh-fin-doc-schet-obj}
++              + ",":U + {&table_arh-fin-doc-schet-tax}
++              + ",":U + {&table_arh-fin-doc-schet-tax-nal}
++              + ",":U + {&table_arh-fin-doc-schet-tax-obj}
++      .
++      assign
++          v-list-edt-full   = {&table_arh-fin-doc-an-full}
++                    + ",":U + {&table_arh-fin-doc-an-nal-full}
++                    + ",":U + {&table_arh-fin-doc-an-nal-obj-full}
++                    + ",":U + {&table_arh-fin-doc-an-obj-full}
++                    + ",":U + {&table_arh-fin-doc-c-s-tax-nal-obj-full}
++                    + ",":U + {&table_arh-fin-doc-c-schet-tax-nal-full}
++                    + ",":U + {&table_arh-fin-doc-contr-s-nal-obj-full}
++                    + ",":U + {&table_arh-fin-doc-contr-s-tax-obj-full}
++                    + ",":U + {&table_arh-fin-doc-contr-schet-full}
++                    + ",":U + {&table_arh-fin-doc-contr-schet-nal-full}
++                    + ",":U + {&table_arh-fin-doc-contr-schet-obj-full}
++                    + ",":U + {&table_arh-fin-doc-contr-schet-tax-full}
++                    + ",":U + {&table_arh-fin-doc-s-tax-nal-obj-full}
++                    + ",":U + {&table_arh-fin-doc-schet-full}
++                    + ",":U + {&table_arh-fin-doc-schet-nal-full}
++                    + ",":U + {&table_arh-fin-doc-schet-nal-obj-full}
++                    + ",":U + {&table_arh-fin-doc-schet-obj-full}
++                    + ",":U + {&table_arh-fin-doc-schet-tax-full}
++                    + ",":U + {&table_arh-fin-doc-schet-tax-nal-full}
++                    + ",":U + {&table_arh-fin-doc-schet-tax-obj-full}
++      .
++    end.
++    if x-mode:screen-value = "obj" then do :
++      assign
++          v-list-edt  = {&table_arh-fin-doc-an-nal-obj}
++              + ",":U + {&table_arh-fin-doc-an-obj}
++              + ",":U + {&table_arh-fin-doc-c-s-tax-nal-obj}
++              + ",":U + {&table_arh-fin-doc-contr-s-nal-obj}
++              + ",":U + {&table_arh-fin-doc-contr-s-tax-obj}
++              + ",":U + {&table_arh-fin-doc-contr-schet-obj}
++              + ",":U + {&table_arh-fin-doc-s-tax-nal-obj}
++              + ",":U + {&table_arh-fin-doc-schet-nal-obj}
++              + ",":U + {&table_arh-fin-doc-schet-obj}
++              + ",":U + {&table_arh-fin-doc-schet-tax-obj}
++      .
++      assign
++          v-list-edt-full   = {&table_arh-fin-doc-an-nal-obj-full}
++                    + ",":U + {&table_arh-fin-doc-an-obj-full}
++                    + ",":U + {&table_arh-fin-doc-c-s-tax-nal-obj-full}
++                    + ",":U + {&table_arh-fin-doc-contr-s-nal-obj-full}
++                    + ",":U + {&table_arh-fin-doc-contr-s-tax-obj-full}
++                    + ",":U + {&table_arh-fin-doc-contr-schet-obj-full}
++                    + ",":U + {&table_arh-fin-doc-s-tax-nal-obj-full}
++                    + ",":U + {&table_arh-fin-doc-schet-nal-obj-full}
++                    + ",":U + {&table_arh-fin-doc-schet-obj-full}
++                    + ",":U + {&table_arh-fin-doc-schet-tax-obj-full}
++      .
++    end.
++    run twowin_clear in this-procedure.
++    do v-counter = 1 to num-entries( v-list-edt-full )
++    on error undo, return error
++    :
++        assign
++            v-label = entry( v-counter, v-list-edt-full )
++            v-value = entry( v-counter, v-list-edt )
++        .
++        run twowin_add-item in this-procedure (
++              input v-value
++            , input v-label
++            , input substitute( "Код вида документа: &1", v-value )
++            , input ( x-doc-type :lookup( v-value ) <> 0 or x-doc-type :list-item-pairs = "< Все >,''":U  )
++        ).
++    end.        /* do */
++    run gbl/twowin.w (
++          input ?
++        , input 1
++        , input "Выбор типов финансовых архивов":U
++        , input "":U
++        , input "&Тест"
++        , input table temp_twowin_items
++        , output table temp_twowin_itemsSelected
++        , output v-changed
++        , output v-accepted
++    ).
++    /*if v-accepted = yes
++        and v-changed = yes
++    then*/
++    do:
++        assign
++            x-doc-type :list-item-pairs    = "< ВСЕ >,''":U
++            v-list                          = "":U
++            v-counter = 0
++        .
++        for each temp_twowin_itemsSelected
++        by temp_twowin_itemsSelected.itm-key
++        :
++            assign
++                v-counter = v-counter + 1
++                v-list = substitute( "&1&2&3"
++                                , v-list
++                                , ( if v-list = "":U then "":U else ",":U )
++                                , temp_twowin_itemsSelected.itmExtKey
++                                )
++            .
++            if v-counter = 1
++            then do:
++                assign
++                    x-doc-type :list-item-pairs    = substitute( "&1,&2"
++                                        , entry( lookup( temp_twowin_itemsSelected.itmExtKey, v-list-edt ), v-list-edt-full )
++                                        , temp_twowin_itemsSelected.itmExtKey
++                                             )
++                .
++            end.
++            else do:
++                x-doc-type :add-last (
++                    entry( lookup( temp_twowin_itemsSelected.itmExtKey, v-list-edt ), v-list-edt-full )
++                    , temp_twowin_itemsSelected.itmExtKey
++                ).
++            end.
++        end.
++        if v-list = v-list-edt
++        then do:
++            assign
++                x-doc-type :list-item-pairs = "< ВСЕ >,''":U
++            .
++        end.
++    end.
++
++end.
++END PROCEDURE. /* select-doc-type */
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
+\ No newline at end of file

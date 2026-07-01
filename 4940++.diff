@@ -1,0 +1,42 @@
+# HG changeset patch
+# User SSlivenko
+# Parent  f6280cd79f3f2ed549868ae95c8c9ede56672458
+refs #4940 Себестоимость в выгрузку чеков в 1С
+
+http://exp-rm1/issues/4940
+
+diff -r f6280cd79f3f ibs/th/bge/1crn/subjects/check.cls
+--- a/ibs/th/bge/1crn/subjects/check.cls	Wed Dec 11 13:20:36 2019 +0300
++++ b/ibs/th/bge/1crn/subjects/check.cls	Thu Dec 12 15:58:58 2019 +0300
+@@ -248,7 +248,7 @@
+     define variable v-ex-Nds       as logical no-undo.
+     define variable v-chk-pay-is-nds as logical no-undo . /* true: в чеке есть платёж с is-nds=1 */
+     define variable v-sum-s        as decimal no-undo .
+-    define variable v-col-parts    as integer no-undo .
++    define variable v-parts-qnty   as decimal no-undo .
+ 
+     insw:start-element ({&tag-message}) .
+ 
+@@ -510,18 +510,18 @@
+         then do :
+           assign
+             v-sum-s = 0
+-            v-col-parts = 0
++            v-parts-qnty = 0
+           .
+           for each buf_parts no-lock where buf_parts.out-code   = p-buf_chk-doc.out-code
+                                          and buf_parts.artic      = buf_goods.artic
+                                          and buf_parts.prod-code  = buf_goods.prod-code
+                                          and buf_parts.prod-type  = buf_goods.prod-type :
+             assign
+-              v-col-parts = v-col-parts + 1
+-              v-sum-s = v-sum-s + (buf_chk-gds.doc-qnty * buf_parts.price-rubl / (1 + (buf_parts.VAT-pc / 100)))
++              v-parts-qnty = v-parts-qnty + buf_parts.fact-qnty
++              v-sum-s = v-sum-s + (buf_parts.fact-qnty * buf_parts.price-rubl / (1 + (buf_parts.VAT-pc / 100)))
+             .
+           end.
+-          if v-col-parts > 0 then v-sum-s = v-sum-s / v-col-parts .
++          if v-parts-qnty > 0 then v-sum-s = v-sum-s / v-parts-qnty .
+           if v-sum-s <> 0
+           then do :
+             insw:write-data-element (  "sum-s",

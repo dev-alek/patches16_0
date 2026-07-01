@@ -1,0 +1,209 @@
+# HG changeset patch
+# User EShklyar
+# Parent  d56d596bbd0415802201f93b30bf157787cf054b
+refs #DEVBO-1880 Ошибки на тестовых р-кодах от 29.06.2022
+
+http://exp-jira.expertek.local:8080/browse/DEVBO-1880
+
+diff --git a/ibs/th/bge/1crn/import/imptrn-gd-doc.cls b/ibs/th/bge/1crn/import/imptrn-gd-doc.cls
+--- a/ibs/th/bge/1crn/import/imptrn-gd-doc.cls
++++ b/ibs/th/bge/1crn/import/imptrn-gd-doc.cls
+@@ -125,7 +125,8 @@ class ibs.th.bge.1crn.import.imptrn-gd-d
+             TempDocLine.vsd-uuid = objPrt:vad-guid
+             TempDocLine.part-id = objPrt:prt-id
+             TempDocLine.price-rubl = objGd:sum / objGd:qnty-fact
+-            TempDocLine.vat-pc = (objGd:sum-nds / (objGd:sum - objGd:sum-nds)) * 100. 
++            TempDocLine.vat-pc = objGd:nds-code .
++/*            TempDocLine.vat-pc = (objGd:sum-nds / (objGd:sum - objGd:sum-nds)) * 100.*/
+         end.
+       end.
+       if available (TempDocLine)
+@@ -141,7 +142,8 @@ class ibs.th.bge.1crn.import.imptrn-gd-d
+           TempDocLine.doc-qnty = objGd:qnty-fact
+           TempDocLine.line-num = integer(objGd:line-num)
+           TempDocLine.price-rubl = objGd:sum / objGd:qnty-fact
+-          TempDocLine.vat-pc = (objGd:sum-nds / (objGd:sum - objGd:sum-nds)) * 100.
++          TempDocLine.vat-pc = objGd:nds-code .
++/*          TempDocLine.vat-pc = (objGd:sum-nds / (objGd:sum - objGd:sum-nds)) * 100.*/
+         .
+         release TempDocLine.
+       end.
+diff --git a/rep/torg-13.p b/rep/torg-13.p
+--- a/rep/torg-13.p
++++ b/rep/torg-13.p
+@@ -1239,7 +1239,7 @@ if t-doc.ext-doc-type = {&TDEDT_Pri_Pere
+                  and gds-dtl.prod-code = doc-line.prod-code
+                  and gds-dtl.artic = doc-line.artic
+                  and gds-dtl.doc-code = doc-line.doc-code
+-                 and gds-dtl.line-num = doc-line.line-num
++                 and doc-line.line-num = if gds-dtl.line-num <> 0 then gds-dtl.line-num else doc-line.line-num 
+             :
+                 find first gds-prt no-lock
+                      where gds-prt.node-code = gds-dtl.prt-code
+@@ -1770,7 +1770,7 @@ if t-doc.ext-doc-type = {&TDEDT_Pri_Pere
+                    and gds-dtl.prod-code = doc-line.prod-code
+                    and gds-dtl.artic = doc-line.artic
+                    and gds-dtl.prt-code = rootnode_code
+-                   and gds-dtl.line-num = doc-line.line-num
++                   and doc-line.line-num = if gds-dtl.line-num <> 0 then gds-dtl.line-num else doc-line.line-num
+             .
+ end.
+ else do:
+diff --git a/str/in-vatp-line.i b/str/in-vatp-line.i
+--- a/str/in-vatp-line.i
++++ b/str/in-vatp-line.i
+@@ -234,7 +234,8 @@ assign
+                                       in-vatp-parts{5}.artic     = {2}artic     and
+                                       in-vatp-parts{5}.prod-type = {2}prod-type and
+                                       in-vatp-parts{5}.prod-code = {2}prod-code and
+-                                      string({2}line-num) = entry(2,in-vatp-parts{5}.part-code,"/")
++                                      string({2}line-num) = if num-entries(in-vatp-parts{5}.part-code,"/") > 1 then entry(2,in-vatp-parts{5}.part-code,"/")
++                                      else string({2}line-num)
+                                       
+                          use-index out-code no-lock:
+           accumulate  in-vatp-parts{5}.road-tax-base  * in-vatp-parts{5}.fact-qnty (total)
+diff --git a/str/out-doc.w b/str/out-doc.w
+--- a/str/out-doc.w
++++ b/str/out-doc.w
+@@ -2207,7 +2207,7 @@ define variable v-recid as recid no-undo
+       and ub.doc-line.artic     = ub.gds-dtl.artic
+       and ub.doc-line.prod-type = ub.gds-dtl.prod-type
+       and ub.doc-line.prod-code = ub.gds-dtl.prod-code
+-      and ub.doc-line.line-num  = ub.gds-dtl.line-num
++      and ub.doc-line.line-num  = if ub.gds-dtl.line-num <> 0 then ub.gds-dtl.line-num else ub.doc-line.line-num
+     .
+   if not available ub.doc-line then do:
+ find first ub.doc-line
+@@ -2515,14 +2515,14 @@ if pardoc-mode = {&lookup} then do:
+                             ub.doc-line.artic     = ub.gds-dtl.artic     and
+                             ub.doc-line.prod-type = ub.gds-dtl.prod-type and
+                             ub.doc-line.prod-code = ub.gds-dtl.prod-code and
+-                            ub.doc-line.line-num  = ub.gds-dtl.line-num no-lock.
++                            ub.doc-line.line-num  = if ub.gds-dtl.line-num <> 0 then ub.gds-dtl.line-num else ub.doc-line.line-num no-lock.
+ end.
+ else do:
+   find first ub.doc-line where ub.doc-line.doc-code  = ub.gds-dtl.doc-code  and
+                             ub.doc-line.artic     = ub.gds-dtl.artic     and
+                             ub.doc-line.prod-type = ub.gds-dtl.prod-type and
+                             ub.doc-line.prod-code = ub.gds-dtl.prod-code and
+-                            ub.doc-line.line-num  = ub.gds-dtl.line-num.
++                            ub.doc-line.line-num  = if ub.gds-dtl.line-num <> 0 then ub.gds-dtl.line-num else ub.doc-line.line-num.
+ end.
+ prt-rec = recid(ub.doc-line).
+ find first ub.goods where ub.goods.artic     = ub.gds-dtl.artic     and
+@@ -4424,7 +4424,7 @@ find ub.doc-line where ub.doc-line.doc-c
+                        and ub.doc-line.prod-code = ub.gds-dtl.prod-code
+                        and ub.doc-line.prod-type = ub.gds-dtl.prod-type
+                        and ub.doc-line.artic     = ub.gds-dtl.artic 
+-                       and ub.doc-line.line-num = ub.gds-dtl.line-num no-lock.
++                       and ub.doc-line.line-num = if ub.gds-dtl.line-num <> 0 then ub.gds-dtl.line-num else ub.doc-line.line-num no-lock.
+ line-rec = recid (ub.doc-line).
+ find ub.goods where ub.goods.prod-code = ub.gds-dtl.prod-code
+              and ub.goods.prod-type = ub.gds-dtl.prod-type
+@@ -6717,7 +6717,8 @@ find ub.doc-line where ub.doc-line.doc-c
+                         and ub.doc-line.prod-code = ub.gds-dtl.prod-code
+                         and ub.doc-line.prod-type = ub.gds-dtl.prod-type
+                         and ub.doc-line.artic         = ub.gds-dtl.artic 
+-                        and ub.doc-line.line-num   = ub.gds-dtl.line-num no-lock.
++                        and ub.doc-line.line-num   = if ub.gds-dtl.line-num <> 0 then ub.gds-dtl.line-num else 
++                        ub.doc-line.line-num no-lock.
+ end.
+ else do:
+ find ub.doc-line where ub.doc-line.doc-code = t-doc.doc-code
+diff --git a/str/out-prt.w b/str/out-prt.w
+--- a/str/out-prt.w
++++ b/str/out-prt.w
+@@ -2291,13 +2291,13 @@ end.
+     find ub.doc-line no-lock
+       where recid( ub.doc-line ) = line-rec
+       .
+-    if t-doc.ext-doc-type = {&TDEDT_Ras_Perem} then do:  
++    if t-doc.ext-doc-type = {&TDEDT_Ras_Perem} or t-doc.ext-doc-type = {&TDEDT_Pri_Perem} then do:  
+     find ub.gds-dtl  no-lock
+-      where ub.gds-dtl.line-num  = ub.doc-line.line-num
+-        and ub.gds-dtl.prod-code = ub.doc-line.prod-code
++      where ub.gds-dtl.prod-code = ub.doc-line.prod-code
+         and ub.gds-dtl.prod-type = ub.doc-line.prod-type
+         and ub.gds-dtl.artic     = ub.doc-line.artic
+         and ub.gds-dtl.doc-code  = t-doc.doc-code
++        and ub.doc-line.line-num = if ub.gds-dtl.line-num <> 0 then ub.gds-dtl.line-num else ub.doc-line.line-num
+       no-error.
+     end.
+     else do:
+@@ -2325,11 +2325,11 @@ end.
+       .
+     if t-doc.ext-doc-type = {&TDEDT_Ras_Perem} or t-doc.ext-doc-type = {&TDEDT_Pri_Perem} then do:  
+     find ub.gds-dtl  no-lock
+-      where ub.gds-dtl.line-num  = ub.doc-line.line-num
+-        and ub.gds-dtl.prod-code = ub.doc-line.prod-code
++      where ub.gds-dtl.prod-code = ub.doc-line.prod-code
+         and ub.gds-dtl.prod-type = ub.doc-line.prod-type
+         and ub.gds-dtl.artic     = ub.doc-line.artic
+         and ub.gds-dtl.doc-code  = t-doc.doc-code
++        and ub.doc-line.line-num = if ub.gds-dtl.line-num <> 0 then ub.gds-dtl.line-num else ub.doc-line.line-num
+       no-error.
+     end.
+     else do:
+diff --git a/str/out-vatp-line.i b/str/out-vatp-line.i
+--- a/str/out-vatp-line.i
++++ b/str/out-vatp-line.i
+@@ -301,7 +301,8 @@ else do:
+                                and out-vatp_parts{5}.artic      = {2}artic
+                                and out-vatp_parts{5}.prod-type  = {2}prod-type
+                                and out-vatp_parts{5}.prod-code  = {2}prod-code
+-                               and string({2}line-num) = entry(2,out-vatp_parts{5}.part-code,"/") no-lock :
++                               and string({2}line-num) = if num-entries(out-vatp_parts{5}.part-code,"/") > 1 then entry(2,out-vatp_parts{5}.part-code,"/") 
++                               else string({2}line-num) no-lock :
+     if out-vatp_parts{5}.purch-code = {&bef-consignation-code} then do:
+       { str/in-vatp.i calc-parts out-vatp_parts{5}. {3} " " o{5} }
+       assign
+@@ -418,15 +419,15 @@ find first out-vatp_gds-dtl{5} where out
+                                      out-vatp_gds-dtl{5}.artic     = {2}artic     and
+                                      out-vatp_gds-dtl{5}.prod-type = {2}prod-type and
+                                      out-vatp_gds-dtl{5}.prod-code = {2}prod-code and
+-                                     out-vatp_gds-dtl{5}.line-num  = {2}line-num                no-lock no-error.
++                                     {2}line-num = if out-vatp_gds-dtl{5}.line-num <> 0 then out-vatp_gds-dtl{5}.line-num else {2}line-num no-lock no-error.
+ /*Если есть хотя бы один признак*/
+ if available out-vatp_gds-dtl{5} then do:
+   find first buf_out-vatp_gds-dtl{5} where buf_out-vatp_gds-dtl{5}.doc-code  =  {3}doc-code                and
+                                            buf_out-vatp_gds-dtl{5}.artic     =  {2}artic                   and
+                                            buf_out-vatp_gds-dtl{5}.prod-type =  {2}prod-type               and
+                                            buf_out-vatp_gds-dtl{5}.prod-code =  {2}prod-code               and
+-                                           buf_out-vatp_gds-dtl{5}.line-num  =  {2}line-num                and
+-                                           recid(buf_out-vatp_gds-dtl{5})    <> recid(out-vatp_gds-dtl{5}) no-lock no-error.
++                                           recid(buf_out-vatp_gds-dtl{5})    <> recid(out-vatp_gds-dtl{5}) and
++                                           {2}line-num = if buf_out-vatp_gds-dtl{5}.line-num <> 0 then buf_out-vatp_gds-dtl{5}.line-num else {2}line-num no-lock no-error.
+   if not available buf_out-vatp_gds-dtl{5} then do:
+     assign
+       varis-one-gds-dtl{5} = yes.
+@@ -479,7 +480,7 @@ if available out-vatp_gds-dtl{5} then do
+                                        out-vatp_gds-dtl{5}.artic     = {2}artic     and
+                                        out-vatp_gds-dtl{5}.prod-type = {2}prod-type and
+                                        out-vatp_gds-dtl{5}.prod-code = {2}prod-code and
+-                                       out-vatp_gds-dtl{5}.line-num  = {2}line-num no-lock :
++                                       {2}line-num = if out-vatp_gds-dtl{5}.line-num <> 0 then out-vatp_gds-dtl{5}.line-num else {2}line-num no-lock :
+       if varoutvprb{5} = "base":u then do:
+         assign
+           varcur{5}price-base = {&gds-dtl}cur-base
+diff --git a/trg/partcopy.i b/trg/partcopy.i
+--- a/trg/partcopy.i
++++ b/trg/partcopy.i
+@@ -144,7 +144,8 @@ procedure partcopy :
+ 
+     if buf_orig_parts.out-code <> p-out-code
+     then do:
+-      if p-out-code = {&free-code} and buf_orig_parts.out-code <> {&free-code} and buf_orig_parts.qnty <> 0 then buf_orig_parts.part-code = "" no-error .
++
++      
+       /* ищем партию и создаем партию, если ее нет */
+       find first buf_parts exclusive-lock
+         where buf_parts.obj-type  = buf_orig_parts.obj-type
+@@ -160,7 +161,7 @@ procedure partcopy :
+       if not available buf_parts
+       then do:
+         define variable v-rsrv-free as logical   no-undo .
+-
++        
+         if p-out-code = {&free-code}
+         or p-out-code = {&output-code}
+         then do:

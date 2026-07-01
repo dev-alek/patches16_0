@@ -1,0 +1,101 @@
+# HG changeset patch
+# User EShklyar
+# Parent  ca2e5dec99b20a1f4e154724e9ecf899ba810922
+refs#DEVBO-1744 ЗИ 275: Остановка продаж в МП Яндекс при приемке
+
+http://exp-jira.expertek.local:8080/browse/DEVBO-1744
+
+отключение + замечание по ПСИ
+
+diff --git a/adm/shattri.p b/adm/shattri.p
+--- a/adm/shattri.p
++++ b/adm/shattri.p
+@@ -3060,7 +3060,7 @@ end.
+       
+       v-prop-code = "{&bef-attr-petrol_block-nozzle}".
+ &scop ptype logical
+-&scop prop-value yes
++&scop prop-value no
+ &scop prop-code entry(v-ii, v-prop-code)
+ 
+       do v-ii = 1 to num-entries(v-prop-code):
+diff --git a/str/blockplgdspm.w b/str/blockplgdspm.w
+--- a/str/blockplgdspm.w
++++ b/str/blockplgdspm.w
+@@ -235,7 +235,7 @@ DEFINE BROWSE b-plgdspm
+    X_marking.gds-name FORMAT "X(10)":U
+    X_marking.loc1 COLUMN-LABEL "Резервуар" FORMAT "X(8)":U
+    X_marking.status_ FORMAT "X(8)":U
+-   X_marking.pl-code COLUMN-LABEL "Код резервуара" FORMAT ">>>>>>>>>>>>9":U
++   X_marking.pl-code COLUMN-LABEL "Код резервуара" FORMAT "999999999":U
+    X_marking.pl-name COLUMN-LABEL "Название резервуара"
+    X_marking.prod-code FORMAT ">>>>>>>>9":U
+    X_marking.prod-type COLUMN-LABEL "товара" FORMAT "X(3)":U
+@@ -463,11 +463,11 @@ ON CHOOSE OF b-block IN FRAME Dialog-Frame /* Блок в МП */
+                   else                   message "Сообщите в службу поддержки о неуспешной попытке блокировки пистолетов"
+                         view-as alert-box.
+                end.
+-               else 
+-               do:
+-                  message "Блокировка пистолетов прошла успешно"
+-                     view-as alert-box.
+-               end.   
++/*               else                                             */
++/*               do:                                              */
++/*                  message "Блокировка пистолетов прошла успешно"*/
++/*                     view-as alert-box.                         */
++/*               end.                                             */
+             end.
+             else 
+             do:
+@@ -589,11 +589,11 @@ ON CHOOSE OF b-repeate-block IN FRAME Di
+                   view-as alert-box.
+                
+          end.
+-         else 
+-         do:
+-            message "Блокировка пистолетов прошла успешно"
+-               view-as alert-box.
+-         end.   
++/*         else                                             */
++/*         do:                                              */
++/*            message "Блокировка пистолетов прошла успешно"*/
++/*               view-as alert-box.                         */
++/*         end.                                             */
+ 
+       end.
+       else 
+@@ -649,11 +649,11 @@ ON CHOOSE OF b-repeate-unblock IN FRAME 
+                   view-as alert-box.
+                
+          end.
+-         else 
+-         do:
+-            message "Разблокировка пистолетов прошла успешно"
+-               view-as alert-box.
+-         end.   
++/*         else                                                */
++/*         do:                                                 */
++/*            message "Разблокировка пистолетов прошла успешно"*/
++/*               view-as alert-box.                            */
++/*         end.                                                */
+ 
+       end.
+       else 
+@@ -750,11 +750,11 @@ ON CHOOSE OF b-unblock IN FRAME Dialog-Frame /* Разблок */
+                         view-as alert-box.
+                
+                end.
+-               else 
+-               do:
+-                  message "Разблокировка пистолетов прошла успешно"
+-                     view-as alert-box.
+-               end.   
++/*               else                                                */
++/*               do:                                                 */
++/*                  message "Разблокировка пистолетов прошла успешно"*/
++/*                     view-as alert-box.                            */
++/*               end.                                                */
+ 
+             end.
+             else 

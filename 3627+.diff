@@ -1,0 +1,29 @@
+# HG changeset patch
+# User EShklyar
+# Parent  bdb70a1dace0a5fe6e14d19e315dad2d38e02369
+refs#3627 ТПСИ
+
+http://exp-rm/redmine/issues/3627
+
+diff -r bdb70a1dace0 str/tpsirsrv.p
+--- a/str/tpsirsrv.p	Sat Oct 20 16:56:56 2018 +0300
++++ b/str/tpsirsrv.p	Sat Oct 20 16:57:48 2018 +0300
+@@ -396,7 +396,8 @@
+         end.
+         assign
+         v-ps =  '':U
+-        v-discnt-type = (if v-alias-type-price = {&alias-type-price-sale-doc} then {&row} else {&percent})
++/*        v-discnt-type = (if v-alias-type-price = {&alias-type-price-sale-doc} then {&row} else {&percent})*/
++        v-discnt-type = {&percent}
+         .
+         { str/crtrndoc.i
+         ?
+@@ -503,7 +504,7 @@
+       /*блок заполнения цены gds-dtl*/
+       /*найдем gds-code*/
+       { gbl/gds-code.i tt0-doc-line.artic tt0-doc-line.prod-type tt0-doc-line.prod-code v-gds-code }
+-      CASE sale-doc.alias-type-price:
++      CASE v-alias-type-price:
+         when {&alias-type-price-cost}  then do:
+           /*согалсно указаниям Суслова - если перемещение по учетной цене - то перед copy-ret заполняем нулями*/
+           assign

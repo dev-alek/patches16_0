@@ -1,0 +1,17 @@
+# HG changeset patch
+# User VSpiridonov
+# Parent  2d48236127acfa5c7df103dce8061eb98020ca77
+refs #DEVBO-587+6   исправлено: наложение полей в документе сверки
+
+diff --git a/str/rvs-doc.w b/str/rvs-doc.w
+--- a/str/rvs-doc.w
++++ b/str/rvs-doc.w
+@@ -393,7 +393,7 @@ define frame {&frame-name}
+   r-boss                        at row 7 col 28    no-label
+   r-doc.state-mh-qnty           at row 7 col 38    colon-aligned label "Оборот"           view-as text format "->,>>>,>>>,>>>.<<<"
+   r-doc.state-am-qnty           at row 7 col 63    colon-aligned label "Сумма"            view-as text format "->,>>>,>>>,>>>.<<<"
+-  r-doc.state-cf-qnty           at row 7 col 85.5  colon-aligned label "Наливы"           view-as text
++  r-doc.state-cf-qnty           at row 7 col 87.5  colon-aligned label "Наливы"           view-as text
+   /*r-doc.state-measure-tc-qnty   at row 8 col  8                  label "Факт(tc)"         view-as text*/
+   /*r-doc.measure-tc-qnty         at row 8 col 47                  label "Измер(tc)"        view-as text*/
+   /*r-doc.state-brutto-tc-qnty    at row 9 col  1                  label "Факт брутто(tc)"  view-as text*/

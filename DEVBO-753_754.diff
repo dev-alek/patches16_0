@@ -1,0 +1,78 @@
+# HG changeset patch
+# User BelovaMM
+# Parent  f00dc29ef29426462aba5e78140c8c5d609342b0
+refs #DEVBO-753 #DEVBO-754 Проверка возраста MAX ID. Отладка. #BTS-2580 #BTS-2579
+BTS-2580 На ГКС не передается параметр NeedUserSimpleAgeConfirm
+BTS-2579 Из ТН не передаются товары на кассу
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-753
+https://msk-exp-jira.expertek.local/browse/DEVBO-754
+https://msk-exp-jira.expertek.local/browse/BTS-2579
+https://msk-exp-jira.expertek.local/browse/BTS-2580
+
+diff --git a/adm/shattri.p b/adm/shattri.p
+--- a/adm/shattri.p
++++ b/adm/shattri.p
+@@ -323,7 +323,7 @@ on error undo, return error
+       v-need-prop-list = v-prop-list.
+       v-num-need = num-entries(v-prop-list).
+       /*нашли начальное значение из вышестоящего*/
+-      if v-found = 1.0 or v-step <> v-start then do:
++      if v-found = 1.0 or (v-found > 0 and v-step <> v-start) then do:
+         if p-param-code <> '' then return.
+         if p-param-code = '':U
+         and p-obj-type <> v-obj-type then do:
+diff --git a/str/send-all-work-gismt.p b/str/send-all-work-gismt.p
+--- a/str/send-all-work-gismt.p
++++ b/str/send-all-work-gismt.p
+@@ -212,7 +212,7 @@ procedure putc :
+            run put-xml-data(iSAXWriter,"MaxApiToken",buf_thbj-attr.property-value-character,"Токен авторизации MAX").                      
+         end.
+         when {&attr-gisMT_AgeConfirm} then do:
+-            run put-xml-data(iSAXWriter,"NeedUserSimpleAgeConfirm",buf_thbj-attr.property-value-integer,"Проверка возраста при продаже НП").            
++            run put-xml-data-ui(iSAXWriter,"NeedUserSimpleAgeConfirm",buf_thbj-attr.property-value-integer,"Проверка возраста при продаже НП").            
+         end.    
+      end case. 
+          
+@@ -308,7 +308,7 @@ procedure putc :
+       run put-xml-data(iSAXWriter,"Resp_TH_required",string(vResp_TH_requiredr),"Обязательность получения результатов проверки КМ в ТН").      
+       run put-xml-data(iSAXWriter,"MaxApiToken",vMaxApiToken,"Токен авторизации MAX").   
+       if vAgeConfirm <> ? then                   
+-      run put-xml-data(iSAXWriter,"NeedUserSimpleAgeConfirm",string(vAgeConfirm),"Проверка возраста при продаже НП").   
++      run put-xml-data-ui(iSAXWriter,"NeedUserSimpleAgeConfirm",string(vAgeConfirm),"Проверка возраста при продаже НП").   
+    end.                                   
+    
+    for each thbjattr-list:
+@@ -332,6 +332,21 @@ procedure put-xml-data:
+     iSAXWriter:end-element("Param" ). 
+ end procedure.       
+ 
++procedure put-xml-data-ui:
++    define input parameter iSAXWriter  as handle    no-undo .
++    define input parameter p-prop-code as character no-undo.
++    define input parameter p-value     as character no-undo.
++    define input parameter p-discr     as character no-undo.
++    
++    iSAXWriter:start-element("Param") .
++    iSAXWriter:insert-attribute("ctrl", "ADD").
++    iSAXWriter:insert-attribute("group", "UISettings").
++    iSAXWriter:insert-attribute("key", p-prop-code).
++    iSAXWriter:write-data-element("ParamValue" , p-value ) .
++    iSAXWriter:write-data-element("ParamDesc" , p-discr).
++    iSAXWriter:end-element("Param" ). 
++end procedure. 
++
+ procedure set-cash-info:
+    define input         parameter iDB-num        as integer     no-undo.
+    define input         parameter iObjType       as character   no-undo.
+diff --git a/str/send-gds.i b/str/send-gds.i
+--- a/str/send-gds.i
++++ b/str/send-gds.i
+@@ -137,6 +137,7 @@ FOR EACH gds-list by order-num:
+     end.
+     if return-value = "NEXT":U then NEXT _gds-list.
+     ACCUMULATE gds-list.artic (COUNT).
++    if cdpcknum = 0 then cdpcknum = 1. /* иначе ошибка деления на ноль */
+     if NOT alllstcs AND ( (accum count gds-list.artic)  modulo cdpcknum)  = 0 then do:
+       run get-stop-state in p-log-handle (output v-stop).
+       if v-stop then do:

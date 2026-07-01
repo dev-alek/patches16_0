@@ -1,0 +1,86 @@
+# HG changeset patch
+# User VSpiridonov
+# Parent  f6869f7ff451e37b865bbe2f0a28e3506810a7ad
+refs #DEVBO-587+5   исправлено: в местах хранения в прих.накл. по НП номер места хранения перекрывается полем наименование str\doc-pl.w
+                                код товара не полностью отображается в строке переоценки str\mplform.w
+
+diff --git a/str/doc-pl.w b/str/doc-pl.w
+--- a/str/doc-pl.w
++++ b/str/doc-pl.w
+@@ -439,11 +439,11 @@ DEFINE FRAME f-doc-pl
+      loc-t-doc-pl.pl-code AT ROW 2.5 COL 16 COLON-ALIGNED WIDGET-ID 68 FORMAT "99999999999"
+           LABEL "Место хранения"
+           VIEW-AS FILL-IN 
+-          SIZE 10.5 BY 1
+-     b-place AT ROW 2.5 COL 28.5 WIDGET-ID 14
+-     buf_place.pl-name AT ROW 2.5 COL 30 COLON-ALIGNED NO-LABEL WIDGET-ID 70 FORMAT "X(66)"
++          SIZE 12 BY 1
++     b-place AT ROW 2.5 COL 29.5 WIDGET-ID 14
++     buf_place.pl-name AT ROW 2.5 COL 30.5 COLON-ALIGNED NO-LABEL WIDGET-ID 70 FORMAT "X(66)"
+           VIEW-AS FILL-IN 
+-          SIZE 67 BY 1
++          SIZE 66 BY 1
+           BGCOLOR 8 
+      buf-obj_clients.obj-type AT ROW 3.75 COL 16 COLON-ALIGNED WIDGET-ID 104
+           LABEL "Объект"
+@@ -452,9 +452,9 @@ DEFINE FRAME f-doc-pl
+      buf-obj_clients.obj-code AT ROW 3.75 COL 20.5 COLON-ALIGNED NO-LABEL WIDGET-ID 52
+           VIEW-AS FILL-IN 
+           SIZE 6 BY 1
+-     buf-obj_clients.obj-name AT ROW 3.75 COL 30 COLON-ALIGNED NO-LABEL WIDGET-ID 56 FORMAT "X(66)"
++     buf-obj_clients.obj-name AT ROW 3.75 COL 30.5 COLON-ALIGNED NO-LABEL WIDGET-ID 56 FORMAT "X(66)"
+           VIEW-AS FILL-IN 
+-          SIZE 67 BY 1
++          SIZE 66 BY 1
+           BGCOLOR 8 
+      buf_place.loc1 AT ROW 5 COL 30 COLON-ALIGNED WIDGET-ID 44
+           VIEW-AS FILL-IN 
+diff --git a/str/mplform.w b/str/mplform.w
+--- a/str/mplform.w
++++ b/str/mplform.w
+@@ -15,11 +15,11 @@ DEFINE BUFFER buf_price-doc-forming-gds 
+ &ANALYZE-SUSPEND _UIB-CODE-BLOCK _CUSTOM _DEFINITIONS Dialog-Frame
+ /*
+ 
+-$Revision$
+-$Author$
+-$Date$
+-$Workfile$
+-$Archive$
++$Revision: f47d21f63b8b, 1891, rls $
++$Author: EShklyar $
++$Date: Fri Jun 07 16:26:45 2019 +0300 $
++$Workfile: mplform.w $
++$Archive: str/mplform.w $
+ 
+ Корректировка строки ДНЦ
+ 
+@@ -63,11 +63,11 @@ define variable copy-code as integer   n
+ define variable v-obj-type as character no-undo .
+ define variable v-obj-code as integer   no-undo .
+ 
+-define variable vss-revision    as character no-undo init "$Revision$":U .
+-define variable vss-author      as character no-undo init "$Author$":U .
+-define variable vss-date        as character no-undo init "$Date$":U .
+-define variable vss-workfile    as character no-undo init "$Workfile$":U .
+-define variable vss-archive     as character no-undo init "$Archive$":U .
++define variable vss-revision    as character no-undo init "$Revision: f47d21f63b8b, 1891, rls $":U .
++define variable vss-author      as character no-undo init "$Author: EShklyar $":U .
++define variable vss-date        as character no-undo init "$Date: Fri Jun 07 16:26:45 2019 +0300 $":U .
++define variable vss-workfile    as character no-undo init "$Workfile: mplform.w $":U .
++define variable vss-archive     as character no-undo init "$Archive: str/mplform.w $":U .
+ define variable vss-description as character no-undo init "Корректировка строки ДНЦ".
+ define variable tt-price-sale as decimal no-undo.   /* для вызова g d s n o v a t . p */
+ define variable tt-price-prodwihvat as decimal no-undo.   /* для вызова g d s n o v a t . p */
+@@ -331,9 +331,9 @@ DEFINE FRAME Dialog-Frame
+      buf_price-doc-forming-gds.b-code AT ROW 2.75 COL 62.13 COLON-ALIGNED FORMAT "99999999999":U
+           LABEL "Бар-код"
+            VIEW-AS TEXT
+-          SIZE 10 BY .67
++          SIZE 12 BY .67
+           BGCOLOR 3 FGCOLOR 15
+-     b-curr AT ROW 2.75 COL 76 COLON-ALIGNED NO-LABEL
++     b-curr AT ROW 2.75 COL 75 COLON-ALIGNED NO-LABEL
+      ub.goods.gds-name AT ROW 3.63 COL 2 NO-LABEL
+            VIEW-AS TEXT
+           SIZE 82.25 BY 1

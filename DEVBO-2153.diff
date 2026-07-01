@@ -1,0 +1,31 @@
+# HG changeset patch
+# User EShklyar
+# Parent  4040d4fd032c802bef85bd0e4bd31ec5019e2602
+refs #DEVBO-2153 Несоответствие объема и массы поступления НП в 1 и 2 части сменного отчета
+
+http://exp-jira.expertek.local:8080/browse/DEVBO-2153
+
+diff --git a/rep/r-shft2r.p b/rep/r-shft2r.p
+--- a/rep/r-shft2r.p
++++ b/rep/r-shft2r.p
+@@ -383,9 +383,9 @@ FOR EACH  ub.trn-doc  NO-LOCK
+         tincome-2.supp-code    = ub.trn-doc.cli-code
+         tincome-2.doc-code     = v-doc-code + "/" + v-InfoSectionsTotal:InfoSectionCurr:SectionName
+         tincome-2.doc-code-trn = ub.trn-doc.doc-code
+-        tincome-2.qnty1       = v-InfoSectionsTotal:InfoSectionCurr:DocQnty
++        tincome-2.qnty1       = v-InfoSectionsTotal:InfoSectionCurr:FactQnty
+         tincome-2.qnty3        = ub.doc-line.cli-qnty
+-        tincome-2.qnty2        = ( IF AVAILABLE ub.inv-line THEN (v-InfoSectionsTotal:InfoSectionCurr:DocQnty * v-InfoSectionsTotal:InfoSectionCurr:DocDensity) ELSE 0 )
++        tincome-2.qnty2        = ( IF AVAILABLE ub.inv-line THEN (v-InfoSectionsTotal:InfoSectionCurr:FactQnty * v-InfoSectionsTotal:InfoSectionCurr:DocDensity) ELSE 0 )
+         tincome-2.temperature  = v-InfoSectionsTotal:GetInfoSectionProp(iNum):DensTemp
+         tincome-2.density      = ( IF tincome-2.qnty2 / tincome-2.qnty1 = ? THEN 0 ELSE tincome-2.qnty2 / tincome-2.qnty1 )
+         tincome-2.naturalloss  = v-InfoSectionsTotal:InfoSectionCurr:NaturalLoss
+@@ -393,7 +393,7 @@ FOR EACH  ub.trn-doc  NO-LOCK
+         tincome-2.ii           = loc-ii
+         loc-ii                 = loc-ii + 1.
+       if is-sug(t-2.gds-code) then tincome-2.qnty1       = ub.doc-line.fact-qnty * tincome-2.density .
+-      else tincome-2.qnty1       = v-InfoSectionsTotal:InfoSectionCurr:DocQnty .
++      else tincome-2.qnty1       = v-InfoSectionsTotal:InfoSectionCurr:FactQnty .
+       if is-gas(t-2.gds-code)
+       then
+       assign

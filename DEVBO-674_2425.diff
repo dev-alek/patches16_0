@@ -1,0 +1,128 @@
+# HG changeset patch
+# User BelovaMM
+# Parent  c4d065082ec1322713fdfcea439046863b200f81
+refs #DEVBO-674 ТС ПИоТ ГИС МТ. Отладка. #BTS-2425
+BTS-2425 После положительной оффлайн проверки и отключенной проверки срока годности, ТН возвращает "status":2
+Обновлено описание запросов (запрос проверки КИ, и запрос параметров ГИС МТ при включении кассы): http://localhost:8080/help 
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-674
+https://msk-exp-jira.expertek.local/browse/BTS-2425
+
+diff --git a/cmp/postman/SaleMark.json b/cmp/postman/SaleMark.json
+--- a/cmp/postman/SaleMark.json
++++ b/cmp/postman/SaleMark.json
+@@ -65,7 +65,7 @@
+ 					}
+ 				},
+ 				"url": {
+-					"raw": "localhost:8080/AuthMarking/?cash=1&shift_num=1&shift_tbeg=14122023&context=1703685343&mark=077777337777090oYKHERACbodGVz&set=sale_lock",
++					"raw": "localhost:8080/AuthMarking/?cash=1&shift_num=1&shift_tbeg=14122023&context=1703685343&mark=077777337777090oYKHERACbodGVz&statusPos=1&isCheckedOffline=false&set=sale_lock",
+ 					"host": [
+ 						"localhost"
+ 					],
+@@ -100,6 +100,16 @@
+ 							"value": "077777337777090oYKHERACbodGVz",
+ 							"description": "РњР°СЂРєР°"
+ 						},
++                                                {
++							"key": "statusPos",
++							"value": "1",
++							"description": "Р РµР·СѓР»СЊС‚Р°С‚ РІС‹РїРѕР»РЅРµРЅРЅРѕР№ РїСЂРѕРІРµСЂРєРё РЅР° РєР°СЃСЃРµ"
++						},
++{
++							"key": "isCheckedOffline",
++							"value": "false",
++							"description": "РџСЂРёР·РЅР°Рє РѕС„Р»Р°Р№РЅ РїСЂРѕРІРµСЂРєРё"
++						}, 
+ 						{
+ 							"key": "set",
+ 							"value": "sale_lock",
+diff --git a/cmp/postman/SendCash.json b/cmp/postman/SendCash.json
+--- a/cmp/postman/SendCash.json
++++ b/cmp/postman/SendCash.json
+@@ -51,6 +51,47 @@
+ 				}
+ 			},
+ 			"response": []
++		},
++        	{
++			"name": "posonline",
++			"request": {
++				"auth": {
++					"type": "noauth"
++				},
++				"method": "GET",
++				"header": [
++					{
++						"key": "Content-Type",
++						"value": "text/html",
++						"type": "text",
++						"disabled": true
++					}
++				],
++				"url": {
++					"raw": "localhost:8080/cashsend/posonline?cash=1&shop-num=38",
++					"host": [
++						"localhost"
++					],
++					"port": "8080",
++					"path": [
++						"cashsend",
++						"goods"
++					],
++					"query": [
++						{
++							"key": "cash",
++							"value": "1",
++							"description": "РќРѕРјРµСЂ РєР°СЃСЃС‹"
++						},
++						{
++							"key": "shop-num",
++							"value": "38",
++							"description": "РќРѕРјРµСЂ РњР°РіР°Р·РёРЅР°"
++						}
++					]
++				}
++			},
++			"response": []
+ 		}
+ 	]
+ }
+\ No newline at end of file
+diff --git a/ibs/th/skt/Commands/HelpSkt.cls b/ibs/th/skt/Commands/HelpSkt.cls
+--- a/ibs/th/skt/Commands/HelpSkt.cls
++++ b/ibs/th/skt/Commands/HelpSkt.cls
+@@ -30,6 +30,7 @@ class ibs.th.skt.Commands.HelpSkt inheri
+       
+       addMethod("",         "SendCash",     "Отправка данных на кассу").
+       addMethod("SendCash", "goods",        "Отправка товаров на кассу").
++      addMethod("SendCash", "posonline",    "Отправка настроек для проверки КМ на кассу").
+       
+       addMethod("",          "TableMenu",   "TableMenu").
+       addMethod("TableMenu", "grp",         "Группы товаров").
+diff --git a/ibs/th/skt/ControlledClients/marking.cls b/ibs/th/skt/ControlledClients/marking.cls
+--- a/ibs/th/skt/ControlledClients/marking.cls
++++ b/ibs/th/skt/ControlledClients/marking.cls
+@@ -386,7 +386,7 @@ CLASS ibs.th.skt.ControlledClients.marki
+                /* проверяем срок годности */
+                if mCheckSts = 1 or mCheckSts = 2 
+                then do:
+-                   /* Проверяем офлайн */
++                   /* Проверяем срок годности */
+                    vAccMarkCheckOff = ChekExpirationDate({&shop},obj-code,buffer buf_marking).                       
+                    vAccMarkCheck = vAccMarkCheckOff. 
+                end.
+@@ -2780,8 +2780,11 @@ CLASS ibs.th.skt.ControlledClients.marki
+                                                 vExpireDate)).
+          END.
+                                             
+-      END.                                   
+-                                         
++      END.                                         
++      /* если была проверка на кассе, то при не нужности проверки даты меняем статус на 1 */
++      ELSE IF (StatusPos = 2 AND mCheckSts = 2)
++           THEN mCheckSts = 1.               
++                                
+       RETURN vErrTxt.
+   END METHOD.
+    

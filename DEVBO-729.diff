@@ -1,0 +1,47 @@
+# HG changeset patch
+# User ARostovtsev
+# Parent  54a9034d93f8c73c4b78dcf11ec5a982ed77662f
+refs #DEVBO-729 При завершении приемки УПД глобальный статус марки менялся на "Проверен".  #BTS-2498
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-729
+https://msk-exp-jira.expertek.local/browse/BTS-2498
+
+diff --git a/str/UPD_browse.w b/str/UPD_browse.w
+--- a/str/UPD_browse.w
++++ b/str/UPD_browse.w
+@@ -2227,29 +2227,12 @@ ON CHOOSE OF b_prov-finish IN FRAME d-utd /* Проверка завершена */
+                for each bf_utd-marking-lines no-lock where bf_utd-marking-lines.db-num  = bf_utd-lines.db-num 
+                                                        and bf_utd-marking-lines.doc-id  = bf_utd-lines.doc-id
+                                                        and bf_utd-marking-lines.LineNum = bf_utd-lines.LineNum,
+-               first buf_marking exclusive-lock where buf_marking.mark = bf_utd-marking-lines.mark:
+-                  case bf_utd-marking-lines.sts:
+-                     when Marking:Checked_:KeyIntDB then 
+-                        do: /*todo*/
+-                           if buf_marking.sts <> Marking:MarkError:KeyIntDB and buf_marking.sts <> Marking:Ungrouped:KeyIntDB and
+-                              not (can-do(Marking:Sale_Return_Wait,string(buf_marking.sts)) or
+-                                   can-do(Marking:Doc_Status,string(buf_marking.sts))) 
+-                           then
+-                              buf_marking.sts = Marking:Checked_:KeyIntDB .
+-                        end.
+-                     when Marking:MarkError:KeyIntDB or 
+-                     when Marking:SaleLock:KeyIntDB or 
+-                     when Marking:SaleWaitLock:KeyIntDB or 
+-                     when Marking:ReturnLock:KeyIntDB or 
+-                     when Marking:ReturnWaitLock:KeyIntDB or
+-                     when Marking:Ungrouped:KeyIntDB then 
+-                        do:
+-                        end.    
+-                     otherwise 
+-                     do:
+-                        if buf_marking.sts <> Marking:MarkError:KeyIntDB then  
+-                           buf_marking.sts = Marking:NotAvailable:KeyIntDB .
+-                     end.  
++                   first buf_marking exclusive-lock where buf_marking.mark = bf_utd-marking-lines.mark:
++                  if bf_utd-marking-lines.sts <> Marking:Checked_:KeyIntDB and
++                     bf_utd-marking-lines.sts <>  Marking:MarkError:KeyIntDB and 
++                     bf_utd-marking-lines.sts <>  Marking:Ungrouped:KeyIntDB then 
++                  do:
++                    buf_marking.sts = Marking:NotAvailable:KeyIntDB .
+                   end.  
+                end.
+             end.

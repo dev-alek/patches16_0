@@ -1,0 +1,163 @@
+# HG changeset patch
+# User SSlivenko
+# Parent  90ef453ad6fe906db530496720921b432849e825
+refs #DEVBO-507 Отладка прототипа Атрибут "опломбирован СЭП" #ZI-562 #BTS-1838
+#BTS-1838 Очищается поле "Пломбировка", если указать значения в полях "Автопредприятие", "Гос. N автоцистерны" или "Нефтебаза" в окне дополнительной информации по приемке топлива
+https://msk-exp-jira.expertek.local/browse/DEVBO-507
+https://msk-exp-jira.expertek.local/browse/BTS-1838
+
+diff --git a/str/in-laddtrn.w b/str/in-laddtrn.w
+--- a/str/in-laddtrn.w
++++ b/str/in-laddtrn.w
+@@ -63,6 +63,7 @@ define variable v-is-lgas as logical no-
+ define variable v-is-scanqr-trn as logical no-undo.
+ 
+ define variable enable-cb-sealing as logical no-undo init no .
++define variable enable-cb-sealing-old as logical no-undo .
+ 
+ define buffer buf_trn-doc for ub.trn-doc .
+ /* Local Variable Definitions ---                                       */
+@@ -751,6 +752,15 @@ END.
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
++&Scoped-define SELF-NAME cb-sealing
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL cb-sealing Dialog-Frame
++ON value-changed of cb-sealing in FRAME Dialog-Frame 
++DO:
++  assign cb-sealing .
++END.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
+ 
+ &Scoped-define SELF-NAME b-auto-tank
+ &ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL b-auto-tank Dialog-Frame
+@@ -809,7 +819,10 @@ DO:
+     .
+     if f-autoent-obj-code <> v-autoent-obj-code
+     then do :
+-      assign enable-cb-sealing = false .
++      assign
++        enable-cb-sealing-old = enable-cb-sealing
++        enable-cb-sealing = false
++      .
+       for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = buf_trn-doc.cli-type
+                                            and buf_clients-attr.obj-code  = buf_trn-doc.cli-code
+                                            and buf_clients-attr.attr-code = {&attr-own-supp}
+@@ -842,9 +855,10 @@ DO:
+       end .
+       if v-is-scanqr-trn then enable-cb-sealing = true .
+       if enable-cb-sealing
++      and not v-is-lgas
+       then do :
+         assign
+-          cb-sealing = -1
++          cb-sealing = -1 when enable-cb-sealing-old <> enable-cb-sealing
+           f-sealing:fgcolor  = 12
+           cb-sealing:fgcolor  = 12
+         .
+@@ -902,7 +916,10 @@ if ref-list <> "" then do:
+        ub.clients.obj-name @ f-autoent-obj-name with frame {&frame-name}.
+   if f-autoent-obj-code:screen-value <> string(v-autoent-obj-code)
+   then do :
+-    assign enable-cb-sealing = false .
++    assign
++      enable-cb-sealing-old = enable-cb-sealing
++      enable-cb-sealing = false
++    .
+     for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = buf_trn-doc.cli-type
+                                          and buf_clients-attr.obj-code  = buf_trn-doc.cli-code
+                                          and buf_clients-attr.attr-code = {&attr-own-supp}
+@@ -935,9 +952,10 @@ if ref-list <> "" then do:
+     end .
+     if v-is-scanqr-trn then enable-cb-sealing = true .
+     if enable-cb-sealing
++    and not v-is-lgas
+     then do :
+       assign
+-        cb-sealing = -1
++        cb-sealing = -1 when enable-cb-sealing-old <> enable-cb-sealing
+         f-sealing:fgcolor  = 12
+         cb-sealing:fgcolor  = 12
+       .
+@@ -1011,7 +1029,10 @@ define variable v-old-code as integer no
+          ub.clients.obj-name @ f-ptboname with frame {&frame-name}.
+     if ub.clients.obj-code <> v-old-code
+     then do :
+-      assign enable-cb-sealing = false .
++      assign
++        enable-cb-sealing-old = enable-cb-sealing
++        enable-cb-sealing = false
++      .
+       for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = buf_trn-doc.cli-type
+                                            and buf_clients-attr.obj-code  = buf_trn-doc.cli-code
+                                            and buf_clients-attr.attr-code = {&attr-own-supp}
+@@ -1043,9 +1064,10 @@ define variable v-old-code as integer no
+         end .
+       end .
+       if enable-cb-sealing
++      and not v-is-lgas
+       then do :
+         assign
+-          cb-sealing = -1
++          cb-sealing = -1 when enable-cb-sealing-old <> enable-cb-sealing
+           f-sealing:fgcolor  = 12
+           cb-sealing:fgcolor  = 12
+         .
+@@ -1985,6 +2007,7 @@ DO ON ERROR   UNDO MAIN-BLOCK, LEAVE MAI
+   if v-is-scanqr-trn then enable-cb-sealing = true .
+   
+   if enable-cb-sealing
++  and not v-is-lgas
+   then do :
+     assign
+       f-sealing:fgcolor  = 12
+@@ -2170,7 +2193,10 @@ PROCEDURE disp-f-ptboname :
+       apply "choose" to b-ptb in frame {&frame-name}.
+   end.
+   
+-  assign enable-cb-sealing = false .
++  assign
++    enable-cb-sealing-old = enable-cb-sealing
++    enable-cb-sealing = false
++  .
+   for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = buf_trn-doc.cli-type
+                                        and buf_clients-attr.obj-code  = buf_trn-doc.cli-code
+                                        and buf_clients-attr.attr-code = {&attr-own-supp}
+@@ -2204,9 +2230,10 @@ PROCEDURE disp-f-ptboname :
+   end .
+   if v-is-scanqr-trn then enable-cb-sealing = true .
+   if enable-cb-sealing
++  and not v-is-lgas
+   then do :
+     assign
+-      cb-sealing = -1
++      cb-sealing = -1 when enable-cb-sealing-old <> enable-cb-sealing
+       f-sealing:fgcolor  = 12
+       cb-sealing:fgcolor  = 12
+     .
+@@ -2248,7 +2275,10 @@ PROCEDURE disp-obj-name :
+ /*      apply "choose" to b-clients in frame {&frame-name}.*/
+   end.
+   
+-  assign enable-cb-sealing = false .
++  assign
++    enable-cb-sealing-old = enable-cb-sealing
++    enable-cb-sealing = false
++  .
+   for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = buf_trn-doc.cli-type
+                                        and buf_clients-attr.obj-code  = buf_trn-doc.cli-code
+                                        and buf_clients-attr.attr-code = {&attr-own-supp}
+@@ -2282,9 +2312,10 @@ PROCEDURE disp-obj-name :
+   end .
+   if v-is-scanqr-trn then enable-cb-sealing = true .
+   if enable-cb-sealing
++  and not v-is-lgas
+   then do :
+     assign
+-      cb-sealing = -1
++      cb-sealing = -1 when enable-cb-sealing-old <> enable-cb-sealing
+       f-sealing:fgcolor  = 12
+       cb-sealing:fgcolor  = 12
+     .

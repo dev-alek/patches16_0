@@ -1,0 +1,394 @@
+# HG changeset patch
+# User DRuban
+# Parent  37179ddcd8afc9dea5769c5d6a281befeac60514
+refs #DISP-718 Создание скрипта для автоматического закрытия смен ТН на несколькихААЗС
+Исправлена нумерация новых смен
+http://exp-jira.expertek.local:8080/browse/DISP-718
+
+diff --git a/bge/socet.i b/bge/socet.i
+--- a/bge/socet.i
++++ b/bge/socet.i
+@@ -35,6 +35,7 @@ define variable mSocetBegTime  as dateti
+ define variable mSocetEndTime  as dec         no-undo.
+ define variable mWriteRespFile as character   no-undo.
+ define variable mTypeResponse  as character   no-undo init "POST".
++define variable mContentType as character     no-undo init "text/xml".
+ publish "getSocetLog" (output mFileLogSocet).
+ if 
+    (   mFileLogSocet eq ""
+@@ -255,7 +256,7 @@ procedure PostRequest:
+       'User-Agent: Apache-HttpClient/4.1.1 (java 1.5)&1'    +
+        
+       'Accept: */*&1' +
+-      'Content-Type: text/xml&1'               +
++      'Content-Type: &7&1'               +
+       'Content-Length: &3&1'                                  +
+       '&1&5' 
+       ,
+@@ -264,7 +265,8 @@ procedure PostRequest:
+       length(iPostData),
+       iPostHost,
+       iPostData,
+-      mTypeResponse).
++      mTypeResponse,
++      mContentType).
+    end.
+    else
+       vCRequest = iPostData.
+diff --git a/gbl/sht-open.p b/gbl/sht-open.p
+--- a/gbl/sht-open.p
++++ b/gbl/sht-open.p
+@@ -191,13 +191,23 @@ end.
+            open-shift.obj-code = p-curr-obj-code and
+            open-shift.shift-date = s-date
+           use-index pi no-error.
++        define variable vnextsh as integer no-undo.
+         if     available open-shift
+-           and open-shift.status_     ne {&sht-expected}
+-        then  
+-           s-num  = open-shift.shift-num  + 1.
+-        else
++        then do:
++           if open-shift.status_     ne {&sht-expected}
++           then  do:
++              s-num   = open-shift.shift-num  + 1.
++              s-name = string(int(open-shift.shift-name) + 1).
++           end.
++           else do:
++              s-num  = open-shift.shift-num.
++              s-name = open-shift.shift-name.
++           end.
++        end.
++        else do:
+            s-num  = (if available open-shift then open-shift.shift-num else 1).
+-        s-name = string(s-num).
++           s-name = string(s-num).
++        end.
+         s-time = time.
+         e-time = time.
+ &else
+diff --git a/ibs/th/bge/aazs/import/salemake2.p b/ibs/th/bge/aazs/import/salemake2.p
+--- a/ibs/th/bge/aazs/import/salemake2.p
++++ b/ibs/th/bge/aazs/import/salemake2.p
+@@ -285,54 +285,54 @@ define buffer buf_doc-attr for ub.doc-at
+                                         ,output v-rid
+                                       ) no-error .
+         if error-status:error then do:
+-&scop my-message substitute("Ошибка при создании отчета о продаже по шаблону <&1> с параметрами:&2" + ~
+-                            "&3&4 дата смены &5 № смены &6&2" +                                ~
++&scop my-message substitute("Ошибка при создании отчета о продаже с параметрами:&2" + ~
++                            "&3&4 дата смены &5 № смены &6 порядок &1&2" +                                ~
+                             "ДОП. фильтр по чекам &7:&2"                                       ~
+-                            , entry(3, buf_schedule-attr.attr-value, ~{&delim-par~})           ~
++                            , v-shift-num           ~
+                             , ~{&new-line~}                                                    ~
+                             , p-curr-obj-type                                                  ~
+                             , p-curr-obj-code                                                  ~
+-                            , v-shift-date-str-rus                                             ~
+-                            , v-shift-num                                                      ~
++                            , v-shift-date                                             ~
++                            ,""                                                       ~
+                             , v-filter-str-rus) +                                              ~
+                  substitute("&1 &2", error-status:get-message(1), return-value )
+           v-view-log = yes.
+-/*          {&display-message}.     */
++          {&display-message}.     
+ /*          NEXT _buf_schedule-attr.*/
+         end.
+         find first buf_Inkas no-lock where
+                   recid(buf_inkas) = v-rid .
+         create temp-inkas.
+         buffer-copy buf_inkas to temp-inkas.
+-&scop   my-message       substitute("Создан документ продажи &1 по шаблону <&2> с параметрами:&3" + ~
+-                            "&4 дата смены &5 № смены &6&3" +                                ~
++&scop   my-message       substitute("Создан документ продажи &1  с параметрами:&3" + ~
++                            "&4 дата смены &5 № смены &6 порядок &2&3" +                                ~
+                             "ДОП. фильтр по чекам &7&3"                                        ~
+                             , temp-inkas.inkas-code                                            ~
+-                            , entry(3, buf_schedule-attr.attr-value, ~{&delim-par~})           ~
++                            , temp-inkas.shift-num           ~
+                             , ~{&new-line~}                                                    ~
+                             , p-curr-obj-type + string(p-curr-obj-code)                        ~
+-                            , v-shift-date-str-rus                                             ~
+-                            , v-shift-num                                                      ~
++                            , temp-inkas.shift-date                                             ~
++                            , temp-inkas.shift-name                                                      ~
+                             , v-filter-str-rus)
+ 
+-/*        {&display-message}.*/
++         {&display-message}.
+       end.
+       else do:
+-&scop my-message substitute("Не будет создан документ продажи по шаблону <&1> с параметрами:&2" + ~
+-                            "&3&4 дата смены &5 № смены &6&2" +                                ~
++&scop my-message substitute("Не будет создан документ продажи с параметрами:&2" + ~
++                            "&3&4 дата смены &5 № смены &6 порядок &1&2" +                                ~
+                             "ДОП. фильтр по чекам &7&2" +                                     ~
+                             "Уже есть документ продажи с такими параметрами"                    ~
+-                            , entry(3, buf_schedule-attr.attr-value, ~{&delim-par~})           ~
++                            , v-shift-num           ~
+                             , ~{&new-line~}                                                    ~
+                             , p-curr-obj-type                                                  ~
+                             , p-curr-obj-code                                                  ~
+-                            , v-shift-date-str-rus                                             ~
+-                            , v-shift-num                                                      ~
++                            , v-shift-date                                             ~
++                            , ""                                                      ~
+                             , v-filter-str-rus)
+ 
+         assign
+         v-view-log = yes.
+-/*        {&display-message}.     */
++        {&display-message}.     
+ /*        NEXT _buf_schedule-attr.*/
+       end.
+ /*      
+diff --git a/ibs/th/bge/disp/dispStatus.cls b/ibs/th/bge/disp/dispStatus.cls
+--- a/ibs/th/bge/disp/dispStatus.cls
++++ b/ibs/th/bge/disp/dispStatus.cls
+@@ -28,7 +28,7 @@ CLASS ibs.th.bge.disp.dispstatus INHERIT
+    GET.
+    SET.
+     
+-   DEFINE PUBLIC PROPERTY shiftUTC AS DATETIME NO-UNDO 
++   DEFINE PUBLIC PROPERTY shiftUTC AS character NO-UNDO 
+    GET.
+    SET.
+    
+@@ -48,12 +48,16 @@ CLASS ibs.th.bge.disp.dispstatus INHERIT
+    
+    method public longchar getjson():
+        DEFINE VARIABLE mesjson AS LOngchar NO-UNDO.
+-       mesjson = SUBSTITUTE ('~{"message":"&1","shiftUTC":"&2","shiftNuber":&3,"order":&4,"isError":&5}',
++       FIX-CODEPAGE ( mesjson ) = "UTF-8".
++       
++       mesjson = SUBSTITUTE ('~{"message":"&1","shiftUTC":"&2","shiftNumber":&3,"order":&4,"isError":&5}&6',
+        pMessage,
+        shiftUTC,
+-       shiftNumber,
++       (if shiftNumber eq ? or shiftNumber eq "" then "0" else shiftNumber),
+        Order,
+-       isError).
++       if isError then "true" else "false",
++       "").
++       
+        return mesjson.  
+    end.
+    
+diff --git a/ibs/th/str/CloseAndOpenShift.cls b/ibs/th/str/CloseAndOpenShift.cls
+--- a/ibs/th/str/CloseAndOpenShift.cls
++++ b/ibs/th/str/CloseAndOpenShift.cls
+@@ -247,6 +247,7 @@ class ibs.th.str.CloseAndOpenShift:
+             buf_shift-staff.shift-date = shift-obj.shift-date
+             buf_shift-staff.psn-num    = person.psn-code
+             buf_shift-staff.next-shift = no
++            buf_shift-staff.staff-role = yes
+          .
+       end.
+       if avail buf_shift-staff then do:
+@@ -435,17 +436,52 @@ class ibs.th.str.CloseAndOpenShift:
+       end.
+       return oOk.
+    end.
+-   method public datetime format_datetime (
++   
++   method public logical getCheck(iCycle as integer):
++      return cycleOperThis(iCycle,"getCheck").
++   end.
++   
++   method public logical getCheck():
++      define variable oOk as logical no-undo init yes.
++      define variable vOk as logical no-undo init yes.
++      define buffer clients   for ub.clients.
++      define variable v-parameter as character no-undo.
++      for each clients where clients.db-num   eq g#dbnum
++                         and clients.obj-type eq {&shop}
++                         and clients.stts     eq 0
++      no-lock:
++         assign
++      v-parameter =
++                     clients.obj-type         + {&delim-par} +
++                     string(clients.obj-code) + {&delim-par} +
++                     string(0)        + {&delim-par} +
++                     string(1)
++    .
++    run str/get-chkf.p (
++                        input parparentproc, /*parparentproc a*/
++                        input WorkHandel, /*p-parent-handle*/
++                        input WorkHandel, /*p-log-handle*/
++                        input v-parameter /*p-parameter*/)
++    no-error .
++    
++         if    error-status:error
++            or not vOk
++         then
++            oOk = false.
++      end.
++      return oOk.
++   end.
++   
++   method public character format_datetime (
+     input v-date as date,
+     input v-time as integer
+     ):
+-    return datetime(
+-    month(v-date),
+-    day(v-date),
+-    year(v-date),
+-    int(entry(1,string(v-time, "HH:MM:SS:000"),":")),
+-    int(entry(2,string(v-time, "HH:MM:SS:000"),":")),
+-    int(entry(3,string(v-time, "HH:MM:SS:000"),":"))).
++    return substitute ("&3-&1-&2T&4Z"
++    , string(month(v-date),"99")
++    ,string(day(v-date),"99")
++    ,string(year(v-date),"9999")
++    ,string(v-time, "HH:MM:SS.000")
++    ).
+    end.
+    
+    method public ibs.th.bge.disp.dispstatus getStatusObj():
+diff --git a/str/proc-startNewShiftTso.p b/str/proc-startNewShiftTso.p
+--- a/str/proc-startNewShiftTso.p
++++ b/str/proc-startNewShiftTso.p
+@@ -15,24 +15,43 @@ define variable parparentproc as handle 
+ parparentproc = this-procedure.
+ DEFINE VARIABLE mERRtest AS CHARACTER NO-UNDO.
+ DEFINE VARIABLE mERRflag AS logical   NO-UNDO.
++define variable mWorkShift as ibs.th.str.CloseAndOpenShift no-undo.
++define variable mDebug as logical no-undo.
+ 
+ procedure PutMesAsuncErr:
+     DEFINE INPUT  PARAMETER itext AS CHARACTER NO-UNDO.
+-    if mERRtest eq ""
+-    then
++    if not mERRflag
++    then do:
+        mERRtest = itext.
+-    mERRflag = yes.
++       mERRflag = yes.
++       run sendStat.
++    end.  
++    
+     run PutStatAsunc(itext).
+ end.
+ 
++procedure sendStat:
++   DEFINE VARIABLE dispStat AS ibs.th.bge.disp.dispstatus NO-UNDO.
++   dispStat = mWorkShift:getStatusObj().
++   dispStat:pMessage = mERRtest.
++   dispStat:isError = mERRflag.
++   mContentType = "application/json".
++   run ConectSocet(mWorkShift:getDispSet():hostdisp,
++                   mWorkShift:getDispSet():portdisp,
++                   "THController/message",
++                   dispStat:getjson(),
++                   "",
++                   ?,
++                   yes,
++                   "Отправка статуса в диспетчерскую").
++   delete object dispStat.
++end.
+ define new shared variable oxml-exch-dir as character no-undo .
+ define new shared variable oxml-heap-dir as character no-undo .
+ &global-define tab-shift 2
+ 
+    { str/auto2dia.i    }
+ do  on error  undo, return error:
+-   define variable mWorkShift as ibs.th.str.CloseAndOpenShift no-undo.
+-   define variable mDebug as logical no-undo.
+    mDebug = logical (GetPARAMAsunc(1)) no-error.
+    if mDebug eq ?
+    then
+@@ -55,15 +74,35 @@ do  on error  undo, return error:
+    if not mWorkShift:closeShift(mcicle)
+    then
+       run PutMesAsunc("Не удалось закрыть смены").
++   run PutStatAsunc("Подкачиваем чеки").
++   if not mWorkShift:getCheck()
++   then
++      run PutMesAsunc("Ошибка при подкачке чеков").
++   else
++      run PutMesAsunc("Чек").
++   
+    run PutStatAsunc("Создаем продажу").
+    if not mWorkShift:crSale(mcicle)
+    then
+       run PutMesAsuncErr("Не удалось создать продажу").
+-
++   else
++      if not mERRflag
++      then do:
++         mERRtest = "Продажа создана.".
++         run sendStat.
++      end. 
++   
+    run PutStatAsunc("Создаем контрольную сверку").
+    if not mWorkShift:crRvsControl(mcicle)
+    then
+       run PutMesAsuncErr("Не удалось создать контрольную сверку").
++   else
++      if not mERRflag
++      then do:
++         mERRtest = "Создана контрольная сверка.".
++         run sendStat.
++      end. 
++   
+    
+    run PutStatAsunc("Открываем смены").
+    if not mWorkShift:openShift(mcicle)
+@@ -73,30 +112,30 @@ do  on error  undo, return error:
+    if not mWorkShift:startShift(mcicle)
+    then
+       run PutMesAsunc("Не удалось запустить новую смену ТСО").
+-   
+    run PutStatAsunc("Создаем сменную сверку").
+    if not mWorkShift:crRvsShift(mcicle)
+    then
+       run PutMesAsuncErr("Не удалось создать сменную сверку").
++   else
++      if not mERRflag
++      then do:
++         mERRtest = "Создана сменная сверка.".
++         run sendStat.
++      end. 
++   
+    run PutStatAsunc("Открывем новую смену").
+    
+    if not mWorkShift:OpenShiftTh(3)
+    then
+       run PutMesAsuncErr("Не удалось открыть смену TH").
++   else
++      if not mERRflag
++      then do:
++         mERRtest = "Открыта новая смена.".
++         run sendStat.
++      end. 
+    
+    run PutStatAsunc("Отправляем статус ").
+-   DEFINE VARIABLE dispStat AS ibs.th.bge.disp.dispstatus NO-UNDO.
+-   dispStat = mWorkShift:getStatusObj().
+-   dispStat:pMessage = mERRtest.
+-   dispStat:isError = mERRflag.
+-   run ConectSocet(mWorkShift:getDispSet():hostdisp,
+-                   mWorkShift:getDispSet():portdisp,
+-                   "THController/message",
+-                   dispStat:getjson(),
+-                   "",
+-                   ?,
+-                   yes,
+-                   "Отправка статуса в диспетчерскую").
+    run PutStatAsunc("Выгружаем данные в 1С").
+    
+    /*    выгрузка в 1С-Erp*/
+diff --git a/str/saleincl.p b/str/saleincl.p
+--- a/str/saleincl.p
++++ b/str/saleincl.p
+@@ -402,6 +402,8 @@ END.
+ ASSIGN
+ glog = QUERY query-chk-doc:GET-FIRST(no-lock) NO-ERROR.
+ IF not glog THEN DO:
++&scop my-message v-query-prepare + v-where-phrase
++{&display-message-laud}.
+ &scop my-message substitute("Нет чеков, удовлетворяющих условиям закачки в продажу &1"  ~
+                           , p-inkas-code)
+ {&display-message-laud}.

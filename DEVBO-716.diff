@@ -1,0 +1,36 @@
+# HG changeset patch
+# User ARostovtsev
+# Parent  6f3462691e21426ff4bc8c5627c162e871d8ffa5
+refs #DEVBO-716 Ошибки создания акта-приема МП по УПД
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-716
+
+diff --git a/str/UPD_browse.w b/str/UPD_browse.w
+--- a/str/UPD_browse.w
++++ b/str/UPD_browse.w
+@@ -3077,7 +3077,9 @@ ON CHOOSE OF r-boss IN FRAME d-utd /* r-
+ ON CHOOSE OF r-contr-TH IN FRAME d-utd
+    DO:
+       define buffer buf_contract for contract.
++      define buffer buf_contract-attr for ub.contract-attr.
+       define variable agnt-list as character no-undo .
++      define variable vEdi as logical no-undo init false.
+       if f-supp-code-TH <> 0 then 
+       do:
+          /*Если есть поставщик*/
+@@ -3122,7 +3124,14 @@ ON CHOOSE OF r-contr-TH IN FRAME d-utd
+             /*Если есть параметр*/
+             if v-FlagEdo then 
+             do:
+-               if buf_contract.whole-send-news > 0 then 
++/*               if buf_contract.whole-send-news > 0 then*/
++               for first buf_contract-attr no-lock where 
++                         buf_contract-attr.host-code     = buf_contract.host-code 
++                     and buf_contract-attr.contract-code = buf_contract.contract-code 
++                     and buf_contract-attr.attr-code = "contract-edi":
++                  vEdi = logical (buf_contract-attr.attr-value) .
++               end.
++               if vEdi then
+                do:
+                   assign
+                      f-contr-TH      = buf_contract.contract-code

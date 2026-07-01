@@ -1,0 +1,65 @@
+# HG changeset patch
+# User SSlivenko
+# Parent  69d767ed69f5c7781130965dfbeebb0a18e2576a
+refs #DEVBO-222 Периодическое отсутствие данных по ТРК в сверке при приёме НП . #BTS-890
+Новый лог pump-ext.err , в который будут складываться данные из pump.err
+https://msk-exp-jira.expertek.local/browse/DEVBO-222
+https://msk-exp-jira.expertek.local/browse/BTS-890
+
+diff --git a/str/lib-rvs.p b/str/lib-rvs.p
+--- a/str/lib-rvs.p
++++ b/str/lib-rvs.p
+@@ -6288,6 +6288,9 @@ procedure lib-rvs_anls-pmp : /* analysis
+   define buffer bf_goods      for ub.goods.
+   define buffer bf_goods-file for ub.goods.
+   define buffer bf_bar-code   for ub.bar-code.
++  
++  define variable v_File-Err-EXT    as character no-undo.
++  v_File-Err-EXT = './pump-ext.err' .
+ 
+   { str/sclspref.i }
+ 
+@@ -6347,14 +6350,14 @@ procedure lib-rvs_anls-pmp : /* analysis
+   then do:
+      assign
+         v_File-Name = search(objSrv:SystemSetting:pumpfile)
+-        v_File-Err  = substitute('&1pump.err', ibs.th.gbl.gbl-inipar:logDir) .
++        v_File-Err  = substitute('&1pump.err', ibs.th.gbl.gbl-inipar:logDir) 
+      .
+      run readfiletxt(v_File-Name,output vPump).
+   end.
+   else if p-read-cur = yes then do:
+     assign
+       v_File-Name = './pump.txt'
+-      v_File-Err  = substitute('&1pump.err', ibs.th.gbl.gbl-inipar:logDir) .
++      v_File-Err  = substitute('&1pump.err', ibs.th.gbl.gbl-inipar:logDir) 
+     .
+     output to value(v_File-Err) .
+     output close.
+@@ -6740,6 +6743,12 @@ procedure lib-rvs_anls-pmp : /* analysis
+                   then 'Log-файл с описанием ошибок ' + v_File-Err + "." 
+                   else '' )+ 'Повторите попытку или обратитесь в техническую поддержку.' 
+                  .
++    if search(v_File-Err-EXT) = ?
++    then do :
++      output to value (v_File-Err-EXT).
++      output close.
++    end .
++    copy-lob from file v_File-Err to file v_File-Err-EXT append .
+     if p-message-on = ?
+     then do :
+       /* Если сверки по приходу До/После то не возвращаем ошибку */
+@@ -6749,6 +6758,13 @@ procedure lib-rvs_anls-pmp : /* analysis
+       return error vtext.
+     end .
+   end.
++  
++  if search(v_File-Err-EXT) = ?
++  then do :
++    output to value (v_File-Err-EXT).
++    output close.
++  end .
++  copy-lob from file v_File-Err to file v_File-Err-EXT append .
+ 
+   /* Записываем данные для возврата */
+   for each tt-pump-nozzle :

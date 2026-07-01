@@ -1,0 +1,967 @@
+# HG changeset patch
+# Parent 8cc0ef02c4aaf81a36919f45f630ce3a407fbb42
+# User SKiryxin
+refs #2978 Автоматическое формирование приходного документа при закрытие продажи с газом
+
+http://exp-rm/redmine/issues/2978
+
+diff -r 8cc0ef02c4aa adm/shattr-1.w
+--- a/adm/shattr-1.w	Wed May 14 18:54:28 2014 +0400
++++ b/adm/shattr-1.w	Wed May 14 19:53:42 2014 +0400
+@@ -127,7 +127,7 @@
+ t-autoclos t-autocomp t-one-curs t-sale-filter t-prcl-spl t-autofbr ~
+ t-restdish t-restingr rs-tpsi-mode t-main-tpsi t-resttpsi t-neg-tpsi-weight ~
+ f-neg-tpsi-qnty t-neg-tpsi-oper t-close-in-rfsl BR-sale-add B-sc-update ~
+-r-wrkr r-agnt r-boss wrkr-name agnt-name boss-name
++B-sc-clear r-wrkr r-agnt r-boss wrkr-name agnt-name boss-name 
+ &Scoped-Define DISPLAYED-FIELDS tt-trn-doc.wrkr tt-trn-doc.agnt ~
+ tt-trn-doc.boss
+ &Scoped-define DISPLAYED-TABLES tt-trn-doc
+@@ -166,6 +166,10 @@
+      SIZE 10 BY 1
+      BGCOLOR 8 .
+ 
++DEFINE BUTTON B-sc-clear 
++     LABEL "&Сбросить" 
++     SIZE 10 BY 1.
++
+ DEFINE BUTTON B-sc-update
+      LABEL "<-&Изменить"
+      SIZE 10 BY 1.
+@@ -193,12 +197,12 @@
+ 
+ DEFINE VARIABLE agnt-name AS CHARACTER FORMAT "x(256)":U
+       VIEW-AS TEXT
+-     SIZE 10.5 BY 1
++     SIZE 10.57 BY 1
+      FGCOLOR 4 FONT 4 NO-UNDO.
+ 
+ DEFINE VARIABLE boss-name AS CHARACTER FORMAT "x(256)":U
+       VIEW-AS TEXT
+-     SIZE 10.5 BY 1
++     SIZE 10.57 BY 1
+      FGCOLOR 4 FONT 4 NO-UNDO.
+ 
+ DEFINE VARIABLE f-neg-tpsi-qnty AS DECIMAL FORMAT ">>,>>9.99":U INITIAL 0
+@@ -208,7 +212,7 @@
+ 
+ DEFINE VARIABLE wrkr-name AS CHARACTER FORMAT "x(256)":U
+       VIEW-AS TEXT
+-     SIZE 10.5 BY 1
++     SIZE 10.57 BY 1
+      FGCOLOR 4 FONT 4 NO-UNDO.
+ 
+ DEFINE VARIABLE rs-tpsi-mode AS INTEGER
+@@ -216,7 +220,7 @@
+      RADIO-BUTTONS
+           "1", 1,
+ "2", 2
+-     SIZE 11.5 BY 1 NO-UNDO.
++     SIZE 11.57 BY 1 NO-UNDO.
+ 
+ DEFINE VARIABLE t-augetres AS LOGICAL INITIAL no
+      LABEL "автом. резервирование после чтения чеков с кассы"
+@@ -251,7 +255,7 @@
+ DEFINE VARIABLE t-close-day-period AS LOGICAL INITIAL no 
+      LABEL "закрыть период по дате продажи" 
+      VIEW-AS TOGGLE-BOX
+-     SIZE 37.3 BY 1 TOOLTIP "Не разрешено делать более одной продажи в день (за смену)" NO-UNDO.
++     SIZE 37.29 BY 1 TOOLTIP "Не разрешено делать более одной продажи в день (за смену)" NO-UNDO.
+ 
+ DEFINE VARIABLE t-close-in-rfsl AS LOGICAL INITIAL no
+      LABEL "закрывать приход по техпроливу на факт"
+@@ -281,12 +285,12 @@
+ DEFINE VARIABLE t-one-sale-per-day AS LOGICAL INITIAL no
+      LABEL "один день-одна продажа"
+      VIEW-AS TOGGLE-BOX
+-     SIZE 37.3 BY 1 TOOLTIP "Не разрешено делать более одной продажи в день (за смену)" NO-UNDO.
++     SIZE 37.29 BY 1 TOOLTIP "Не разрешено делать более одной продажи в день (за смену)" NO-UNDO.
+ 
+ DEFINE VARIABLE t-pay-gds-algo AS LOGICAL INITIAL no
+      LABEL "разбивка по типам касс.плат."
+      VIEW-AS TOGGLE-BOX
+-     SIZE 37.3 BY 1 TOOLTIP "Разбивка строк чека по типам касс.плат. при закачке чека в продажу для дальнейш" NO-UNDO.
++     SIZE 37.29 BY 1 TOOLTIP "Разбивка строк чека по типам касс.плат. при закачке чека в продажу для дальнейш" NO-UNDO.
+ 
+ DEFINE VARIABLE t-prcl-spl AS LOGICAL INITIAL no
+      LABEL "Значение цены в продаже брать из прайс-листа (не из чека)"
+@@ -306,7 +310,7 @@
+ DEFINE VARIABLE t-resttpsi AS LOGICAL INITIAL no
+      LABEL "учет остатков товаров при резервировании (для ТПСИ)"
+      VIEW-AS TOGGLE-BOX
+-     SIZE 66.5 BY 1 TOOLTIP "резервировать остатки чужого товара на объекте продажи" NO-UNDO.
++     SIZE 66.57 BY 1 TOOLTIP "резервировать остатки чужого товара на объекте продажи" NO-UNDO.
+ 
+ DEFINE VARIABLE t-sale-filter AS LOGICAL INITIAL no
+      LABEL "в продажу чеки только по фильтру (если задан)"
+@@ -330,10 +334,10 @@
+             WIDTH 22
+       tt-sale-add.obj-type FORMAT "X(3)":U
+       tt-sale-add.obj-code COLUMN-LABEL "Код" FORMAT ">>>>>>>>9":U
+-      tt-sale-add.obj-name FORMAT "X(40)":U WIDTH 28.3
++      tt-sale-add.obj-name FORMAT "X(40)":U WIDTH 27
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+-    WITH NO-ROW-MARKERS SEPARATORS SIZE 66 BY 4.5
++    WITH NO-ROW-MARKERS SEPARATORS SIZE 66 BY 6
+          TITLE "Контрагенты для дополнительных документов, создаваемых по продаже" FIT-LAST-COLUMN.
+ 
+ 
+@@ -365,35 +369,36 @@
+      t-neg-tpsi-oper AT ROW 17 COL 1
+      t-close-in-rfsl AT ROW 18 COL 1 WIDGET-ID 26
+      BR-sale-add AT ROW 19 COL 1
+-     B-sc-update AT ROW 19.13 COL 67.5
+-     tt-trn-doc.wrkr AT ROW 20.47 COL 74 COLON-ALIGNED WIDGET-ID 18
++     B-sc-update AT ROW 19 COL 68
++     B-sc-clear AT ROW 19 COL 78 WIDGET-ID 30
++     tt-trn-doc.wrkr AT ROW 21.65 COL 73 COLON-ALIGNED WIDGET-ID 18
+           LABEL "К&л-к"
+           VIEW-AS FILL-IN
+-          SIZE 8.8 BY 1
++          SIZE 8.86 BY 1
+           FONT 4
+-     r-wrkr AT ROW 20.47 COL 96.1 WIDGET-ID 14
+-     tt-trn-doc.agnt AT ROW 21.47 COL 74 COLON-ALIGNED WIDGET-ID 2
++     r-wrkr AT ROW 21.65 COL 95.14 WIDGET-ID 14
++     tt-trn-doc.agnt AT ROW 22.65 COL 73 COLON-ALIGNED WIDGET-ID 2
+           LABEL "И&сп"
+           VIEW-AS FILL-IN
+-          SIZE 8.8 BY 1
++          SIZE 8.86 BY 1
+           FONT 4
+-     r-agnt AT ROW 21.47 COL 96 WIDGET-ID 10
+-     tt-trn-doc.boss AT ROW 22.47 COL 74 COLON-ALIGNED WIDGET-ID 6
++     r-agnt AT ROW 22.65 COL 95 WIDGET-ID 10
++     tt-trn-doc.boss AT ROW 23.65 COL 73 COLON-ALIGNED WIDGET-ID 6
+           LABEL "&М-р"
+           VIEW-AS FILL-IN
+-          SIZE 8.8 BY 1
++          SIZE 8.86 BY 1
+           FONT 4
+-     r-boss AT ROW 22.47 COL 96 WIDGET-ID 12
+-     wrkr-name AT ROW 20.47 COL 83.5 COLON-ALIGNED NO-LABEL WIDGET-ID 20
+-     agnt-name AT ROW 21.47 COL 83.5 COLON-ALIGNED NO-LABEL WIDGET-ID 4
+-     boss-name AT ROW 22.47 COL 83.5 COLON-ALIGNED NO-LABEL WIDGET-ID 8
++     r-boss AT ROW 23.65 COL 95 WIDGET-ID 12
++     wrkr-name AT ROW 21.65 COL 82.57 COLON-ALIGNED NO-LABEL WIDGET-ID 20
++     agnt-name AT ROW 22.65 COL 82.57 COLON-ALIGNED NO-LABEL WIDGET-ID 4
++     boss-name AT ROW 23.65 COL 82.57 COLON-ALIGNED NO-LABEL WIDGET-ID 8
++     "Проставлять в док-ты:" VIEW-AS TEXT
++          SIZE 20.57 BY 1 AT ROW 20.3 COL 77.57 WIDGET-ID 16
++          FGCOLOR 4 
+      "Режим работы ТПСИ" VIEW-AS TEXT
+-          SIZE 19.5 BY 1 AT ROW 13 COL 4
++          SIZE 19.57 BY 1 AT ROW 13 COL 4
+           FGCOLOR 4
+-     "Проставлять в док-ты:" VIEW-AS TEXT
+-          SIZE 20.5 BY 1 AT ROW 19.13 COL 78.5 WIDGET-ID 16
+-          FGCOLOR 4
+-     SPACE(0.30) SKIP(3.44)
++     SPACE(75.72) SKIP(11.21)
+     WITH VIEW-AS DIALOG-BOX KEEP-TAB-ORDER
+          SIDE-LABELS NO-UNDERLINE THREE-D  SCROLLABLE
+          TITLE "Набор опций работы с продажей"
+@@ -455,7 +460,7 @@
+      _FldNameList[3]   > Temp-Tables.tt-sale-add.obj-code
+ "tt-sale-add.obj-code" "Код" ? "integer" ? ? ? ? ? ? no ? no no ? yes no no "U" "" "" "" "" "" "" 0 no 0 no no
+      _FldNameList[4]   > Temp-Tables.tt-sale-add.obj-name
+-"tt-sale-add.obj-name" ? ? "character" ? ? ? ? ? ? no ? no no "28.3" yes no no "U" "" "" "" "" "" "" 0 no 0 no no
++"tt-sale-add.obj-name" ? ? "character" ? ? ? ? ? ? no ? no no "27" yes no no "U" "" "" "" "" "" "" 0 no 0 no no
+      _Query            is OPENED
+ */  /* BROWSE BR-sale-add */
+ &ANALYZE-RESUME
+@@ -522,6 +527,28 @@
+ &ANALYZE-RESUME
+ 
+ 
++&Scoped-define SELF-NAME B-sc-clear
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL B-sc-clear Dialog-Frame
++ON CHOOSE OF B-sc-clear IN FRAME Dialog-Frame /* Сбросить */
++DO:
++    /* Очистим от контрагента */
++    DEFINE BUFFER buf_tt-sale-add FOR tt-sale-add.
++
++    FIND FIRST buf_tt-sale-add WHERE
++              buf_tt-sale-add.doc-kind = tt-sale-add.doc-kind.
++    ASSIGN
++    buf_tt-sale-add.obj-type = ''
++    buf_tt-sale-add.obj-code = 0
++    buf_tt-sale-add.obj-name = ''
++    .
++    br-sale-add:REFRESH().
++END.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++
+ &Scoped-define SELF-NAME B-sc-update
+ &ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL B-sc-update Dialog-Frame
+ ON CHOOSE OF B-sc-update IN FRAME Dialog-Frame /* <-Изменить */
+@@ -954,7 +981,7 @@
+          t-close-day-period t-autocalc t-pay-gds-algo t-autoclos t-autocomp
+          t-one-curs t-sale-filter t-prcl-spl t-autofbr t-restdish t-restingr
+          rs-tpsi-mode t-main-tpsi t-resttpsi t-neg-tpsi-weight f-neg-tpsi-qnty
+-         t-neg-tpsi-oper t-close-in-rfsl BR-sale-add B-sc-update
++         t-neg-tpsi-oper t-close-in-rfsl BR-sale-add B-sc-update B-sc-clear 
+          tt-trn-doc.wrkr r-wrkr tt-trn-doc.agnt r-agnt tt-trn-doc.boss r-boss
+          wrkr-name agnt-name boss-name
+       WITH FRAME Dialog-Frame.
+@@ -1347,6 +1374,7 @@
+ t-close-in-rfsl WHEN p-mode = {&UPDATE}
+ br-sale-add
+ b-sc-update WHEN p-mode = {&UPDATE}
++b-sc-clear WHEN p-mode = {&UPDATE}
+ rs-tpsi-mode WHEN p-mode = {&UPDATE}
+ t-main-tpsi WHEN p-mode = {&UPDATE}
+ tt-trn-doc.wrkr WHEN p-mode = {&UPDATE}
+diff -r 8cc0ef02c4aa cmp/str-glb4.p
+--- a/cmp/str-glb4.p	Wed May 14 18:54:28 2014 +0400
++++ b/cmp/str-glb4.p	Wed May 14 19:53:42 2014 +0400
+@@ -1521,11 +1521,13 @@
+ { cmp/cr-prep.i 1 sale-add-tech-refuell      trf          ТехПролив              trf  TechRefuell}
+ { cmp/cr-prep.i 1 sale-add-return-write-off  rwo          Списание-по-Возврату   rwo  Write-off-by-Return}
+ { cmp/cr-prep.i 1 sale-add-write-off         swo          Списание               swo  Write-off}
++{ cmp/cr-prep.i 1 sale-add-nat-gas           ngs          Приход-Природный-Газ   ngs  Natural-Gas}
+ 
+ &glob sale-add-kinds '~
+ {&bef-sale-add-return-write-off}~
+ ,{&bef-sale-add-tech-refuell}~
+ ,{&bef-sale-add-write-off}~
++,{&bef-sale-add-nat-gas}~
+ ':U
+ 
+ run filwrlib_append-new-line in this-procedure ( input "&global-define sale-add-kinds {&sale-add-kinds}" ).
+@@ -1534,6 +1536,7 @@
+ {&bef-sale-add-return-write-off-full}~
+ ,{&bef-sale-add-tech-refuell-full}~
+ ,{&bef-sale-add-write-off-full}~
++,{&bef-sale-add-nat-gas-full}~
+ ':U
+ run filwrlib_append-new-line in this-procedure ( input "&global-define sale-add-kinds-full {&sale-add-kinds-full}" ).
+ 
+@@ -1544,7 +1547,8 @@
+ ~~~~~~~{&bef-TDEDT_Vozvrat_Vnesh_Kass},~
+ {&bef-sale-add-return-write-off},~
+ {&bef-sale-add-tech-refuell},~
+-{&bef-sale-add-write-off}~
++{&bef-sale-add-write-off},~
++{&bef-sale-add-nat-gas}~
+ ':U
+ 
+ run filwrlib_append-new-line in this-procedure ( input "&global-define sale-all-doc-kinds {&sale-all-doc-kinds}" ).
+@@ -1554,7 +1558,8 @@
+ ~~~~~~~{&bef-TDEDT_Vozvrat_Vnesh_Kass-full},~
+ {&bef-sale-add-return-write-off-full},~
+ {&bef-sale-add-tech-refuell-full},~
+-{&bef-sale-add-write-off-full}~
++{&bef-sale-add-write-off-full},~
++{&bef-sale-add-nat-gas-full}~
+ ':U
+ 
+ run filwrlib_append-new-line in this-procedure ( input "&global-define sale-all-doc-kinds-full {&sale-all-doc-kinds-full}" ).
+diff -r 8cc0ef02c4aa cmp/str-glbl.i
+--- a/cmp/str-glbl.i	Wed May 14 18:54:28 2014 +0400
++++ b/cmp/str-glbl.i	Wed May 14 19:53:42 2014 +0400
+@@ -4099,19 +4099,23 @@
+ &global-define sale-add-write-off '{&bef-sale-add-write-off}':U
+ &global-define bef-sale-add-write-off-full Списание
+ &global-define sale-add-write-off-full '{&bef-sale-add-write-off-full}':U
+-&global-define sale-add-kinds 'rwo,trf,swo':U
+-&global-define sale-add-kinds-full 'Списание-по-Возврату,ТехПролив,Списание':U
+-&global-define sale-all-doc-kinds '~{&bef-TDEDT_Ras_Vnesh_Kass},~{&bef-TDEDT_Vozvrat_Vnesh_Kass},rwo,trf,swo':U
+-&global-define sale-all-doc-kinds-full '~{&bef-TDEDT_Ras_Vnesh_Kass-full},~{&bef-TDEDT_Vozvrat_Vnesh_Kass-full},Списание-по-Возврату,ТехПролив,Списание':U
++&global-define bef-sale-add-nat-gas ngs
++&global-define sale-add-nat-gas '{&bef-sale-add-nat-gas}':U
++&global-define bef-sale-add-nat-gas-full Приход-Природный-Газ
++&global-define sale-add-nat-gas-full '{&bef-sale-add-nat-gas-full}':U
++&global-define sale-add-kinds 'rwo,trf,swo,ngs':U
++&global-define sale-add-kinds-full 'Списание-по-Возврату,ТехПролив,Списание,Приход-Природный-Газ':U
++&global-define sale-all-doc-kinds '~{&bef-TDEDT_Ras_Vnesh_Kass},~{&bef-TDEDT_Vozvrat_Vnesh_Kass},rwo,trf,swo,ngs':U
++&global-define sale-all-doc-kinds-full '~{&bef-TDEDT_Ras_Vnesh_Kass-full},~{&bef-TDEDT_Vozvrat_Vnesh_Kass-full},Списание-по-Возврату,ТехПролив,Списание,Приход-Природный-Газ':U
+ &global-define sale-add-ext-doc-types '~{&bef-TDEDT_Spi_Vnesh},~{&bef-TDEDT_Spi_Vnesh},~{&bef-TDEDT_Spi_Vnesh}':U
+ &global-define bef-sale-add2-in-tech-refuell itr
+ &global-define sale-add2-in-tech-refuell '{&bef-sale-add2-in-tech-refuell}':U
+ &global-define bef-sale-add2-in-tech-refuell-full ПриТехПрол
+ &global-define sale-add2-in-tech-refuell-full '{&bef-sale-add2-in-tech-refuell-full}':U
+-&global-define sale-doc-name entry (lookup (~{&sale-doc-kind}, '{&bef-TDEDT_Ras_Vnesh_Kass},{&bef-TDEDT_Vozvrat_Vnesh_Kass},rwo,trf,swo':U + ',' + 'itr':U) + 1, ',' + '{&bef-TDEDT_Ras_Vnesh_Kass-full},{&bef-TDEDT_Vozvrat_Vnesh_Kass-full},Списание-по-Возврату,ТехПролив,Списание':U + ',' + 'ПриТехПрол':U )
+-&global-define sale-doc-kind-born entry (lookup (~{&sale-doc-kind}, '{&bef-TDEDT_Ras_Vnesh_Kass},{&bef-TDEDT_Vozvrat_Vnesh_Kass},rwo,trf,swo':U), 'main,pair,trio-m,quadro,stock-down')
+-&global-define sale-doc-main-receipt-type entry (lookup (~{&sale-doc-kind}, '{&bef-TDEDT_Ras_Vnesh_Kass},{&bef-TDEDT_Vozvrat_Vnesh_Kass},rwo,trf,swo':U) + 1, '0,~{&bef-rcpt-sale},~{&bef-rcpt-return},~{&bef-rcpt-return-write-off},~{&bef-rcpt-tech-refuell},~{&bef-rcpt-write-off}':U)
+-&global-define sale-doc-poss-wro-codes entry (lookup (~{&sale-doc-kind}, '{&bef-TDEDT_Ras_Vnesh_Kass},{&bef-TDEDT_Vozvrat_Vnesh_Kass},rwo,trf,swo':U) + 1, '0,~{&bef-wro-r-modificator},~{&bef-wro-v-modificator},~{&bef-wro-cancell-item};~{&bef-wro-v-modificator-ci};~{&bef-wro-cancell-all};~{&bef-wro-v-modificator-ca},~{&bef-wro-r-tech-refuell},~{&bef-wro-without-payment};~{&bef-wro-r-modificator-wp}':U)
++&global-define sale-doc-name entry (lookup (~{&sale-doc-kind}, '{&bef-TDEDT_Ras_Vnesh_Kass},{&bef-TDEDT_Vozvrat_Vnesh_Kass},rwo,trf,swo,ngs':U + ',' + 'itr':U) + 1, ',' + '{&bef-TDEDT_Ras_Vnesh_Kass-full},{&bef-TDEDT_Vozvrat_Vnesh_Kass-full},Списание-по-Возврату,ТехПролив,Списание,Приход-Природный-Газ':U + ',' + 'ПриТехПрол':U )
++&global-define sale-doc-kind-born entry (lookup (~{&sale-doc-kind}, '{&bef-TDEDT_Ras_Vnesh_Kass},{&bef-TDEDT_Vozvrat_Vnesh_Kass},rwo,trf,swo,ngs':U), 'main,pair,trio-m,quadro,stock-down')
++&global-define sale-doc-main-receipt-type entry (lookup (~{&sale-doc-kind}, '{&bef-TDEDT_Ras_Vnesh_Kass},{&bef-TDEDT_Vozvrat_Vnesh_Kass},rwo,trf,swo,ngs':U) + 1, '0,~{&bef-rcpt-sale},~{&bef-rcpt-return},~{&bef-rcpt-return-write-off},~{&bef-rcpt-tech-refuell},~{&bef-rcpt-write-off}':U)
++&global-define sale-doc-poss-wro-codes entry (lookup (~{&sale-doc-kind}, '{&bef-TDEDT_Ras_Vnesh_Kass},{&bef-TDEDT_Vozvrat_Vnesh_Kass},rwo,trf,swo,ngs':U) + 1, '0,~{&bef-wro-r-modificator},~{&bef-wro-v-modificator},~{&bef-wro-cancell-item};~{&bef-wro-v-modificator-ci};~{&bef-wro-cancell-all};~{&bef-wro-v-modificator-ca},~{&bef-wro-r-tech-refuell},~{&bef-wro-without-payment};~{&bef-wro-r-modificator-wp}':U)
+ &global-define sale-doc-fbrsale '~{&bef-TDEDT_Ras_Vnesh_Kass},swo':U
+ &global-define sale-all-ext-doc-types '~{&bef-TDEDT_Ras_Vnesh_Kass},~{&bef-TDEDT_Vozvrat_Vnesh_Kass},~{&bef-TDEDT_Spi_Vnesh}':U
+ &global-define bef-contr-chf-nodef Не определено
+@@ -7731,9 +7735,9 @@
+ &global-define cpdoc-attr-name 'РРН-ВБРР,Остальные':U
+ &global-define thbjattr-list 'autosale,get-chk,chk-view,cd-sending,cd-inf-send,scale-inf,cd-type-ibm,cd-type-ipc-servispl,cd-type-NCR-GM,cd-type-NCR-AS-R,cd-type-magia-xml,cd-type-omron,cd-type-omron-new,cd-type-IBM-XML,cd-type-IBS-TH,cd-type-IBS-TH-MOB,alias-tpsi,cd-type-r-keeper,cd-type-autotank,cd-type-maria,arh-global,nakl_par,contr-in,rt-trn-doc,overval,inv-obj,rezerv-obj,ord-obj,abc-sale-day,Ass-obj,fin-global,fin-plan,fin-doc,gds-ref,gds-ref_obj,dc-ref,cli-all,cashpays,wthdoc,wthdoc_obj,attr-wthrep,rum,rum_obj,easyfuel,images,prt-obj,report-obj,code-range,bge-export,auto-task,wnd-size,obj-date,fbrattr,petrol':U
+ &global-define thbjattr-list-all 'autosale,get-chk,chk-view,cd-sending,cd-inf-send,scale-inf,cd-type-ibm,cd-type-ipc-servispl,cd-type-NCR-GM,cd-type-NCR-AS-R,cd-type-magia-xml,cd-type-omron,cd-type-omron-new,cd-type-IBM-XML,cd-type-IBS-TH,cd-type-IBS-TH-MOB,alias-tpsi,cd-type-r-keeper,cd-type-maria,arh-global,nakl-glob,nakl_par,contr-in,rt-trn-doc,overval,inv-global,inv-obj,rezerv-global,rezerv-obj,ord-global,ord-obj,abc-sale-day,Ass-obj,fin-global,fin-plan,fin-doc,gds-ref,gds-ref_obj,dc-ref,cli-all,cashpays,wthdoc,wthdoc_obj,attr-wthrep,rum,rum_obj,easyfuel,images,prt-glob,prt-firm,prt-obj,report-glob,report-firm,report-obj,code-range,bge-export,auto-task,wnd-size,obj-date,fbrattr,petrol,staff':U
+-&global-define str-glbl_vss-revision 'Revision: 5af892880dc2, 1, rls ':U
+-&global-define str-glbl2_vss-revision 'Revision: 5af892880dc2, 1, rls ':U
+-&global-define str-glbl3_vss-revision 'Revision: 5af892880dc2, 1, rls ':U
++&global-define str-glbl_vss-revision 'Revision: aea5316774be, 0, rls ':U
++&global-define str-glbl2_vss-revision 'Revision: aea5316774be, 0, rls ':U
++&global-define str-glbl3_vss-revision 'Revision: aea5316774be, 0, rls ':U
+ &global-define str-glbl4_vss-revision 'Revision':U
+ &global-define str-glbl5_vss-revision 'Revision: 199ddf50f4e5, 2, test ':U
+ &global-define str-glblt_vss-revision 'Revision: f0e393ce9a27, 3, test ':U
+diff -r 8cc0ef02c4aa rep/r-shift1.p
+--- a/rep/r-shift1.p	Wed May 14 18:54:28 2014 +0400
++++ b/rep/r-shift1.p	Wed May 14 19:53:42 2014 +0400
+@@ -493,6 +493,19 @@
+       with frame frame-1.
+       down stream PrnLibstream with frame frame-1.
+       
++      {&PutExcel}
++          "Метан(КПГ)кгс/см2" {&tabulation}
++          pol2 {&tabulation}
++          {&tabulation}
++          {&tabulation}
++          pol5 {&tabulation}
++          pol6 {&tabulation}
++          pol7 {&tabulation}
++          {&tabulation}
++          pol9 {&tabulation}
++          {&new-line}.
++      
++      
+       /* Вторая строчка для газа */
+       
+       assign
+@@ -510,6 +523,17 @@
+       with frame frame-1.
+       down stream PrnLibstream with frame frame-1.      
+ 
++      {&PutExcel}
++          pol1 {&tabulation}
++          {&tabulation}
++          {&tabulation}
++          {&tabulation}
++          pol5 {&tabulation}
++          pol6 {&tabulation}
++          pol7 {&tabulation}
++          {&new-line}.
++      
++
+       /* Третья строчка для газа */
+       assign
+       pol1 = "Pвх-CH4 кгс/см2"
+@@ -524,6 +548,24 @@
+       with frame frame-1.
+       down stream PrnLibstream with frame frame-1.  
+       
++      {&PutExcel}
++          pol1 {&tabulation}
++          pol2 {&tabulation}
++          {&tabulation}
++          {&tabulation}
++          {&tabulation}
++          {&tabulation}
++          {&tabulation}
++          {&tabulation}
++          {&tabulation}
++          {&tabulation}
++          {&tabulation}
++          {&tabulation}
++          {&tabulation}
++          {&tabulation}
++          pol15 {&tabulation}
++          {&new-line}.
++      
+       /* Четвертая строчка для газа */
+ 
+       assign
+@@ -539,31 +581,29 @@
+       with frame frame-1.
+       down stream PrnLibstream with frame frame-1.  
+       
++      {&PutExcel}
++          pol1 {&tabulation}
++          pol2 {&tabulation}
++          {&tabulation}
++          {&tabulation}
++          {&tabulation}
++          {&tabulation}
++          {&tabulation}
++          {&tabulation}
++          {&tabulation}
++          {&tabulation}
++          {&tabulation}
++          {&tabulation}
++          {&tabulation}
++          {&tabulation}
++          pol15 {&tabulation}
++          {&new-line}.
++      
+       /* Подчеркнем */
+       
+       underline stream PrnLibstream {&all-sym} {&all-pol} with frame frame-1.
+       down stream PrnLibstream with frame frame-1.
+ 
+-/*                  Excel                    */
+-
+-/*      {&PutExcel}                          */
+-/*          "Метан(КПГ)кгс/см2" {&tabulation}*/
+-/*          "240" {&tabulation}              */
+-/*          {&tabulation}                    */
+-/*          {&tabulation}                    */
+-/*          "10000000" {&tabulation}         */
+-/*          "10000001" {&tabulation}         */
+-/*          "1"        {&tabulation}         */
+-/*          {&tabulation}                    */
+-/*          "240" {&tabulation}              */
+-/*      {&new-line}                          */
+-/*          "CH4 м3"                         */
+-/*      {&new-line}                          */
+-/*          "Pвх - CH4 кгс/см2"              */
+-/*      {&new-line}                          */
+-/*          "Tвх - CH4 °C"                   */
+-/*      {&new-line}.                         */
+-
+       next.
+   end.
+ 
+diff -r 8cc0ef02c4aa str/gas-autosl.p
+--- /dev/null	Thu Jan 01 00:00:00 1970 +0000
++++ b/str/gas-autosl.p	Wed May 14 19:53:42 2014 +0400
+@@ -0,0 +1,303 @@
++/*
++
++$Revision$
++$Author$
++$Date$
++$Workfile$
++$Archive$
++
++Создание приходного документа по документу продажи газа (ТГУ)
++
++Автор: Кирюхин Сергей
++Дата создания: 10/09/13
++Author: SKiryxin
++Creation date: 10/09/13
++
++*/
++
++define input parameter parparentproc as widget-handle no-undo.
++define input parameter p-log-handle as handle no-undo.
++define input parameter log-file-name as character no-undo.
++define input parameter p-auto as integer no-undo.
++define input parameter p-inkas-code as character no-undo.
++define input parameter v-curr-r-b as character no-undo.
++define input parameter p-cli-type as character no-undo. /* из shattr */
++define input parameter p-cli-code as integer no-undo. /* из shattr */
++define output parameter p-doc-code as character no-undo.
++define output parameter p-root-node as character no-undo.
++/* документ продажи */
++define parameter buffer buf-sale_trn-doc for ub.trn-doc.
++/* линия продажи */
++define parameter buffer buf-sale_doc-line for ub.doc-line.
++/* создарнный документ прихода */
++define parameter buffer buf-new_trn-doc for ub.trn-doc.
++
++define variable vss-revision as character no-undo init "$Revision$":U .
++define variable vss-author as character no-undo init "$Author$":U .
++define variable vss-date as character no-undo init "$Date$":U .
++define variable vss-workfile as character no-undo init "$Workfile$":U .
++define variable vss-archive as character no-undo init "$Archive$":U .
++define variable vss-description as character no-undo init "Создание приходного документа техпролива по документу продажи газа (ТГУ)".
++{cmp/vssrevis.i}
++
++/* Inclides */
++{cmp/trg-def.i}
++{str/lib-trn.i}
++{str/doc-code.i}
++{trg/partscr.i}
++{cmp/gds-list.i gds-list def "new shared"}
++
++/* Local variables */
++define variable v-vat-type as character no-undo.
++define variable v-vat-pc as decimal no-undo.
++define variable v-slt-type as character no-undo.
++define variable v-slt-pc as decimal no-undo.
++define variable v-doc-pl-rowid as rowid no-undo.
++define variable varchg-inv as logical no-undo.
++define variable v-cntxt-rsrv-time as integer no-undo.
++define variable v-cntxt-load-time as integer no-undo.
++define variable v-cntxt-holidays as character no-undo.
++/* Buffers */
++define buffer buf_clients for ub.clients.
++define buffer buf-new_doc-line for ub.doc-line.
++define buffer buf_parts for ub.parts.
++define buffer buf_goods for ub.goods.
++define buffer buf_pl-gds for ub.pl-gds.
++define buffer buf-new_doc-pl for ub.doc-pl.
++define buffer buf_sysconf for ub.sysconf.
++define buffer buf_sale-gds-dtl for ub.gds-dtl.
++define buffer buf-new_sale-gds-dtl for ub.gds-dtl.
++
++/*-----------------------------------------------------------------------------------------------------*/
++
++/* Получим код для новой накладной */
++run doc-code in this-procedure (input "chip",
++                                input buf-sale_trn-doc.obj-type,
++                                input buf-sale_trn-doc.obj-code,
++                                input buf-sale_trn-doc.doc-code,
++                                output p-doc-code) no-error.
++
++/* Создадим шапку нового документа */
++
++find first buf_clients where buf_clients.obj-type = p-cli-type
++                         and buf_clients.obj-code = p-cli-code no-lock.
++
++/* Отсюда возьмём суммы */
++find first buf_sale-gds-dtl where buf_sale-gds-dtl.doc-code = buf-sale_doc-line.doc-code
++                              and buf_sale-gds-dtl.artic = buf-sale_doc-line.artic
++                              and buf_sale-gds-dtl.prod-code = buf-sale_doc-line.prod-code
++                              and buf_sale-gds-dtl.prod-type = buf-sale_doc-line.prod-type no-lock.
++
++{str/crtrndoc.i
++ ?
++ ?
++ buf-sale_trn-doc.base-rate
++ buf-sale_trn-doc.base-scale
++ buf_clients.obj-code
++ buf_clients.obj-type
++ buf_clients.obj-name
++ buf-sale_trn-doc.cr-db-num
++ g#userid
++ "''"
++ p-doc-code
++ buf-sale_trn-doc.doc-date
++ {&income}
++ buf-sale_trn-doc.flag
++ buf-sale_trn-doc.host-code
++ false
++ buf-sale_trn-doc.obj-code
++ buf-sale_trn-doc.obj-type
++ false
++ buf-sale_trn-doc.pay-code
++ '"ПН для продажи природного газа"'
++ false
++ {&without-SLT}
++ {&wayb}
++ "{&inc-VAT}"
++ {&TDEDT_Pri_Vnesh}
++ {&bef-repayment-code}
++ no-error}
++
++/* Встанем на созданный документ */
++find first buf-new_trn-doc where buf-new_trn-doc.doc-code = p-doc-code exclusive-lock.
++
++/* пишем поля */
++assign
++buf-new_trn-doc.out-code = buf-sale_trn-doc.doc-code
++buf-new_trn-doc.fact-date  = buf-sale_trn-doc.fact-date
++buf-new_trn-doc.shift-date = buf-sale_trn-doc.shift-date
++buf-new_trn-doc.shift-num  = buf-sale_trn-doc.shift-num
++buf-new_trn-doc.shift-name = buf-sale_trn-doc.shift-name
++buf-new_trn-doc.base-rate = buf-sale_trn-doc.base-rate
++buf-new_trn-doc.base-scale = buf-sale_trn-doc.base-scale
++buf-new_trn-doc.exch-scale = buf-sale_trn-doc.exch-scale
++buf-new_trn-doc.exch-rate = buf-sale_trn-doc.exch-rate
++buf-new_trn-doc.pay-code = buf-sale_trn-doc.pay-code
++buf-new_trn-doc.tot-lines = 1
++buf-new_trn-doc.tot-doc = buf_sale-gds-dtl.price-base * buf_sale-gds-dtl.fact-qnty
++buf-new_trn-doc.tot-fact = buf_sale-gds-dtl.price-base * buf_sale-gds-dtl.fact-qnty
++buf-new_trn-doc.tot-rubl = buf_sale-gds-dtl.price-base * buf_sale-gds-dtl.fact-qnty
++buf-new_trn-doc.tot-sale = buf_sale-gds-dtl.price-base * buf_sale-gds-dtl.fact-qnty
++buf-new_trn-doc.tot-cli = buf_sale-gds-dtl.price-base * buf_sale-gds-dtl.fact-qnty
++buf-new_trn-doc.tot-calc = buf_sale-gds-dtl.price-base * buf_sale-gds-dtl.fact-qnty.
++
++/* Создадим линию накладной */
++{str/crdoclin.i
++ buf-new_trn-doc.doc-code
++ buf-sale_doc-line.artic
++ buf-sale_doc-line.prod-type
++ buf-sale_doc-line.prod-code
++ buf-new_trn-doc.obj-type
++ buf-new_trn-doc.obj-code
++ "''"
++ buf-new_trn-doc.ext-doc-type
++ buf-sale_doc-line.prt-root
++ buf-sale_doc-line.vat-pc
++ buf-sale_doc-line.slt-pc
++ buf-sale_doc-line.cons-vat-pc
++ no-error}
++
++/* Встанем на созданную линию */
++find first buf-new_doc-line where buf-new_doc-line.doc-code = buf-new_trn-doc.doc-code  exclusive-lock.
++
++/* Определим товар */
++find first buf_goods where buf_goods.artic = buf-new_doc-line.artic
++                       and buf_goods.prod-type = buf-new_doc-line.prod-type
++                       and buf_goods.prod-code = buf-new_doc-line.prod-code no-lock.
++
++/* И место */
++find first buf_pl-gds where buf_pl-gds.obj-type = buf-new_trn-doc.obj-type
++                        and buf_pl-gds.obj-code = buf-new_trn-doc.obj-code
++                        and buf_pl-gds.gds-code = buf_goods.gds-code
++                        and buf_pl-gds.status_ = {&current-status} no-lock.
++
++
++
++/* Добавим всё нужное в линию */
++assign
++buf-new_doc-line.fact-density = buf-sale_doc-line.fact-density
++buf-new_doc-line.cli-qnty = buf-sale_doc-line.fact-qnty * buf-sale_doc-line.fact-density
++buf-new_doc-line.fact-qnty = buf-sale_doc-line.fact-qnty
++buf-new_doc-line.doc-qnty = buf-sale_doc-line.fact-qnty
++buf-new_doc-line.price-rubl = buf_sale-gds-dtl.price-rubl
++buf-new_doc-line.price-base = buf_sale-gds-dtl.price-base
++buf-new_doc-line.price-cli = buf_sale-gds-dtl.price-base / buf-sale_doc-line.fact-density
++buf-new_doc-line.unit-cli = buf_goods.unit-cli
++buf-new_doc-line.cli-base-rate = 1 / buf-sale_doc-line.fact-density
++buf-new_doc-line.doc-density = buf-sale_doc-line.doc-density.
++
++{str/crdocpl.i
++ buf-new_trn-doc.doc-code
++ buf_goods.gds-code
++ buf_pl-gds.pl-code
++ buf-new_trn-doc.obj-type
++ buf-new_trn-doc.obj-code
++ v-doc-pl-rowid
++ no-error}
++
++find first buf-new_doc-pl where rowid(buf-new_doc-pl) = v-doc-pl-rowid exclusive-lock.
++assign
++buf-new_doc-pl.doc-qnty = buf-new_doc-line.doc-qnty
++buf-new_doc-pl.fact-qnty = buf-new_doc-line.fact-qnty
++buf-new_doc-pl.cli-qnty = buf-new_doc-line.cli-qnty
++buf-new_doc-pl.cli-doc-qnty = buf-new_doc-line.cli-qnty
++buf-new_doc-pl.cli-fact-qnty = buf-new_doc-line.cli-qnty
++buf-new_doc-pl.out-code = buf-new_doc-line.doc-code.
++
++{gbl/rootnode.i
++ buf-new_doc-line.artic
++ buf-new_doc-line.prod-type
++ buf-new_doc-line.prod-code
++ p-root-node}
++
++{str/crgdsdtl.i
++ buf-new_trn-doc.obj-code
++ buf-new_trn-doc.obj-type
++ buf-new_trn-doc.doc-code
++ buf-new_doc-line.artic
++ buf-new_doc-line.prod-code
++ buf-new_doc-line.prod-type
++ p-root-node
++ false}
++
++find first buf-new_sale-gds-dtl where buf-new_sale-gds-dtl.doc-code = p-doc-code exclusive-lock.
++
++assign
++buf-new_sale-gds-dtl.price-base = buf-new_doc-line.price-base
++buf-new_sale-gds-dtl.price-rubl = buf-new_doc-line.price-rubl
++buf-new_sale-gds-dtl.doc-qnty = buf-new_doc-line.doc-qnty
++buf-new_sale-gds-dtl.fact-qnty = buf-new_doc-line.fact-qnty.
++
++{str/saledoc.i}
++
++run saledoc-create in this-procedure (
++    input p-inkas-code,
++    input buf-sale_trn-doc.host-code,
++    input buf-sale_trn-doc.obj-type,
++    input buf-sale_trn-doc.obj-code,
++    input {&sale-add-nat-gas},
++    input {&gds-goods},
++    input no,
++    input '':U,
++    input '':U,
++    input 0,
++    buffer buf-new_trn-doc) no-error.
++
++find first buf_sysconf where buf_sysconf.host-code = buf-new_trn-doc.host-code no-lock.
++
++assign
++v-cntxt-rsrv-time = buf_sysconf.rsrv-time
++v-cntxt-load-time = buf_sysconf.load-time
++v-cntxt-holidays = buf_sysconf.holidays.
++
++run partscr_get-default-values in this-procedure (buffer buf-new_doc-line,
++                                                  output v-vat-type,
++                                                  output v-vat-pc,
++                                                  output v-slt-type,
++                                                  output v-slt-pc).
++run partscr in this-procedure
++      (input  parparentproc,
++       input  buf-new_trn-doc.cr-db-num,
++       input  g#userid,
++       input  {trg/partsprm.i "supp-type" "buf-new_trn-doc."},
++       input  {trg/partsprm.i "supp-code" "buf-new_trn-doc."},
++       input  '':U,
++       input  '':U,
++       input  '':U,
++       input  '':U,
++       input  buf-new_doc-line.price-base,
++       input  buf-new_doc-line.price-rubl,
++       input  v-vat-type,
++       input  v-vat-pc,
++       input  v-slt-type,
++       input  v-slt-pc,
++       input  buf-new_doc-line.fact-qnty,
++       input  "prompt=disable-create",
++       input  buf-new_doc-line.cli-qnty,
++       input  ?,
++       input  ?,
++       input  buf_pl-gds.pl-code,
++       buffer buf-new_doc-line,
++       buffer buf_parts) no-error.
++
++{str/calc-in.i
++ parparentproc
++ recid(buf-new_trn-doc)
++ this-procedure
++ no-error}
++
++run str/trn-stat.p (
++    input parparentproc,
++    input this-procedure,
++    input {&close-fact} ,
++    input buf-new_trn-doc.doc-code,
++    input false,
++    input g#db-num,
++    input false,
++    input v-cntxt-rsrv-time,
++    input v-cntxt-load-time,
++    input v-cntxt-holidays,
++    input false,
++    output varchg-inv,
++    output table gds-list) no-error.
++if error-status:error then  message error-status:get-message(1) skip return-value view-as alert-box warning.
+diff -r 8cc0ef02c4aa str/lib-trn3.p
+--- a/str/lib-trn3.p	Wed May 14 18:54:28 2014 +0400
++++ b/str/lib-trn3.p	Wed May 14 19:53:42 2014 +0400
+@@ -38,7 +38,8 @@
+ { str/lib-rvs.i  }
+ { gbl/getsect.i  def }
+ { gbl/ptrlprop.i def }
+-
++{ ref/gds-attr.i }
++{ str/is-gas.i }
+ 
+ define temp-table temp-tpsi-clients no-undo like ub.clients.
+ 
+@@ -2557,13 +2558,16 @@
+       is-pieces
+     }
+     if is-petrol = yes
+-      and is-pieces = no
++      and is-pieces = no or is-gas(buf_goods.gds-code)
+     then do:
+       if buf_goods.unit-base = buf_goods.unit-cli then do:
+         assign
+           p-density = 1.0
+         .
+       end.
++      
++      if is-gas(buf_goods.gds-code) then p-density = 1 / buf_goods.cli-base-rate.
++      
+       else do:
+ 
+         { gbl/ptrlprop.i run p-obj-type p-obj-code }
+diff -r 8cc0ef02c4aa str/saleclos.p
+--- a/str/saleclos.p	Wed May 14 18:54:28 2014 +0400
++++ b/str/saleclos.p	Wed May 14 19:53:42 2014 +0400
+@@ -99,6 +99,8 @@
+ { str/lib-trn.i }
+ { str/chksplin.i }
+ { gbl/thbjattr.i }
++{ ref/gds-attr.i }
++{ str/is-gas.i }
+ 
+ define variable v-obj-type like ub.inkas.obj-type no-undo .
+ define variable v-obj-code like ub.inkas.obj-code no-undo .
+@@ -111,7 +113,8 @@
+ define variable v-back-date as logical no-undo .
+ define variable force-auto-fbr as logical no-undo .
+ define variable force-tpsi-obj as logical no-undo .
+-define variable ii as integer no-undo .
++define variable ii as integer no-undo . /* пожалуйста, не трогайте ее */
++define variable jj as integer no-undo.
+ define variable v-notes as character no-undo .
+ define variable case-num as integer no-undo .
+ define variable v-fbr-income-doc-code like ub.trn-doc.doc-code no-undo .
+@@ -320,8 +323,27 @@
+ define variable v-shift-date as date no-undo .
+ define variable v-shift-num as integer no-undo .
+ define variable v-shift-name as character no-undo .
++define variable v-value-character as character no-undo .
++define variable v-value-date as date no-undo .
++define variable v-value-decimal as decimal no-undo .
++define variable v-value-integer as INTEGER no-undo .
++define variable v-value-logical AS LOGICAL no-undo .
++define variable v-param-type as character no-undo .
++define variable v-found as decimal no-undo.
++define variable v-tth as handle no-undo .
++define variable v-entry as character no-undo.
++define variable v-gas-cli-type as character no-undo.
++define variable v-gas-cli-code as integer no-undo.
++define variable v-run-tpsi-line as logical no-undo.
++define variable v-new_doc-code as character no-undo.
++define variable v-root-node as integer no-undo.
++
+ define buffer buf_shift-obj for ub.shift-obj.
+ define buffer tpsi_sale-doc for ub.sale-doc.
++define buffer buf-new_trn-doc for ub.trn-doc.
++define buffer buf_goods for ub.goods.
++define buffer buf_doc-line for ub.doc-line.
++define buffer buf_sale-doc for ub.sale-doc.
+ 
+ do
+ on error undo, return error return-value
+@@ -456,11 +478,7 @@
+   if NOT can-find( first ub.chk-doc NO-LOCK where ub.chk-doc.out-code = buf_inkas.inkas-code ) then  do:
+     return error substitute("Отчет о продаже N&1 пуст. Закрытие невозможно.", buf_inkas.inkas-code).
+   end.
+-  define variable v-param-type as character no-undo .
+-  define variable v-value-date as date no-undo .
+-  define variable v-value-decimal as decimal no-undo .
+-  define variable v-value-integer as INTEGER no-undo .
+-  define variable v-tth as handle no-undo .
++  
+   run fbrhist-read-conf in this-procedure .
+   if p-auto < 2 then do:
+     if NOT auto-close then do:
+@@ -611,6 +629,86 @@
+     if error-status:error then undo f-close, return error.
+     else compensed = yes.
+     run set-compensed in p-parent-handle(input compensed) no-error .
++        
++    if buf_trn-doc.ext-doc-type = {&TDEDT_ras_vnesh_kass} then do:
++
++        run thbjattr_value in this-procedure (input v-obj-type
++                                             ,input v-obj-code
++                                             ,input {&attr-autosale}
++                                             ,input {&attr-autosale_sale-add}
++                                             ,output v-value-character
++                                             ,output v-value-date
++                                             ,output v-value-decimal
++                                             ,output v-value-integer
++                                             ,output v-value-logical
++                                             ,output v-param-type
++                                             ,output v-found) no-error.
++        
++        assign
++        v-gas-cli-type = ""
++        v-gas-cli-code = 0.
++        
++        jj:
++        do jj = 1 to num-entries(v-value-character, ';':U):
++            v-entry = entry(jj, v-value-character, ';':U).
++            if entry(1, v-entry) = {&sale-add-nat-gas} and integer(entry(3, v-entry)) > 0 then do: /* В контрагенте на природный газ кто-то стоит */
++                assign
++                v-gas-cli-type = entry(2, v-entry)
++                v-gas-cli-code = integer(entry(3, v-entry)).
++                leave jj.
++            end.
++        end. /*do jj*/
++        
++        if v-gas-cli-code > 0 then do:
++            
++            for each buf_doc-line where buf_doc-line.doc-code = buf_trn-doc.doc-code:
++                
++                find first buf_goods where buf_goods.prod-code = buf_doc-line.prod-code
++                                       and buf_goods.prod-type = buf_doc-line.prod-type
++                                       and buf_goods.artic = buf_doc-line.artic no-lock.
++                                        
++                /* Проверим, если газ */
++                if is-gas(buf_goods.gds-code) then do:
++                    
++                    find first buf_sale-doc where buf_sale-doc.inkas-code = p-inkas-code.
++                    
++                    run str/gas-autosl.p (input parparentproc,
++                                          input p-log-handle,
++                                          input log-file-name,
++                                          input p-auto,
++                                          input p-inkas-code,
++                                          input v-curr-r-b,
++                                          input v-gas-cli-type,
++                                          input v-gas-cli-code,
++                                          output v-new_doc-code,
++                                          output v-root-node,
++                                          buffer buf_trn-doc,
++                                          buffer buf_doc-line,
++                                          buffer buf-new_trn-doc).
++                    
++                    run RSRV-line in this-procedure (input 1,
++                                                     input no,
++                                                     input no,
++                                                     input yes,
++                                                     input no,
++                                                     input v-new_doc-code,
++                                                     input no,
++                                                     input no,
++                                                     input yes,
++                                                     input buf_goods.gds-code,
++                                                     input v-root-node,
++                                                     output v-run-tpsi-line,
++                                                     buffer buf_doc-line,
++                                                     buffer buf_trn-doc,
++                                                     buffer buf_sale-doc).
++                end. /*if is-gas(buf_goods.gds-code) */
++            
++            end. /*  for each buf_doc-line */
++            
++        end. /* if v-gas-cli-code > 0 */
++            
++    end. /* if buf_trn-doc.ext-doc-type */
++    
+     RUN button-close in this-procedure (
+                                              buffer buf_trn-doc
+                                             ,buffer buf_ret-doc
+diff -r 8cc0ef02c4aa trg/chktdcpl.p
+--- a/trg/chktdcpl.p	Wed May 14 18:54:28 2014 +0400
++++ b/trg/chktdcpl.p	Wed May 14 19:53:42 2014 +0400
+@@ -33,6 +33,7 @@
+ { gbl/clntattr.i }
+ { ref/gds-attr.i }
+ { str/valddnst.i def      }
++{ str/is-gas.i }
+ 
+ do
+ on error  undo, return error substitute( "&1. &2&3&4", vss-workfile, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) )
+@@ -203,7 +204,7 @@
+               ,output v-attr-value
+               ,output v-attr-type
+               ) .
+-            if lookup(v-attr-value, 'true,yes':u) = 0 then do:
++            if lookup(v-attr-value, 'true,yes':u) = 0 and not is-gas(buf_goods.gds-code) then do:
+               assign
+                 v-chk-rvs = true
+               .
+@@ -248,6 +249,9 @@
+           and buf_goods.prod-type = buf_doc-line.prod-type
+           and buf_goods.prod-code = buf_doc-line.prod-code
+       .
++      
++      if is-gas(buf_goods.gds-code) then next.
++      
+       { gbl/gdsobjat.i
+         buf_doc-line.obj-type
+         buf_doc-line.obj-code
+diff -r 8cc0ef02c4aa trg/rsrv-dtl.p
+--- a/trg/rsrv-dtl.p	Wed May 14 18:54:28 2014 +0400
++++ b/trg/rsrv-dtl.p	Wed May 14 19:53:42 2014 +0400
+@@ -144,6 +144,8 @@
+ { trg/partlist.i }
+ { cmp/trg-def.i  }
+ { gbl/lineattr.i }
++{ ref/gds-attr.i }
++{ str/is-gas.i }
+ /* что резервируем: документ, товар, признак, объект */
+ define variable v-obj-type   like ub.gds-dtl.obj-type  no-undo .
+ define variable v-obj-code   like ub.gds-dtl.obj-code  no-undo .
+@@ -1329,7 +1331,7 @@
+             undo, return error return-value .
+           end.
+ 
+-          if absolute( buf_doc-pl.doc-qnty ) <> absolute( v-input-qnty ) then do:
++          if absolute( buf_doc-pl.doc-qnty ) <> absolute( v-input-qnty ) and not is-gas(ub.goods.gds-code) then do:
+             /* резервировать можно только полное кол-во по doc-pl, никакого дорезервирования */
+             message
+               "Артикул" ub.goods.artic ub.goods.gds-name skip

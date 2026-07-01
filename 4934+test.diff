@@ -1,0 +1,74 @@
+# HG changeset patch
+# User druban
+# Parent  364390203f089e1d2bcd3dedab4e25bbf98189cf
+refs #4934 ќбновление базы с исключенными пользовател€ми.
+
+http://exp-rm/redmine/issues/4934
+
+diff -r 364390203f08 cmp/18091901_1.df
+--- /dev/null	Thu Jan 01 00:00:00 1970 +0000
++++ b/cmp/18091901_1.df	Mon Mar 04 15:44:21 2019 +0300
+@@ -0,0 +1,14 @@
++update FIELD "VAT-pc" OF "chk-gds" AS decimal
++  NULL-ALLOWED
++
++update FIELD "VAT-sum-rubl" OF "chk-gds" AS decimal
++  NULL-ALLOWED
++
++update FIELD "VAT-sum-rubl" OF "doc-line" AS decimal
++  NULL-ALLOWED
++
++.
++PSC
++cpstream=1251
++.
++0000006445
+diff -r 364390203f08 cmp/nom9.df
+--- /dev/null	Thu Jan 01 00:00:00 1970 +0000
++++ b/cmp/nom9.df	Mon Mar 04 15:44:21 2019 +0300
+@@ -0,0 +1,8 @@
++UPDATE FIELD "reserve1-char" OF "db" 
++  INITIAL "12"
++
++.
++PSC
++cpstream=1251
++.
++
+diff -r 364390203f08 ibs/th/adm/upd/observupd.cls
+--- a/ibs/th/adm/upd/observupd.cls	Mon Mar 04 15:43:29 2019 +0300
++++ b/ibs/th/adm/upd/observupd.cls	Mon Mar 04 15:44:21 2019 +0300
+@@ -58,7 +58,7 @@
+   define property IsComp as logical no-undo
+     get.
+     set.
+-  &scop NumWorkBase 12
++  &scop NumWorkBase 13
+   define public property  m-upd-list-df      as character extent {&NumWorkBase} no-undo
+     initial ["cmp/18051601.df"  
+             ,"cmp/18062801.df"
+@@ -73,6 +73,7 @@
+             ,"proc:ibs/th/adm/upd/copytable.p;arh-fin-doc-contr-schet-nal|arh-fin-doc-schet-nal-obj|fin-doc"
+             ,"cmp/19022602.df"
+             
++            ,"cmp/18091901_1.df"
+             
+             ] 
+      get.
+@@ -94,7 +95,7 @@
+             ] 
+     get.
+   define public property  upd-all-list-df      as character  no-undo /* список df файлов которые груз€тс€ всегда. */ 
+-    initial ""  
++    initial "cmp/nom9.df"  // сюда записываютс€ df те которые груз€тс€ всегда  
+     get.
+                
+   define property upd-df as character no-undo
+@@ -132,6 +133,7 @@
+        find first buf_db no-lock where buf_db.db-num = DbNum no-error.
+        CurrDBShm = integer (buf_db.reserve1-char) no-error.
+     end.
++    release buf_db.
+     if     error-status:error
+        or not available buf_db
+        or buf_db.reserve1-char eq ""

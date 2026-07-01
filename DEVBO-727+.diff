@@ -1,0 +1,63 @@
+# HG changeset patch
+# User VSpiridonov
+# Parent  f666179fbae2ef237d68fb5880d9a40d3edbb054
+refs #DEVBO-727+  отключение отправки thbj-attr не в свои убд ТН 16.0
+
+diff --git a/str/callnews.p b/str/callnews.p
+--- a/str/callnews.p
++++ b/str/callnews.p
+@@ -415,6 +415,7 @@ on error  undo, return error substitute(
+ 
+ 
+   /************************** создание списков возможных адресатов отправки **************************/
++
+   assign
+     list-remote-db-wsd = ""
+     list-remote-db     = ""
+@@ -458,7 +459,45 @@ on error  undo, return error substitute(
+       .
+    end.
+ 
+-  /********************************* "решатель" куда отправить ***************************************/
++if p-tbl-name = {&table_db} and g#db-num = 0 and not g#news then do:
++   assign list-db-for-send = string(p-tbl-handle:buffer-field("db-num"):buffer-value).
++   if list-db-for-send = "0" then assign list-db-for-send = "".
++   assign v-found = yes.
++end.
++
++/* отключение отправки thbj-attr не в свои убд   */
++if p-tbl-name = {&table_thbj-attr} and g#db-num = 0 then do:
++   v-obj-type = p-tbl-handle:buffer-field("obj-type"):buffer-value.
++   v-obj-code = p-tbl-handle:buffer-field("obj-code"):buffer-value.
++
++   /* Глобальные и  региональные во все БД */
++   if (v-obj-type = "" and v-obj-code = 0) or v-obj-type = {&region} then do:
++       assign list-db-for-send = list-remote-db-wsd.
++   end.
++   else do:
++       /* Локальные настройки – только в свою БД */
++       if v-obj-type = {&db} then do:
++           if v-obj-code > 0 then
++               assign list-db-for-send = string(v-obj-code).
++           else
++               assign list-db-for-send = "".
++       end.
++       else do:
++           find first buf_clients no-lock
++               where buf_clients.obj-type = v-obj-type
++                 and buf_clients.obj-code = v-obj-code no-error.
++           if available buf_clients then do:
++               assign list-db-for-send = string(buf_clients.db-num).
++               if list-db-for-send = "0" then assign list-db-for-send = "".
++           end.
++           else do:
++               assign list-db-for-send = "".
++           end.
++       end.
++   end.
++   assign v-found = yes.
++end.
++/********************************* "решатель" куда отправить ***************************************/
+   
+   if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and lookup(v-tbl-name, v-0-rdb-and-from-news) > 0 then do:

@@ -1,0 +1,21 @@
+# HG changeset patch
+# User EShklyar
+# Parent  29adf654e64f9fb0235377144f827764d243a941
+refs #DEVBO-1880 Ошибки на тестовых р-кодах от 29.06.2022
+
+http://exp-jira.expertek.local:8080/browse/DEVBO-1880
+
+diff --git a/trg/partcopy.i b/trg/partcopy.i
+--- a/trg/partcopy.i
++++ b/trg/partcopy.i
+@@ -155,8 +155,9 @@ procedure partcopy :
+           and buf_parts.prod-code = buf_orig_parts.prod-code
+           and buf_parts.in-code   = buf_orig_parts.in-code
+           and buf_parts.out-code  = p-out-code
+-          and buf_parts.part-code = buf_orig_parts.part-code
+           and buf_parts.prt-code  = buf_orig_parts.prt-code
++          and buf_parts.part-code = if p-out-code = {&free-code} then buf_parts.part-code else buf_orig_parts.part-code
++          
+         no-error.
+       if not available buf_parts
+       then do:

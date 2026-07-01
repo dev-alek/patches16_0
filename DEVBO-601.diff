@@ -1,0 +1,46 @@
+# HG changeset patch
+# User EShklyar
+# Parent  a9f888f9830ca714e090fe83c2e6d59e186b80e2
+refs #DEVBO-601 Интерфейс промоакций
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-601
+
+diff --git a/ibs/th/ref/promo/wListActions.cls b/ibs/th/ref/promo/wListActions.cls
+--- a/ibs/th/ref/promo/wListActions.cls
++++ b/ibs/th/ref/promo/wListActions.cls
+@@ -562,7 +562,7 @@ class ibs.th.ref.promo.wListActions inhe
+       /*  */
+       /* label1 */
+       /*  */
+-      this-object:label1:Dock = System.Windows.Forms.DockStyle:Fill.
++      this-object:label1:Dock = System.Windows.Forms.DockStyle:Bottom.
+       this-object:label1:Location = new System.Drawing.Point(450, 0).
+       this-object:label1:Name = "label1".
+       this-object:label1:Size = new System.Drawing.Size(44, 34).
+@@ -573,7 +573,7 @@ class ibs.th.ref.promo.wListActions inhe
+       /*  */
+       /* dateTimePicker1 */
+       /*  */
+-      this-object:dateTimePicker1:Dock = System.Windows.Forms.DockStyle:Fill.
++      this-object:dateTimePicker1:Dock = System.Windows.Forms.DockStyle:Bottom.
+       this-object:dateTimePicker1:Location = new System.Drawing.Point(500, 3).
+       this-object:dateTimePicker1:Name = "dateTimePicker1".
+       this-object:dateTimePicker1:Size = new System.Drawing.Size(144, 20).
+@@ -581,7 +581,7 @@ class ibs.th.ref.promo.wListActions inhe
+       /*  */
+       /* label2 */
+       /*  */
+-      this-object:label2:Dock = System.Windows.Forms.DockStyle:Fill.
++      this-object:label2:Dock = System.Windows.Forms.DockStyle:Bottom.
+       this-object:label2:Location = new System.Drawing.Point(650, 0).
+       this-object:label2:Name = "label2".
+       this-object:label2:Size = new System.Drawing.Size(54, 34).
+@@ -592,7 +592,7 @@ class ibs.th.ref.promo.wListActions inhe
+       /*  */
+       /* comboBox1 */
+       /*  */
+-      this-object:comboBox1:Dock = System.Windows.Forms.DockStyle:Fill.
++      this-object:comboBox1:Dock = System.Windows.Forms.DockStyle:Bottom.
+       this-object:comboBox1:FormattingEnabled = true.
+       this-object:comboBox1:Location = new System.Drawing.Point(710, 3).
+       this-object:comboBox1:Name = "comboBox1".

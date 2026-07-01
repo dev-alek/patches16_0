@@ -1,0 +1,646 @@
+# HG changeset patch
+# User DRuban
+# Parent  c5bf38fae19255bf24a1a5750e6f262a4fa28771
+convert
+
+diff --git a/example/transFile.p b/example/transFile.p
+new file mode 100644
+--- /dev/null
++++ b/example/transFile.p
+@@ -0,0 +1,78 @@
++&glob workDir c:\work16_0
++&glob fileConvert "c:\11\file.txt"
++&glob fileResult "c:\11\res.txt"
++define variable mFileHelper as class ibs.th.file.filehelper no-undo.
++mFileHelper = new ibs.th.file.filehelper ().
++{gbl/Waitfram.i}
++{utl/ttfileList.i  ttfile  }
++run waitfram-show ("Собираем список файлов для конвертации.").
++
++mFileHelper:getListfile("{&workDir}", "*", output table ttfile).
++mFileHelper:cleartt().
++mFileHelper:addDir("{&workDir}" + "\ccf\img" ).
++mFileHelper:addDir("{&workDir}" + "\upd\code" ).
++mFileHelper:addDir("{&workDir}" + "\upd\df" ).
++mFileHelper:addDir("{&workDir}" + "\utlcomp\md5" ).
++output to {&fileConvert}.
++block-file:
++for each ttfile:
++   if    ttfile.localPach begins "cmp"
++      or ttfile.localPach begins "upd"
++   then do:
++      define variable vnewFile as character no-undo.
++      if entry(2,ttfile.fulllocalpach,".") eq "bmp"
++         or entry(2,ttfile.fulllocalpach,".") eq "ico"
++         or entry(2,ttfile.fulllocalpach,".") eq "msd"
++         or entry(2,ttfile.fulllocalpach,".") eq "jpg"
++         or (     num-entries (ttfile.fulllocalpach,".") >2 
++              and entry(3,ttfile.fulllocalpach,".") eq "bmp")
++      then
++         vnewFile = replace(ttfile.fulllocalpach,"cmp\","ccf/img/").
++      else if    entry(2,ttfile.fulllocalpach,".") eq "i"
++              or entry(2,ttfile.fulllocalpach,".") eq "p"
++              or entry(2,ttfile.fulllocalpach,".") eq "w"
++              or entry(2,ttfile.fulllocalpach,"\") eq "actn.txt"
++              or entry(2,ttfile.fulllocalpach,"\") eq "menu.txt"
++              or ttfile.fulllocalpach begins "cmp\icon\"
++      then
++        next block-file.
++      else if    entry(2,ttfile.fulllocalpach,".") eq "xml"
++      then do:
++         vnewFile = replace(ttfile.fulllocalpach,"upd\","upd/code/").
++         vnewFile = replace(vnewFile,"cmp\","ccf/").
++      end.
++      else if    entry(2,ttfile.fulllocalpach,".") eq "md5"
++      then do:
++         vnewFile = replace(ttfile.fulllocalpach,"upd\","upd/code/").
++         vnewFile = replace(vnewFile,"cmp\","utlcomp/md5/").
++      end.
++      else if    entry(2,ttfile.fulllocalpach,".") eq "df"
++      then
++         vnewFile = replace(ttfile.fulllocalpach,"cmp\","upd/df/").
++      else
++         vnewFile = replace(ttfile.fulllocalpach,"cmp\","ccf/").
++      
++      put unformatted ttfile.fulllocalpach " " vnewFile skip.
++   end.
++end. 
++output close.
++
++
++
++run waitfram-show ("Читаем сиски файлоз для переноса и текст для замены.").
++
++
++mFileHelper:addFileCopyForDir({&fileConvert},"{&workDir}").
++mFileHelper:addTextRepl({&fileConvert}).
++run waitfram-show ("Заменяем текст в файлах.").
++output to {&fileResult}.
++mFileHelper:fileRepText("{&workDir},{&workDir}\.hg\patches").
++mFileHelper:Copyfiles(yes).
++
++output close.
++
++delete object mFileHelper.
++os-command no-wait value(search({&fileResult})).
++run waitfram-hide.
++message "ok"
++view-as alert-box.
+\ No newline at end of file
+diff --git a/gbl/code-upd.p b/gbl/code-upd.p
+--- a/gbl/code-upd.p
++++ b/gbl/code-upd.p
+@@ -65,8 +65,8 @@ subscribe "DisableNwsTable" anywhere run
+ vimport= new ibs.th.bge.xmlimpexp().
+ block-upd:
+ do mdbver = mdbver_old + 1 to 999999999:
+-   mfile    = search(substitute("upd/&1.xml",string(mdbver,"999999999"))).
+-   mfilemd5 = search(substitute("upd/&1.md5",string(mdbver,"999999999"))).
++   mfile    = search(substitute("upd/code/&1.xml",string(mdbver,"999999999"))).
++   mfilemd5 = search(substitute("upd/code/&1.md5",string(mdbver,"999999999"))).
+    if    mfile    eq ? 
+       or mfilemd5 eq ?
+    then 
+diff --git a/ibs/th/file/filehelper.cls b/ibs/th/file/filehelper.cls
+new file mode 100644
+--- /dev/null
++++ b/ibs/th/file/filehelper.cls
+@@ -0,0 +1,508 @@
++ 
++ /*------------------------------------------------------------------------
++    File        : filehelper
++    Purpose     : 
++    Syntax      : 
++    Description : 
++    Author(s)   : druban
++    Created     : Fri Aug 24 08:22:40 MSK 2018
++    Notes       : 
++  ----------------------------------------------------------------------*/
++
++using Progress.Lang.*.
++
++class ibs.th.file.filehelper: 
++   
++   define public variable mProcAfterCreate as character no-undo init ?.
++   {utl/ttfileList.i  ttfile  }
++   define temp-table ttfileTarget no-undo like ttfile.
++   define temp-table ttfileList   no-undo like ttfile.
++   define temp-table ttTextRep    no-undo
++      field textOld as character 
++      field textNew as character
++   index textRep is unique primary textOld.
++   
++   define temp-table ttFileCopy    no-undo
++      field fileOld   as character 
++      field fileNew   as character
++   index fileCop is unique primary fileOld. 
++   
++   define temp-table ttDirList    no-undo
++      field dir   as character 
++   index dir is unique primary dir.   
++      
++   define variable v-path-tls-dir-delim as character no-undo init "\":u.
++   define variable v-path-tls-dir-delim2 as character no-undo init "/":u.
++   
++   define stream sRead.
++
++   constructor filehelper ( ):
++      super ().
++   end constructor.
++
++   method public void  CopyDirstruct (input iDirS as char,input iDirT as char):
++      creatTTForDir(iDirS).
++      updateFolder(iDirT).
++   end.
++
++   method public void  getListfile (input iDir as char,input ilist as character,output table ttfilelist):
++      creatTTForDir(idir,ilist).
++   end.
++   
++   method public void  createdir ():
++      for each ttDirList:
++         createdir(ttDirList.dir).
++      end.
++   end method.
++   
++   method public void  createdir (input iDir as char):
++      define variable vi as integer no-undo.
++      define variable vdir as character no-undo.
++      iDir = replace(iDir,v-path-tls-dir-delim2,v-path-tls-dir-delim).
++      do vi = 1 to num-entries(iDir,v-path-tls-dir-delim):
++         vdir = (if vdir eq "" then "" else vdir + v-path-tls-dir-delim) + entry(vi,iDir,v-path-tls-dir-delim).
++         file-info:file-name = vdir.
++         if file-info:file-type = ? 
++         then do:
++            os-create-dir VALUE(vdir).
++            getErrorOs(vdir).
++         end.
++      end.
++   end.
++
++   method public void  Copyfile (input iDirS as char,input iDirT as char,input ilistCopy as character):
++      Copyfile ( iDirS , iDirT ,ilistCopy,"*" ) .
++   end.
++
++   method public void  Copyfile (input iDirS as char,input iDirT as char,input ilistCopy as character,input itype as char):
++      cleartt().
++      creatTTForDir(idirs,"",ilistCopy,itype).
++      Copyfiles(iDirT).   
++   end.
++   
++   method public void  Copyfiles (input iDirT as char):
++      for each ttfilelist :
++         addFileCopy(ttfilelist.fullpach + v-path-tls-dir-delim + ttfilelist.fulllocalpach,
++                     iDirt + v-path-tls-dir-delim + ttfilelist.fulllocalpach).
++         addDir(iDirT + v-path-tls-dir-delim + ttfilelist.localPach).
++      end.
++      Copyfiles (no).
++      clearDir().  
++   end.
++   
++   method public void  Copyfiles (iDelOldFile as logical):
++      createdir().
++      for each ttFileCopy :
++         os-copy value(ttFileCopy.fileOld )
++                 value(ttFileCopy.fileNew ).
++         
++         if not objExists (ttFileCopy.fileNew)
++         then do:
++            os-copy value(ttFileCopy.fileOld)
++                    value(ttFileCopy.fileNew ).
++            if not getErrorOs(substitute ("Не скопирован файл из &1 в &2", ttFileCopy.fileOld, ttFileCopy.fileNew))
++            then        
++               put unformatted 
++                  "Скопирован файл из " ttFileCopy.fileOld " в " ttFileCopy.fileNew skip.
++         end.
++      end.
++      
++      if iDelOldFile
++      then do:
++         for each ttFileCopy :
++            if objExists(ttFileCopy.fileNew)
++            then do:
++            os-delete value(ttFileCopy.fileOld).
++            getErrorOS(ttFileCopy.fileOld).
++            end.
++            else
++              put unformatted 
++            "!!! Файл не скопирован из " ttFileCopy.fileOld " в " ttFileCopy.fileNew skip.
++         end.
++      end.  
++   end method.
++   
++   method private void  creatTTForDir (input iDir as char):
++      creatTTForDir(idir,"").
++   end method.
++   
++   method public void  creatTTForDir (input iDir as char,output table ttfile):
++      creatTTForDir(idir,"").
++   end.
++   
++   method public void  cleartt ():
++      for each ttfile:
++         delete ttfile.
++      end.   
++      for each ttfileTarget:
++         delete ttfileTarget.
++      end.
++      for each ttfilelist:
++          delete ttfilelist.
++      end.
++   end. 
++   
++   method public void  addFile (iDir as char,ifile as char):
++      define var vPureName  as char    no-undo.
++      define var vFullPath  as char    no-undo.
++      define var vFileType  as char    no-undo.
++      define variable vFileName as character no-undo.
++   
++      iDir  = trim(replace (iDir, "/",v-path-tls-dir-delim),v-path-tls-dir-delim).
++      ifile = trim(replace (ifile,"/",v-path-tls-dir-delim),v-path-tls-dir-delim).
++      vFileName = IDIR + v-path-tls-dir-delim + ifile.
++      if FileExists(vFileName)
++      then do:
++         file-information:file-name = vFileName. 
++         create ttfilelist.
++         assign
++            ttfilelist.fnAME         = entry(num-entries(file-information:full-pathname,v-path-tls-dir-delim),file-information:full-pathname,v-path-tls-dir-delim)
++            ttfilelist.fullpach      = iDir
++            ttfilelist.localPach     = replace(replace(file-information:full-pathname,idir + v-path-tls-dir-delim,""),v-path-tls-dir-delim + ttfilelist.fnAME,"")
++            ttfilelist.fulllocalpach = trim(ttfilelist.localPach + v-path-tls-dir-delim + ttfilelist.fnAME,v-path-tls-dir-delim)
++            ttfilelist.fLevel        = num-entries(ttfilelist.fulllocalpach,v-path-tls-dir-delim) 
++         .
++      end. 
++   end.
++   
++   method private void  creatTTForDir (input iDir as char,input ilistCopy as character):
++      cleartt().
++      creatTTForDir(idir,"",ilistCopy).
++   end.
++
++   method private void  creatTTForDir (input iDir as char,input iLoaclPath as character,input ilistCopy as character  ):
++      creatTTForDir(idir,iLoaclPath,ilistCopy,"*").
++   end.
++   
++   method private void  creatTTForDir (input iDir as char,input iLoaclPath as character,input ilistCopy as character, input itype as char  ):
++      define var vPureName  as char    no-undo.
++      define var vFullPath  as char    no-undo.
++      define var vFileType  as char    no-undo.
++   
++      iDir = trim(idir,v-path-tls-dir-delim).
++   
++      input STREAM sRead FROM os-dir(iDir + v-path-tls-dir-delim + iLoaclPath ).
++      repeat:
++         import stream sRead vPureName vFullPath vFileType.
++         if vPureName begins  "."   then next.
++         if     vFileType =  "d" 
++            and can-do(itype, vFileType )
++         then do:
++            create ttfile.
++            assign
++               ttfile.fnAME       = vPureName
++               ttfile.fullpach    = iDir
++               ttfile.localPach   = iLoaclPath
++               ttfile.fulllocalpach = trim(ttfile.localPach + v-path-tls-dir-delim + ttfile.fnAME,v-path-tls-dir-delim)
++               ttfile.fLevel      = num-entries(ttfile.fulllocalpach,v-path-tls-dir-delim) 
++            .
++         end.
++         else if     ilistCopy ne "" 
++                 and vFileType =  "F"
++                 and can-do(itype, vFileType )
++                  /*and num-entries(vPureName,".")  eq 2*/
++                 and can-do (ilistCopy,entry(num-entries(vPureName,"."),vPureName,"."))
++         then do:
++            create ttfilelist.
++            assign
++               ttfilelist.fnAME         = vPureName
++               ttfilelist.fullpach      = iDir
++               ttfilelist.localPach     = iLoaclPath
++               ttfilelist.fulllocalpach = trim(ttfilelist.localPach + v-path-tls-dir-delim + ttfilelist.fnAME,v-path-tls-dir-delim)
++               ttfilelist.fLevel        = num-entries(ttfilelist.fulllocalpach,v-path-tls-dir-delim) 
++            .
++         end.   
++      end.
++      input close.
++      
++      for each ttfile where not ttfile.NotNew
++           and ttfile.fLevel eq (num-entries(iLoaclPath,v-path-tls-dir-delim) + 1):
++         ttfile.NotNew = yes.
++         creatTTForDir(iDir,ttfile.fulllocalpach,ilistCopy).
++      end.   
++   end method.
++   
++   method public void  updateFolder (input iDir as char):
++      updateFolder(idir,"",input table ttfile).
++   end. 
++   
++   method private void  updateFolder (input iDir as char,input Table ttfile):
++      updateFolder(idir,"",input table ttfile by-reference).
++   end.   
++   
++   method private void  updateFolder (input iDir as char,input iLoaclPath as character ,input Table ttfile):
++      define var vPureName as char no-undo.
++      define var vFullPath as char no-undo.
++      define var vFileType as char no-undo.
++      define variable vLevel as integer no-undo.
++   
++      iDir = trim(idir,v-path-tls-dir-delim).
++      if not FolderExists(iDir) 
++      then do:
++          os-create-dir VALUE(iDir ).
++          getErrorOS ( iDir).
++          if     mProcAfterCreate ne ?
++             and mProcAfterCreate ne ""
++          then
++             os-command value(substitute(mProcAfterCreate,iDir )).
++      end.
++      input STREAM sRead FROM os-dir(iDir + v-path-tls-dir-delim + iLoaclPath ).
++      repeat:
++         import stream sRead vPureName vFullPath vFileType.
++         if vPureName begins "." then next.
++         if vFileType =  "d" then 
++         do:
++            find first ttfile where ttfile.localPach = iLoaclPath 
++                                and ttfile.fnAME     = vPureName
++            no-error.
++            if available ttfile
++            then do:
++               create ttfileTarget.
++               assign
++                  ttfileTarget.fnAME         = vPureName
++                  ttfileTarget.fullpach      = iDir
++                  ttfileTarget.localPach     = iLoaclPath
++                  ttfileTarget.fulllocalpach = trim(ttfile.localPach + v-path-tls-dir-delim + ttfile.fnAME,v-path-tls-dir-delim)
++                  ttfileTarget.fLevel        = num-entries(ttfile.fulllocalpach,v-path-tls-dir-delim) 
++               .
++               delete ttfile.
++             end.
++             else do:
++                put unformatted "удален каталог " vFullPath skip.
++                os-delete value(vFullPath) RECURSIVE.
++                getErrorOs(vFullPath).
++             end.
++         end.
++      end.
++      
++      for each   ttfile where ttfile.localpach eq iLoaclPath
++             and ttfile.fLevel eq (num-entries(iLoaclPath,v-path-tls-dir-delim) + 1):
++         os-create-dir VALUE(iDir + v-path-tls-dir-delim + ttfile.fulllocalpach).
++         getErrorOs(iDir + v-path-tls-dir-delim + ttfile.fulllocalpach).
++         if mProcAfterCreate ne ?
++            and mProcAfterCreate ne ""
++         then
++            os-command value(substitute(mProcAfterCreate,iDir + v-path-tls-dir-delim + ttfile.fulllocalpach)). 
++         put unformatted 
++            "Создан каталог " iDir + v-path-tls-dir-delim + ttfile.fulllocalpach skip.
++         
++         create ttfileTarget.
++         assign
++            ttfileTarget.fnAME         = ttfile.fnAME
++            ttfileTarget.fullpach      = iDir
++            ttfileTarget.localPach     = iLoaclPath
++            ttfileTarget.fulllocalpach = trim(ttfile.localPach + v-path-tls-dir-delim + ttfile.fnAME,v-path-tls-dir-delim)
++            ttfileTarget.fLevel        = num-entries(ttfile.fulllocalpach,v-path-tls-dir-delim) 
++            .
++         delete ttfile.
++      end.
++      
++      input close.
++      for each ttfileTarget where ttfileTarget.fLevel eq (num-entries(iLoaclPath,v-path-tls-dir-delim) + 1)
++                              and not ttfileTarget.NotNew:
++         ttfileTarget.NotNew = yes.
++         updateFolder(iDir,ttfileTarget.fulllocalpach,input table ttfile by-reference).
++        /* delete ttfileTarget.*/
++      end.
++   end method.
++   
++   method public logical FolderExists  (input  ifolder as character ):
++      return objExists(ifolder,"D") ne ?.
++   end. 
++   
++   method public logical FileExists  (input  ifolder as character ):
++      return objExists(ifolder,"F") ne ?.
++   end.
++   
++   method public logical  objExists  (input  ifile as character):
++      return    (objExists(ifile,"D") ne ?) 
++             or (objExists(ifile,"F") ne ?) .                                  
++   end.   
++   
++   method public character  objExists  (input  ifolder as character,
++                                        input  iType   as character  ):
++      define variable vPureName  as character no-undo.
++      define variable vFullPath as character no-undo.
++      define variable vFileType as character no-undo.                                  
++      file-information:file-name = ifolder.
++      if index( file-information:file-type, iType ) > 0 then return file-information:full-pathname .
++      file-information:file-name = "./" + ifolder.
++      if index( file-information:file-type, iType ) > 0 then return file-information:full-pathname .
++
++      return ? .
++   end method.
++   
++   method public void  addTextRepl  (input  iFile as character):
++      define variable vFileOld as character no-undo.
++      define variable vFileNew as character no-undo.
++      input stream sRead from value (iFile).
++      repeat:
++         import stream sRead vFileOld vFileNew no-error.
++         addTextRepl (vFileOld,vFileNew).
++      end.
++      input stream sRead close.
++   end method.
++   
++   method public void  addTextRepl  (input  iTextOld as character,
++                                     input  iTextNew as character  ):
++      find first ttTextRep where ttTextRep.textOld eq iTextOld
++      no-error.
++      if not available ttTextRep
++      then do:
++         create ttTextRep.
++         ttTextRep.textOld = iTextOld.
++      end.
++      ttTextRep.textNew = iTextNew.
++   end method.
++   
++   method public void  clearTextRepl():
++      empty temp-table ttTextRep.
++   end.
++   
++   method public void  addFileCopy  (input  iFile as character):
++      define variable vTextOld as character no-undo.
++      define variable vTextNew as character no-undo.
++      input stream sRead from value (iFile).
++      repeat:
++         import stream sRead vTextOld vTextNew no-error.
++         addFileCopy (vTextOld,vTextNew).
++      end.
++      input stream sRead close.
++   end method.
++   
++   method public void  addFileCopyForDir  (input  iFile as character, idir as character ):
++      define variable vTextOld as character no-undo.
++      define variable vTextNew as character no-undo.
++      input stream sRead from value (iFile).
++      repeat:
++         import stream sRead vTextOld vTextNew no-error.
++         addFileCopy (idir + v-path-tls-dir-delim + vTextOld,idir + v-path-tls-dir-delim + vTextNew).
++      end.
++      input stream sRead close.
++   end method.
++   
++   method public void  addFileCopy  (input  iFileOld as character,
++                                     input  iFileNew as character  ):
++      find first ttFileCopy where ttFileCopy.FileOld eq iFileOld
++      no-error.
++      if not available ttFileCopy
++      then do:
++         create ttFileCopy.
++         ttFileCopy.FileOld = iFileOld.
++      end.
++      ttFileCopy.FileNew = iFileNew.
++   end method.
++   
++   method public void  clearFileList():
++      empty temp-table ttFileCopy.
++   end.
++   
++   method public void  addDir  (input  iDir as character):
++      find first ttDirList where ttDirList.dir eq iDir
++      no-error.
++      if not available ttDirList
++      then do:
++         create ttDirList.
++         ttDirList.Dir = iDir.
++      end.
++      
++   end method.
++   
++   method public void  clearDir():
++      empty temp-table ttDirList.
++   end.
++   
++   method public void fileRepText(iDirList as character ):
++      define variable vi as integer no-undo.
++      do vi = 1 to num-entries (iDirList):
++         creatTTForDir(entry(vi,iDirList),"","i,p,w,cls,diff,txt").
++         
++      end.
++      define variable vFileLong as longchar no-undo.
++      for each ttfileList:
++         copy-lob from file   ttfileList.fullpach + v-path-tls-dir-delim + ttfileList.fulllocalpach 
++                  to   object vFileLong.
++         vFileLong = replText(vFileLong).
++         copy-lob from object vFileLong
++                  to   file   ttfileList.fullpach + v-path-tls-dir-delim + ttfileList.fulllocalpach.
++      end.
++   end method.
++   
++   method public longchar replText(iText as longchar ):
++      for each ttTextRep:
++         iText = replace(iText,ttTextRep.textOld,ttTextRep.textNew).
++         iText = replace(iText,replace (ttTextRep.textOld,v-path-tls-dir-delim,v-path-tls-dir-delim2),ttTextRep.textNew).
++      end.
++      return iText.
++   end.
++
++   method public logical getErrorOs( itext as character ):
++      define variable err-status as integer no-undo.
++      err-status = os-error.
++      if err-status ne 0 
++      then do:
++         if err-status eq 1 
++         then
++            put unformatted "You are not the owner of this file or directory. " itext skip.
++         else if err-status eq 2 
++         then  
++            put unformatted "No such file or directory. " itext skip. 
++         
++         else if err-status eq 3 
++         then  
++            put unformatted "Interrupted system call. " itext skip. 
++         else if err-status eq 4 
++         then  
++            put unformatted "I/O error " itext skip. 
++         else if err-status eq 5 
++         then  
++            put unformatted "Bad file number. " itext skip. 
++         else if err-status eq 6 
++         then  
++            put unformatted "No more processes. " itext skip. 
++         else if err-status eq 7 
++         then  
++            put unformatted "Not enough core memory. " itext skip. 
++         else if err-status eq 8 
++         then  
++            put unformatted "Permission denied. " itext skip. 
++         else if err-status eq 9 
++         then  
++            put unformatted "Bad address. " itext skip. 
++         else if err-status eq 10 
++         then  
++            put unformatted "File exists. " itext skip. 
++         else if err-status eq 11 
++         then  
++            put unformatted " No such device. " itext skip. 
++         else if err-status eq 12 
++         then  
++            put unformatted "Not a directory. " itext skip. 
++         else if err-status eq 13 
++         then  
++            put unformatted "Is a directory. " itext skip. 
++         else if err-status eq 14 
++         then  
++            put unformatted "File table overflow. " itext skip. 
++         else if err-status eq 15 
++         then  
++            put unformatted "Too many open files. " itext skip. 
++         else if err-status eq 16 
++         then  
++            put unformatted "File too large. " itext skip. 
++         else if err-status eq 17 
++         then  
++            put unformatted "No space left on device. " itext skip. 
++         else if err-status eq 18 
++         then  
++            put unformatted "Directory not empty. " itext skip. 
++         else if err-status eq 999 
++         then do: 
++            put unformatted "Unmapped error (ABL default). " itext skip.
++         end. 
++         else
++            put unformatted substitute ("OS Error #&1 &2", string(os-error,">>99"),itext) skip.  
++      end.
++      return err-status ne 0.
++   end.
++end class.
+\ No newline at end of file
+diff --git a/utl/chkstrgbl.p b/utl/chkstrgbl.p
+--- a/utl/chkstrgbl.p
++++ b/utl/chkstrgbl.p
+@@ -149,7 +149,7 @@ then do:
+    define variable mdbver as integer no-undo.
+    block-upd:
+    do mdbver = 1 to 999999999:
+-      mfile    = substitute("upd/&1.xml",string(mdbver ,"999999999")).
++      mfile    = substitute("upd/code/&1.xml",string(mdbver ,"999999999")).
+       if    search(mfile)    eq ? 
+       then 
+          leave block-upd.
+@@ -170,6 +170,7 @@ then do:
+       
+       mfile = entry(mi,mliststrfile).
+       mfilenew = replace (mfile,".txt",".enc").
++      mfilenew = replace (mfilenew,"cmp/","ccp/").
+       run SaveFileList (mfile,mfileNew).
+       mfile = search(mfile).
+       
+@@ -204,7 +205,7 @@ then do:
+       chancriptone = yes.
+       &endif
+       mfilenew = replace (mfile,".txt",".enc").
+-      
++      mfilenew = replace (mfilenew,"cmp/","ccp/").
+       if    chancriptone
+          or search(mfilenew) eq ?
+       then do:

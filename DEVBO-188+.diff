@@ -1,0 +1,125 @@
+# HG changeset patch
+# User VSpiridonov
+# Parent  a7c24b1747c3e5f1aeb7a6294968204c14cb42e2
+refs #DEVBO-188  Для промоакции с механикой "Временная скидка, скидка процентом, количество по строке" не выгружается размер скидки в 1С ERP (секция <chk-discnt> BTS-767
+                 Исправлена выгрузка тега chk-discnt, добавлена выгрузка скидок с line-type =  1 и record-type = 0.
+                 Может затронуть только выгрузку тега <chk-discnt> в xml.
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-188
+https://msk-exp-jira.expertek.local/browse/BTS-767
+
+diff --git a/ibs/th/bge/1crn/subjects/check.cls b/ibs/th/bge/1crn/subjects/check.cls
+--- a/ibs/th/bge/1crn/subjects/check.cls
++++ b/ibs/th/bge/1crn/subjects/check.cls
+@@ -759,8 +759,8 @@ define private temp-table tt-recid-TranF
+         if (buf_chk-gds.discnt > 0) or (buf_chk-gds.discnt < 0) then
+         insw:write-data-element (  "sum-discnt",
+ /*          left-trim( string(buf_chk-gds.doc-qnty * buf_chk-gds.discnt, "->>>>>>>>>9.9<<<<<<<<<") ) */
+-          left-trim(string((chk-gds.doc-qnty * chk-gds.discnt  + chk-gds.doc-qnty * src-discnt) , "->>>>>>>>>9.9<" ))  
+-        ) . /* Скидка на строку товара - с учетом всех скидок на строку и на итог (Число) */
++        left-trim(string((buf_chk-gds.doc-qnty * buf_chk-gds.discnt  + buf_chk-gds.doc-qnty * buf_chk-gds.src-discnt) , "->>>>>>>>>9.9<" )) ) . 
++        /* Скидка на строку товара - с учетом всех скидок на строку и на итог (Число) */
+         
+         if v-is-petrolium and (buf_chk-gds.density > 0) then
+         insw:write-data-element (  "dnsty",  string(buf_chk-gds.density, "9.9999999999")  ) . /* Плотность (Число 12,10) */
+@@ -1025,16 +1025,22 @@ define private temp-table tt-recid-TranF
+     for each buf_chk-discnt no-lock
+        where buf_chk-discnt.doc-code = p-buf_chk-doc.doc-code
+         /* скидки обычные (record-type = 0) и скидки, которыми выравниваются погрешности (record-type = 2) */
+-         and ( buf_chk-discnt.record-type = 0 or buf_chk-discnt.record-type = 1 or buf_chk-discnt.record-type = 2 or buf_chk-discnt.value-type = 14 )
+-    break by buf_chk-discnt.doc-code :
++         and ( buf_chk-discnt.record-type = 0   /* record-type = 0 первичная */ 
++            or buf_chk-discnt.record-type = 1   /* record-type = 1 вторичная */ 
++            or buf_chk-discnt.record-type = 2   /* record-type = 2-коррекция округления  */ 
++            or buf_chk-discnt.value-type = 14 )
++      break by buf_chk-discnt.doc-code :
++
+       if first-of(buf_chk-discnt.doc-code) then insw:start-element ({&tag-section3}) .
++
+       /*если промоакции и скидка на подитог, необходимо размазать скидку на все товары*/
+       if /* buf_chk-discnt.promo-id > "" and */  
+-      (buf_chk-discnt.line-type = integer({&discnt-sub-total})  and buf_chk-discnt.record-type = 1  
+-        and can-find(first  bf_chk-discnt no-lock  where  bf_chk-discnt.doc-code = buf_chk-discnt.doc-code and  bf_chk-discnt.record-type = 1 and bf_chk-discnt.discnt-id = buf_chk-discnt.discnt-id) )
+-          or
+-      (buf_chk-discnt.line-type =  1  and buf_chk-discnt.record-type = 0 
+-        and can-find(first  bf_chk-discnt no-lock  where bf_chk-discnt.doc-code = buf_chk-discnt.doc-code and  bf_chk-discnt.record-type = 0 and bf_chk-discnt.discnt-id = buf_chk-discnt.discnt-id ) )
++            (buf_chk-discnt.line-type   = integer({&discnt-sub-total})              /* line-type   = 2 товарная */
++         and buf_chk-discnt.record-type = 1                                         /* record-type = 1 вторичная */ 
++         and can-find(first  bf_chk-discnt no-lock  where  
++                             bf_chk-discnt.doc-code = buf_chk-discnt.doc-code 
++                         and bf_chk-discnt.record-type = 1 
++                         and bf_chk-discnt.discnt-id = buf_chk-discnt.discnt-id) )
+       then do:
+          if not vflg
+          then
+@@ -1042,30 +1048,59 @@ define private temp-table tt-recid-TranF
+           where bf_chk-discnt.doc-code = buf_chk-discnt.doc-code and bf_chk-discnt.record-type = 1  and bf_chk-discnt.discnt-id = buf_chk-discnt.discnt-id  break by bf_chk-discnt.object-line-num:
+           vflg = yes.
+           insw:start-element ({&tag-item3}) .
+-          insw:write-data-element (  "discnt-num",       string(bf_chk-discnt.discnt-id)          ) . /* Номер строки скидки (Число) */
+-          insw:write-data-element (  "line-num",         string(bf_chk-discnt.object-line-num)           ) . /* Номер строки чека на которую предоставлена скидка (Число) */
+-          insw:write-data-element (  "discnt-type",      string(bf_chk-discnt.value-type)        ) . /* Тип скидки (Строка) */
+-          insw:write-data-element (  "discntValueAbs",   left-trim(string(bf_chk-discnt.discnt-value-abs,  "->>>>>>>>>9.9<<<<<<<<<"))  ) . /* Абсолютное значение скидки - сумма (Число) */
+-          insw:write-data-element (  "discntValuePcnt",  left-trim(string(bf_chk-discnt.discnt-value-pcnt, "->>>9.9<"))                 ) . /* % скидки (Число) */
++          insw:write-data-element ( "discnt-num",      string(bf_chk-discnt.discnt-id)       ) . /* Номер строки скидки (Число) */
++          insw:write-data-element ( "line-num",        string(bf_chk-discnt.object-line-num) ) . /* Номер строки чека на которую предоставлена скидка (Число) */
++          insw:write-data-element ( "discnt-type",     string(bf_chk-discnt.value-type)      ) . /* Тип скидки (Строка) */
++          insw:write-data-element ( "discntValueAbs",  left-trim(string(bf_chk-discnt.discnt-value-abs,  "->>>>>>>>>9.9<<<<<<<<<")) ) . /* Абсолютное значение скидки - сумма (Число) */
++          insw:write-data-element ( "discntValuePcnt", left-trim(string(bf_chk-discnt.discnt-value-pcnt, "->>>9.9<"))               ) . /* % скидки (Число) */
+           /* обязательность 0-1 */
+           if bf_chk-discnt.promo-id > "" then 
+           do:
+             find first PromoAction where PromoAction.id =  int(bf_chk-discnt.promo-id) no-lock no-error.
+-         
+             insw:write-data-element (  "promotion-code", if available PromoAction and PromoAction.ext-code > '' then PromoAction.ext-code else  bf_chk-discnt.promo-id  ) . /* Код промо-акции (Строка) */
+-        
+           end.
+-          if bf_chk-discnt.templ-rl-root > 0 then  insw:write-data-element (  "discntGdsReason",       string(bf_chk-discnt.templ-rl-root)          ) .
++          if bf_chk-discnt.templ-rl-root > 0 then  insw:write-data-element ( "discntGdsReason", string(bf_chk-discnt.templ-rl-root) ) .
+           insw:end-element ({&tag-item3}) .
+         
+         end.
+       end.
++
++      if      buf_chk-discnt.line-type   = 1                                      /* line-type   = 1 итоговая  */
++          and buf_chk-discnt.record-type = 0                                      /* record-type = 0 первичная */ 
++          and buf_chk-discnt.discnt-type = 7
++          and can-find(first bf_chk-discnt no-lock  where 
++                             bf_chk-discnt.doc-code    = buf_chk-discnt.doc-code 
++                         and bf_chk-discnt.record-type = 0 
++                         and bf_chk-discnt.discnt-id   = buf_chk-discnt.discnt-id )   
++      then do:
++         if not vflg
++         then
++         for each bf_chk-discnt no-lock
++          where bf_chk-discnt.doc-code = buf_chk-discnt.doc-code and bf_chk-discnt.record-type = 0  and bf_chk-discnt.discnt-id = buf_chk-discnt.discnt-id  break by bf_chk-discnt.object-line-num:
++          vflg = yes.
++          insw:start-element ({&tag-item3}) .
++          insw:write-data-element ( "discnt-num",      string(bf_chk-discnt.discnt-id)       ) . /* Номер строки скидки (Число) */
++          insw:write-data-element ( "line-num",        string(bf_chk-discnt.object-line-num) ) . /* Номер строки чека на которую предоставлена скидка (Число) */
++          insw:write-data-element ( "discnt-type",     string(bf_chk-discnt.value-type)      ) . /* Тип скидки (Строка) */
++          insw:write-data-element ( "discntValueAbs",  left-trim(string(bf_chk-discnt.discnt-value-abs,  "->>>>>>>>>9.9<<<<<<<<<")) ) . /* Абсолютное значение скидки - сумма (Число) */
++          insw:write-data-element ( "discntValuePcnt", left-trim(string(bf_chk-discnt.discnt-value-pcnt, "->>>9.9<"))               ) . /* % скидки (Число) */
++          /* обязательность 0-1 */
++          if bf_chk-discnt.promo-id > "" then 
++          do:
++            find first PromoAction where PromoAction.id =  int(bf_chk-discnt.promo-id) no-lock no-error.
++            insw:write-data-element (  "promotion-code", if available PromoAction and PromoAction.ext-code > '' then PromoAction.ext-code else  bf_chk-discnt.promo-id  ) . /* Код промо-акции (Строка) */
++          end.
++          if bf_chk-discnt.templ-rl-root > 0 then  insw:write-data-element ( "discntGdsReason", string(bf_chk-discnt.templ-rl-root) ) .
++          insw:end-element ({&tag-item3}) .
++        end.
++      end.
++
+       else 
+       do:  
+         insw:start-element ({&tag-item3}) .
+-        insw:write-data-element (  "discnt-num",       string(buf_chk-discnt.discnt-id)          ) . /* Номер строки скидки (Число) */
+-        insw:write-data-element (  "line-num",         string(buf_chk-discnt.line-num)           ) . /* Номер строки чека на которую предоставлена скидка (Число) */
+-        insw:write-data-element (  "discnt-type",      string(buf_chk-discnt.value-type)        ) . /* Тип скидки (Строка) */
++        insw:write-data-element (  "discnt-num",       string(buf_chk-discnt.discnt-id)       ) . /* Номер строки скидки (Число) */
++        insw:write-data-element (  "line-num",         string(buf_chk-discnt.line-num)        ) . /* Номер строки чека на которую предоставлена скидка (Число) */
++        insw:write-data-element (  "discnt-type",      string(buf_chk-discnt.value-type)      ) . /* Тип скидки (Строка) */
+         insw:write-data-element (  "discntValueAbs",   left-trim(string(buf_chk-discnt.discnt-value-abs,  "->>>>>>>>>9.9<<<<<<<<<"))  ) . /* Абсолютное значение скидки - сумма (Число) */
+         insw:write-data-element (  "discntValuePcnt",  left-trim(string(buf_chk-discnt.discnt-value-pcnt, "->>>>9.9<"))                 ) . /* % скидки (Число) */
+         /* обязательность 0-1 */

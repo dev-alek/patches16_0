@@ -1,0 +1,20 @@
+# HG changeset patch
+# User VSpiridonov
+# Parent  5f4508af53707055393821cb091aa833fb39aaa0
+refs #DEVBO-727 BTS-2475 Временное отключение обмена новостями в ТБД. ТН 16.0
+
+diff --git a/nws/send-nws.p b/nws/send-nws.p
+--- a/nws/send-nws.p
++++ b/nws/send-nws.p
+@@ -101,6 +101,11 @@ on error undo, return error
+     .
+   end.
+ 
++   if buf-dst_db.max-p-queue = 0 and p-db-num > 0  then do:
++      run write-to-log( substitute( "Отправка в БД &1 отключена ", p-db-num ) ) .
++      return .
++   end.
++
+   case p-action:
+     when "one-pack":U then do:
+       run write-to-log( substitute("Отправка одного пакета новостей в БД &1", p-db-num ) ) .

@@ -1,0 +1,44 @@
+# HG changeset patch
+# User SSlivenko
+# Parent  9d600104409d290bf3dcb6376a6bd8ebb28c98e0
+refs #4522 Импорт накладных
+
+http://exp-rm1.expertek.local/issues/4522
+http://exp-jira.expertek.local:8080/browse/GCS-1071
+
+diff -r 9d600104409d -r 1176c9e831bb utl/imp-doc4.p
+--- a/utl/imp-doc4.p	Thu Oct 31 14:27:28 2019 +0300
++++ b/utl/imp-doc4.p	Thu Oct 31 16:32:41 2019 +0300
+@@ -190,7 +190,7 @@
+         buf_tt-parts.artic         = substring(  entry( 1, v-imp-row, ';'),  7  ) // отрезаем начальное "PART: &1;"
+         buf_tt-parts.part-code     =      trim(  entry( 3, v-imp-row, ';')  )
+         buf_tt-parts.in-code       =      trim(  entry( 4, v-imp-row, ';')  )
+-        buf_tt-parts.gds-code      =   integer(  entry( 5, v-imp-row, ';')  )
++        buf_tt-parts.gds-code      =     int64(  entry( 5, v-imp-row, ';')  )
+         buf_tt-parts.price-rubl    =   decimal(  entry( 6, v-imp-row, ';')  )
+         buf_tt-parts.fact-qnty     =   decimal(  entry( 7, v-imp-row, ';')  )
+         buf_tt-parts.vat-tax-value =   decimal(  entry(11, v-imp-row, ';')  )
+diff -r 9d600104409d -r 1176c9e831bb utl/imp-doc4cr.p
+--- a/utl/imp-doc4cr.p	Thu Oct 31 14:27:28 2019 +0300
++++ b/utl/imp-doc4cr.p	Thu Oct 31 16:32:41 2019 +0300
+@@ -235,7 +235,7 @@
+ .
+ // 19/IX-2018 сопоставление товаров потребовалось переделать с артикулов на коды товаров 
+ define temp-table w-gds no-undo
+-  field gds-code-15_0 as integer
++  field gds-code-15_0 as int64
+   field gds-code-16_0 as integer
+ .
+ 
+diff -r 9d600104409d -r 1176c9e831bb utl/imp-parts.i
+--- a/utl/imp-parts.i	Thu Oct 31 14:27:28 2019 +0300
++++ b/utl/imp-parts.i	Thu Oct 31 16:32:41 2019 +0300
+@@ -5,7 +5,7 @@
+            field f02           as character
+   /* 03 */ field part-code     as character
+   /* 04 */ field in-code       like ub.parts.in-code
+-  /* 05 */ field gds-code      as integer
++  /* 05 */ field gds-code      as int64
+   /* 06 */ field price-rubl    like ub.parts.price-rubl
+   /* 07 */ field fact-qnty     like ub.parts.fact-qnty
+            field f08           as character

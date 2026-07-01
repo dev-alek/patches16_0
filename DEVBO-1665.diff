@@ -1,0 +1,45 @@
+# HG changeset patch
+# User EShklyar
+# Parent  567ddbc1e9cf825c4a850f813d22873b59eaf32b
+refs #DEVBO-1665 Округление массы в инвентаризационной описи
+
+http://exp-jira.expertek.local:8080/browse/DEVBO-1665
+
+diff --git a/rep/r-orioxl-pokmi.p b/rep/r-orioxl-pokmi.p
+--- a/rep/r-orioxl-pokmi.p
++++ b/rep/r-orioxl-pokmi.p
+@@ -304,9 +304,9 @@ procedure data-print :
+          tt-petrol.volue    = bf_rvs-line.state-measure-qnty * 0.001 /*Переводим из л в м3 */
+          tt-petrol.density  = bf_rvs-line.state-density * 1000 /*Переводим из г/см3 в кг/м3 */
+          tt-petrol.temp     = bf_rvs-line.state-temperature
+-         tt-petrol.qnty     = round(bf_rvs-line.state-measure-cli-qnty,0)
++         tt-petrol.qnty     = bf_rvs-line.state-measure-cli-qnty
+          tt-petrol.volue-pl = bf_place.add-qnty * 0.001
+-         tt-petrol.qnty1    = round((tt-petrol.volue-pl * tt-petrol.density),0)
++         tt-petrol.qnty1    = (tt-petrol.volue-pl * tt-petrol.density)
+          tt-petrol.pl-type  = "трубопровод"
+          .
+     find first c-rvs-doc no-lock where c-rvs-doc.rvs-code = bf_rvs-doc.rvs-code and c-rvs-doc.obj-code = bf_rvs-doc.obj-code and
+@@ -474,8 +474,8 @@ procedure table-inv:
+       '<TD colspan = "8" text_wrap="true" num="0.000" val="' + fnc-convert-dot-to-colon(tt-petrol.volue,"->>>>>>>>>>>9.999",3) + '" style="text-align: center; border: 1px solid black;">' + fnc-convert-dot-to-colon(tt-petrol.volue,"->>>>>>>>>>>9.999",3) + '</TD>' skip
+       '<TD colspan = "9" text_wrap="true" num="0.0" val="' + fnc-convert-dot-to-colon(tt-petrol.density,"->>>>>>>>>>>9.9",1) + '" style="text-align: center; border: 1px solid black;">' + fnc-convert-dot-to-colon(tt-petrol.density,"->>>>>>>>>>>9.9",1) + '</TD>' skip
+       '<TD colspan = "9" text_wrap="true" num="0.0" val="' + fnc-convert-dot-to-colon(tt-petrol.temp,"->>>>>>>>>>>9.9",1) + '" style="text-align: center; border: 1px solid black;">' + fnc-convert-dot-to-colon(tt-petrol.temp,"->>>>>>>>>>>9.9",1) + '</TD>' skip
+-      '<TD colspan = "9" text_wrap="true" num="0" val="' + fnc-convert-dot-to-colon(tt-petrol.qnty,"->>>>>>>>>>>9",0) + '" style="text-align: center; border: 1px solid black;">' + fnc-convert-dot-to-colon(tt-petrol.qnty,"->>>>>>>>>>>9",0) + '</TD>' skip
+-      '<TD colspan = "9" text_wrap="true" num="0.000" val="' + fnc-convert-dot-to-colon(tt-petrol.delta,"->>>>>>>>>>>9.999",3) + '" style="text-align: center; border: 1px solid black;">' + fnc-convert-dot-to-colon(tt-petrol.delta,"->>>>>>>>>>>9.999",3) + '</TD>' skip
++      '<TD colspan = "9" text_wrap="true" num="0.0" val="' + fnc-convert-dot-to-colon(tt-petrol.qnty,"->>>>>>>>>>>9.9",1) + '" style="text-align: center; border: 1px solid black;">' + fnc-convert-dot-to-colon(tt-petrol.qnty,"->>>>>>>>>>>9.9",1) + '</TD>' skip
++      '<TD colspan = "9" text_wrap="true" num="0.00" val="' + fnc-convert-dot-to-colon(tt-petrol.delta,"->>>>>>>>>>>9.99",2) + '" style="text-align: center; border: 1px solid black;">' + fnc-convert-dot-to-colon(tt-petrol.delta,"->>>>>>>>>>>9.99",2) + '</TD>' skip
+       '</TR>'skip     
+       .
+   end.
+@@ -533,9 +533,9 @@ procedure table-inv:
+       '<TD colspan = "10" text_wrap="true" style="text-align: center; border: 1px solid black;">' + string(tt-petrol.log-pl) + '</TD>' skip
+       '<TD colspan = "10" text_wrap="true" num="0.0" val="' + fnc-convert-dot-to-colon(tt-petrol.density,"->>>>>>>>>>>9.9",1) + '" style="text-align: center; border: 1px solid black;">' + fnc-convert-dot-to-colon(tt-petrol.density,"->>>>>>>>>>>9.9",1) + '</TD>' skip
+       '<TD colspan = "10" text_wrap="true" num="0.0" val="' + fnc-convert-dot-to-colon(tt-petrol.temp,"->>>>>>>>>>>9.9",1) + '" style="text-align: center; border: 1px solid black;">' + fnc-convert-dot-to-colon(tt-petrol.temp,"->>>>>>>>>>>9.9",1) + '</TD>' skip
+-      '<TD colspan = "10" text_wrap="true" num="0" val="' + fnc-convert-dot-to-colon(tt-petrol.qnty1,"->>>>>>>>>>>9",0) + '" style="text-align: center; border: 1px solid black;">' + fnc-convert-dot-to-colon(tt-petrol.qnty1,"->>>>>>>>>>>9",0) + '</TD>' skip
++      '<TD colspan = "10" text_wrap="true" num="0.0" val="' + fnc-convert-dot-to-colon(tt-petrol.qnty1,"->>>>>>>>>>>9.9",1) + '" style="text-align: center; border: 1px solid black;">' + fnc-convert-dot-to-colon(tt-petrol.qnty1,"->>>>>>>>>>>9.9",1) + '</TD>' skip
+ /*      '<TD colspan = "10" text_wrap="true" style="text-align: center; border: 1px solid black;"></TD>' skip*/
+-      '<TD colspan = "10" text_wrap="true" num="0.000" val="' + fnc-convert-dot-to-colon(tt-petrol.delta1,"->>>>>>>>>>>9.999",3) + '" style="text-align: center; border: 1px solid black;">' + fnc-convert-dot-to-colon(tt-petrol.delta1,"->>>>>>>>>>>9.999",3) + '</TD>' skip
++      '<TD colspan = "10" text_wrap="true" num="0.00" val="' + fnc-convert-dot-to-colon(tt-petrol.delta1,"->>>>>>>>>>>9.99",2) + '" style="text-align: center; border: 1px solid black;">' + fnc-convert-dot-to-colon(tt-petrol.delta1,"->>>>>>>>>>>9.99",2) + '</TD>' skip
+       '</TR>'skip     
+       .
+   end.  

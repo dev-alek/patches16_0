@@ -1,0 +1,48 @@
+# HG changeset patch
+# User EShklyar
+# Parent  f46b7c1c439aa6b2baaf5be674a6b0ece0d2fdb2
+refs #DEVBO-2761 Версионность ТСД
+
+http://188.254.98.141/browse/DEVBO-2761
+
+diff --git a/adm/sktsrv.w b/adm/sktsrv.w
+--- a/adm/sktsrv.w
++++ b/adm/sktsrv.w
+@@ -55,6 +55,7 @@ define variable v-hd-line     as charact
+ define variable v-cont-length as integer   no-undo.
+ define variable v-cont-type   as character no-undo.
+ define variable v-user-agent  as character no-undo.
++define variable v-TSD-version as character no-undo.
+ define variable v-querypar    as character no-undo.
+ define variable v-path        as character no-undo.
+ define variable mWork         as logical no-undo.
+@@ -452,6 +453,7 @@ PROCEDURE connproc :
+   v-hd-line = "" .
+   v-cont-type = "".
+   v-user-agent = "".
++  v-TSD-version = "".
+   
+   v-str = '':U.
+   resp-head = substitute("HTTP/1.0 400 Bad Request&1Server: 4GL&2",{&CRLF},{&HdEnd}).  /* Возвращаемая по умолчанию ошибка */
+@@ -846,6 +848,21 @@ procedure parseheader:
+       IF  v-hd-line  BEGINS "user-agent:"  THEN  do:
+           v-user-agent = trim(SUBSTRING(v-hd-line,13,LENGTH(v-hd-line))).
+       END.
++      IF  v-hd-line  BEGINS "TSD-version:"  THEN  do:
++          v-TSD-version = trim(SUBSTRING(v-hd-line,13,LENGTH(v-hd-line))).
++          if v-TSD-version <> "" then do:
++            find first ub.Code exclusive-lock where ub.Code.code = "TSD" and ub.Code.parent = "TSD-version" no-error .
++            if not available (ub.Code) then do:
++              create ub.Code .
++              assign
++              ub.Code.code = "TSD"
++              ub.Code.parent = "TSD-version"
++              .
++            end.
++            else ub.Code.CodeValue = v-TSD-version .
++          end.
++      END.  
++
+   END.
+     
+ end procedure.

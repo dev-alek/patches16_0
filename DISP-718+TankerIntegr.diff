@@ -1,0 +1,18 @@
+# HG changeset patch
+# User DRuban
+# Parent  ee213409dc4cb7bb7e8cfbf0ae574340f45f2fb0
+refs #DISP-718 Создание скрипта для автоматического закрытия смен ТН на несколькихААЗС
+TankerIntegr
+http://exp-jira.expertek.local:8080/browse/DISP-718
+
+diff --git a/ibs/th/str/tso_trg.cls b/ibs/th/str/tso_trg.cls
+--- a/ibs/th/str/tso_trg.cls
++++ b/ibs/th/str/tso_trg.cls
+@@ -680,6 +680,7 @@ class ibs.th.str.tso_trg:
+                              buf_cash-desk.cash-num).
+          if     vdevice ne mdevice:TCOAGC
+             and vdevice ne mdevice:Tanker
++            and vdevice ne mdevice:TankerIntegr
+          then do :
+             vQuery:get-next (). /* Вывод из оборота */
+             next .

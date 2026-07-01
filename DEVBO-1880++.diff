@@ -1,0 +1,187 @@
+# HG changeset patch
+# User EShklyar
+# Parent  bd5a1b8f606a476a6755aef5e95523a3475cc28e
+refs #DEVBO-1880 Ошибки на тестовых р-кодах от 29.06.2022
+
+http://exp-jira.expertek.local:8080/browse/DEVBO-1880
+
+diff --git a/gbl/library.p b/gbl/library.p
+--- a/gbl/library.p
++++ b/gbl/library.p
+@@ -7639,7 +7639,7 @@ procedure gdsdtlcr :
+         and buf_gds-dtl.prod-type = buf_doc-line.prod-type
+         and buf_gds-dtl.prod-code = buf_doc-line.prod-code
+         and buf_gds-dtl.prt-code  = v-root-node
+-        and buf_gds-dtl.line-num  = buf_doc-line.line-num
++        and buf_doc-line.line-num = if buf_gds-dtl.line-num <> 0 then buf_gds-dtl.line-num else buf_doc-line.line-num 
+       no-error .
+     if not available buf_gds-dtl
+     then do:
+diff --git a/str/lib-trn.p b/str/lib-trn.p
+--- a/str/lib-trn.p
++++ b/str/lib-trn.p
+@@ -1091,7 +1091,7 @@ if ei_trn-doc.doc-type = {&income} and
+                               ei_gds-dtl.artic     = parartic     and
+                               ei_gds-dtl.prod-code = parprod-code and
+                               ei_gds-dtl.prod-type = parprod-type and
+-                              ei_gds-dtl.line-num  = parline-num:
++                              parline-num = if ei_gds-dtl.line-num <> 0 then ei_gds-dtl.line-num else parline-num:
+        assign ei_gds-dtl.price-base = parprice-base
+               ei_gds-dtl.price-rubl = parprice-rubl.
+     end.
+@@ -2096,7 +2096,7 @@ find first bf_gds-dtl where bf_gds-dtl.d
+                         and bf_gds-dtl.prod-code  = parprod-code
+                         and bf_gds-dtl.prod-type  = parprod-type
+                         and bf_gds-dtl.prt-code   = parprt-code  
+-                        and bf_gds-dtl.line-num   = parline-num no-error.
++                        and parline-num = if bf_gds-dtl.line-num <> 0 then bf_gds-dtl.line-num else parline-num  no-error.
+ end.
+ else do:
+ find first bf_gds-dtl where bf_gds-dtl.doc-code   = pardoc-code
+@@ -2858,7 +2858,7 @@ else do:
+                          and ca_gds-dtl.prod-code  = ca_goods.prod-code
+                          and ca_gds-dtl.prod-type  = ca_goods.prod-type
+                          and ca_gds-dtl.prt-code   = varlegal-node 
+-                         and ca_gds-dtl.line-num   = ca_doc-line.line-num no-error.
++                         and ca_doc-line.line-num  = if ca_gds-dtl.line-num <> 0 then ca_gds-dtl.line-num else ca_doc-line.line-num no-error.
+        if not available ca_gds-dtl then do:
+          { str/crgdsdtl.i
+            ca_trn-doc.obj-code
+@@ -3199,7 +3199,7 @@ else do:
+                          and ca_gds-dtl.prod-code  = ca_goods.prod-code
+                          and ca_gds-dtl.prod-type  = ca_goods.prod-type
+                          and ca_gds-dtl.prt-code   = varlegal-node 
+-                         and ca_gds-dtl.line-num   = ca_doc-line.line-num no-error.
++                         and ca_doc-line.line-num  = if ca_gds-dtl.line-num <> 0 then ca_gds-dtl.line-num else ca_doc-line.line-num  no-error.
+        if not available ca_gds-dtl then do:
+          { str/crgdsdtl.i
+            ca_trn-doc.obj-code
+diff --git a/str/parts-l.w b/str/parts-l.w
+--- a/str/parts-l.w
++++ b/str/parts-l.w
+@@ -2615,6 +2615,7 @@ else do:
+   ON ERROR   UNDO MAIN-BLOCK, LEAVE MAIN-BLOCK
+   ON END-KEY UNDO MAIN-BLOCK, LEAVE MAIN-BLOCK
+   :
++
+     run main-block-procedure no-error .
+     if error-status :error
+     then do:
+@@ -4341,7 +4342,8 @@ PROCEDURE save-changes :
+             and buf_doc-line.artic     = bf_parts.artic
+             and buf_doc-line.prod-type = bf_parts.prod-type
+             and buf_doc-line.prod-code = bf_parts.prod-code
+-            and buf_doc-line.line-num = integer(entry(2,bf_parts.part-code,"/")) no-error .
++            and buf_doc-line.line-num = if num-entries(bf_parts.part-code,"/") > 1 then integer(entry(2,bf_parts.part-code,"/")) else buf_doc-line.line-num
++             no-error .
+           if not available (buf_doc-line) then
+           do:
+           /*Запускаем процедуру создания новой линии документа*/
+@@ -4410,7 +4412,8 @@ PROCEDURE save-changes :
+               and bf_doc-line.artic     = bf_parts.artic
+               and bf_doc-line.prod-type = bf_parts.prod-type
+               and bf_doc-line.prod-code = bf_parts.prod-code
+-              and bf_doc-line.line-num = integer(entry(2,bf_parts.part-code,"/")) no-error .
++              and bf_doc-line.line-num = if num-entries(bf_parts.part-code,"/") > 1 then integer(entry(2,bf_parts.part-code,"/")) else bf_doc-line.line-num
++               no-error .
+             if available (bf_doc-line) then
+             do:
+               assign
+@@ -4458,8 +4461,9 @@ PROCEDURE save-changes :
+                 and ub.gds-dtl.prod-code = bf_doc-line.prod-code
+                 and ub.gds-dtl.prod-type = bf_doc-line.prod-type
+                 and ub.gds-dtl.prt-code  = buf_gds-prt.node-code
+-                and ub.gds-dtl.line-num  = bf_doc-line.line-num
++                and buf_doc-line.line-num = if ub.gds-dtl.line-num <> 0 then ub.gds-dtl.line-num else buf_doc-line.line-num
+                 .
++                
+               assign
+                 ub.gds-dtl.price-base  = ?
+                 ub.gds-dtl.price-rubl  = ?
+@@ -4562,7 +4566,7 @@ PROCEDURE save-changes :
+               and buf_parts.artic     = buf_doc-line.artic
+               and buf_parts.prod-type = buf_doc-line.prod-type
+               and buf_parts.prod-code = buf_doc-line.prod-code
+-              and buf_doc-line.line-num = integer(entry(2,buf_parts.part-code,"/"))
++              and buf_doc-line.line-num = if num-entries(buf_parts.part-code,"/") > 1 then integer(entry(2,buf_parts.part-code,"/")) else buf_doc-line.line-num
+               on error undo, return error return-value
+               :
+               if buf_trn-doc.ext-doc-type = {&TDEDT_Ras_Vnesh_VP}
+diff --git a/trg/doc-lind.p b/trg/doc-lind.p
+--- a/trg/doc-lind.p
++++ b/trg/doc-lind.p
+@@ -231,7 +231,7 @@ on stop   undo main-block, return error 
+        and ub.gds-dtl.artic     = ub.doc-line.artic
+        and ub.gds-dtl.prod-type = ub.doc-line.prod-type
+        and ub.gds-dtl.prod-code = ub.doc-line.prod-code
+-       and ub.doc-line.line-num = if ub.gds-dtl.line-num <> 0 then ub.gds-dtl.line-num else 0
++       and ub.doc-line.line-num = if ub.gds-dtl.line-num <> 0 then ub.gds-dtl.line-num else ub.doc-line.line-num
+   on error undo main-block, return error substitute( "&1&2&3", vss-workfile, {&new-line}, return-value )
+   :
+     delete ub.gds-dtl .
+diff --git a/trg/partrqst.i b/trg/partrqst.i
+--- a/trg/partrqst.i
++++ b/trg/partrqst.i
+@@ -145,7 +145,7 @@ procedure partrqst :
+         and buf_parts.artic     = p-artic
+         and buf_parts.prod-type = p-prod-type
+         and buf_parts.prod-code = p-prod-code
+-        and string(p-line-num) = entry(2, buf_parts.part-code, "/")
++        and string(p-line-num) = if num-entries(buf_parts.part-code,"/") > 1 then string(entry(2,buf_parts.part-code,"/")) else string(p-line-num)
+         on error undo, return error return-value
+         : 
+         assign
+diff --git a/trg/rsrgdsck.i b/trg/rsrgdsck.i
+--- a/trg/rsrgdsck.i
++++ b/trg/rsrgdsck.i
+@@ -109,7 +109,7 @@ procedure rsrgdsck :
+       and buf_parts.artic     = p-artic
+       and buf_parts.prod-type = p-prod-type
+       and buf_parts.prod-code = p-prod-code
+-      and string(p-line-num) = entry(2, buf_parts.part-code, "/")
++      and string(p-line-num) = if num-entries(buf_parts.part-code,"/") > 1 then entry(2, buf_parts.part-code, "/") else string(p-line-num)
+   on error undo, return error
+   :
+ 
+diff --git a/trg/trn-docw.p b/trg/trn-docw.p
+--- a/trg/trn-docw.p
++++ b/trg/trn-docw.p
+@@ -3149,7 +3149,7 @@ procedure validate-trn-doc :
+           and buf_gds-dtl.prod-code = buf_doc-line.prod-code
+       on error undo, return error return-value
+       :
+-        if old-doc.ext-doc-type = {&TDEDT_Pri_Perem} and buf_gds-dtl.line-num <> buf_doc-line.line-num then next .
++        if old-doc.ext-doc-type = {&TDEDT_Pri_Perem} and buf_gds-dtl.line-num <> 0 and buf_gds-dtl.line-num <> buf_doc-line.line-num then next .
+         /* проверим, что gds-dtl заведен на правильный признак */
+         { gbl/prtcheck.i
+           l-doc-prt
+diff --git a/utl/ora-i516-1c.p b/utl/ora-i516-1c.p
+--- a/utl/ora-i516-1c.p
++++ b/utl/ora-i516-1c.p
+@@ -856,7 +856,7 @@ assign
+           tt-gds-dtl.artic = temp_doc-line.artic and
+           tt-gds-dtl.prod-code = temp_doc-line.prod-code and
+           tt-gds-dtl.prod-type = temp_doc-line.prod-type and
+-          tt-gds-dtl.line-num = temp_doc-line.line-num no-error.
++          temp_doc-line.line-num = if tt-gds-dtl.line-num <> 0 then tt-gds-dtl.line-num else temp_doc-line.line-num no-error.
+         
+         if not available (tt-gds-dtl) then do:
+         create tt-gds-dtl.
+@@ -1168,7 +1168,7 @@ end.
+                 ub.gds-dtl.artic = buf_goods.artic and
+                 ub.gds-dtl.prod-type = buf_goods.prod-type  and
+                 ub.gds-dtl.prod-code = buf_goods.prod-code and
+-                ub.gds-dtl.line-num = ub.doc-line.line-num.
++                ub.doc-line.line-num = if ub.gds-dtl.line-num <> 0 then ub.gds-dtl.line-num else ub.doc-line.line-num .
+ 
+               find first temp_doc-line where temp_doc-line.gds-code = buf_goods.gds-code and temp_doc-line.line-num = ub.doc-line.line-num.
+                 
+@@ -1419,7 +1419,7 @@ end.
+           and ub.doc-line.artic = ub.gds-dtl.artic
+           and ub.doc-line.prod-type = ub.gds-dtl.prod-type
+           and ub.doc-line.prod-code = ub.gds-dtl.prod-code
+-          and ub.doc-line.line-num = ub.gds-dtl.line-num.
++          and ub.gds-dtl.line-num = if ub.doc-line.line-num <> 0 then ub.doc-line.line-num else ub.gds-dtl.line-num.
+         chg-qnty = 0 - ub.doc-line.fact-qnty.
+         run trg/rsrv-dtl.p
+           ( input        ParParentProc

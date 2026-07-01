@@ -1,0 +1,31 @@
+# HG changeset patch
+# User EShklyar
+# Parent  80e1f10752eaf0ec10d107eae40ef5c6fe9e43d8
+refs #DEVBO-2291 Промоакции, на товар исключение не применяется скидка по промоакции сумма в чеке
+
+http://exp-jira.expertek.local:8080/browse/DEVBO-2291
+
+diff --git a/str/xml-gds.i b/str/xml-gds.i
+--- a/str/xml-gds.i
++++ b/str/xml-gds.i
+@@ -238,8 +238,19 @@ end.
+     end.                                            
+     run bgelib-tag-put in this-procedure ( input 4, input "ISActivate" ,
+                                           input (if cash-gds.office-type = {&attr-office-type_card-act} then string(1) else string(0)), input 1 ).
++    if cash-gds.wgd > 0 then do:
+     run bgelib-tag-put in this-procedure ( input 4, input "ISNoDiscount" ,
+-                                            input string(if cash-gds.wgd > 0 then wgd-option else 0), input 1 ).
++                                            input string(wgd-option), input 1 ).      
++    end.
++    else do:
++      find first buf_goods-attr where buf_goods-attr.gds-code = cash-gds.gds-code and buf_goods-attr.attr-code = {&attr-except} no-lock no-error .
++      if available (buf_goods-attr) and logical(buf_goods-attr.attr-value) = true then
++               run bgelib-tag-put in this-procedure ( input 4, input "ISNoDiscount" ,
++                                            input string("1"), input 1 ). 
++      else     run bgelib-tag-put in this-procedure ( input 4, input "ISNoDiscount" ,
++                                            input string("0"), input 1 ). 
++    end.
++
+     run bgelib-tag-put in this-procedure ( input 4, input "ISGaz" ,
+                                             input string(if cash-gds.is-gas then 1 else 0), input 1 ).
+     run bgelib-tag-put in this-procedure ( input 4, input "ISFuelAsUnit" ,

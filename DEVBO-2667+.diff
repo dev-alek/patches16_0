@@ -1,0 +1,136 @@
+# HG changeset patch
+# User ARostovtsev
+# Parent  212225bcc4d09eeaedefcbdfc66ac9a3a735587b
+refs #DEVBO-2667 Остановка потока новостей в ГБД из-за ошибки "error transaction_block_command". ТН 16.0 РН-Москва #EXPSD-8175
+
+http://exp-jira.expertek.local:8080/browse/DEVBO-2667
+Доработка тиражного решения:
+1. Не отправлять на УБД execution, если commit на эту УБД не отправлялся
+2. При обработке ответов, если нет записи для какой-то УБД, то выводим сообщение и продолжаем обработку
+
+diff --git a/nws/dbreccmd.p b/nws/dbreccmd.p
+--- a/nws/dbreccmd.p
++++ b/nws/dbreccmd.p
+@@ -41,6 +41,7 @@ on error undo, return error
+   define variable v-answer-code       as integer   no-undo .
+   define variable v-answer-msg        as character no-undo .
+   define variable v-send-db-list      as character no-undo .
++  define variable v-send-db-list0     as character no-undo .
+   define variable v-all-db-list       as character no-undo .
+   define variable v-need-send-inquiry as logical   no-undo .
+   define variable v-send-news         as logical   no-undo .
+@@ -169,31 +170,27 @@ on error undo, return error
+             no-error
+           .
+           if not available buf-all_db-rec-attr then do:
+-/*            run write-to-log                                                                        */
+-/*              ( substitute( 'Отсутствует запись о проведении операции "&1" над записью &2 для БД &3'*/
+-/*                            ,v-action                                                               */
+-/*                            ,v-uniq-key-rec                                                         */
+-/*                            ,v-db-num                                                               */
+-/*                          )                                                                         */
+-/*              ).                                                                                    */
+-/*            return error .                                                                          */
+-            create buf-all_db-rec-attr.
+-            assign
+-              buf-all_db-rec-attr.db-num             = v-db-num
+-              buf-all_db-rec-attr.uniq-key-rec       = v-uniq-key-rec
+-              buf-all_db-rec-attr.attr-code          = v-action
+-              buf-all_db-rec-attr.attr-value-decimal = v-db-init
+-              buf-all_db-rec-attr.attr-type          = "commit"
+-            .
++            
++            run write-to-log
++              ( substitute( 'Отсутствует запись о проведении операции "&1" над записью &2 для БД &3'
++                            ,v-action
++                            ,v-uniq-key-rec
++                            ,v-db-num
++                          )
++              ).
++            /* если записи для какой-то БД нет, то просто выводим сообщение. Предполагаем, что это БД только что добавили */
++            /*return error .*/
+           end.
+-          if buf-all_db-rec-attr.attr-type <> v-operation
+-            or ( buf-all_db-rec-attr.attr-type = v-operation
+-                and buf-all_db-rec-attr.attr-value-logical = FALSE
+-              )
+-          then do:
+-            assign
+-              v-change-oper = FALSE
+-            .
++          else do:
++            if buf-all_db-rec-attr.attr-type <> v-operation
++              or ( buf-all_db-rec-attr.attr-type = v-operation
++                  and buf-all_db-rec-attr.attr-value-logical = FALSE
++                )
++            then do:
++              assign
++                v-change-oper = FALSE
++              .
++            end.
+           end.
+         end.
+         if v-change-oper = TRUE then do:
+@@ -414,11 +411,11 @@ on error undo, return error
+       end.
+       else do:
+ /*        EXPSD-8175 убрана проверка. если 1-го запроса commit не было. ну и ладно. выполняем без него */ 
+-/*        if not available buf_db-rec-attr                                                                                          */
+-/*          and v-operation = "execution":U                                                                                         */
+-/*        then do:                                                                                                                  */
+-/*          return error substitute( '&1. Нельзя выполнить шаг "&2" не выполнив шага "&3"', vss-workfile, v-operation, "commit":U ).*/
+-/*        end.                                                                                                                      */
++        if not available buf_db-rec-attr
++          and v-operation = "execution":U
++        then do:
++          return error substitute( '&1. Нельзя выполнить шаг "&2" не выполнив шага "&3"', vss-workfile, v-operation, "commit":U ).
++        end.
+ 
+         if available buf_db-rec-attr
+           and buf_db-rec-attr.attr-type = v-operation
+@@ -567,6 +564,7 @@ on error undo, return error
+             if v-db-num = 0
+ /*              or v-db-num = v-db-init*/ /*это необходимо если инициатором является УБД */
+             then do:
++              v-send-db-list0 = substitute("&1&2&3",v-send-db-list0,{&comma-char},string(v-db-num)).
+               next.
+             end.
+             find first buf_db-rec-attr
+@@ -574,7 +572,8 @@ on error undo, return error
+                 and buf_db-rec-attr.uniq-key-rec = v-uniq-key-rec
+                 and buf_db-rec-attr.attr-code    = v-action
+               no-error.
+-            if not available buf_db-rec-attr then do:
++            if not available buf_db-rec-attr and v-operation <> "execution" then 
++            do: /* новую запись добавляем только если не execution, для execution запись должна быть, если это не добавленная БД */
+               create buf_db-rec-attr.
+               assign
+                 buf_db-rec-attr.db-num             = v-db-num
+@@ -582,14 +581,20 @@ on error undo, return error
+                 buf_db-rec-attr.attr-code          = v-action
+               .
+             end.
+-            assign
+-              buf_db-rec-attr.attr-type          = v-operation
+-              buf_db-rec-attr.attr-value         = v-parameters
+-              buf_db-rec-attr.attr-value-decimal = v-db-init
+-              buf_db-rec-attr.attr-value-date    = TODAY
+-              buf_db-rec-attr.attr-value-logical = FALSE
+-            .
++            if available buf_db-rec-attr then 
++            do:
++                assign
++                  buf_db-rec-attr.attr-type          = v-operation
++                  buf_db-rec-attr.attr-value         = v-parameters
++                  buf_db-rec-attr.attr-value-decimal = v-db-init
++                  buf_db-rec-attr.attr-value-date    = TODAY
++                  buf_db-rec-attr.attr-value-logical = FALSE
++                  /* формируем новый список БД для отправки в новости без добавленных БД */
++                  v-send-db-list0 = substitute("&1&2&3",v-send-db-list0,{&comma-char},string(v-db-num))
++                .
++            end.
+           end.
++          v-send-db-list = trim(v-send-db-list0,{&comma-char}).
+         end.
+       end.
+       else do:

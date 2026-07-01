@@ -1,0 +1,299 @@
+# HG changeset patch
+# User DARuban
+# Parent  993f26a41ad03b4b155abc6fe52ce9c0cc729232
+refs #DEVBO-532 Авторизация th через домен
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-532
+
+diff --git a/adm/l-i.w b/adm/l-i.w
+--- a/adm/l-i.w
++++ b/adm/l-i.w
+@@ -424,7 +424,10 @@ on stop   undo, leave
+   if v-preconnection = FALSE 
+   then
+       run utl/chkstrgbl.p.
+-  
++  run utl/chgpswdall.p (name,password)no-error.
++  if error-status:error
++  then
++     quit.
+   v-cConnect = ibs.th.gbl.gbl-inipar:conPar.
+    
+   if v-cConnect = ?
+diff --git a/utl/chgpswdall.p b/utl/chgpswdall.p
+new file mode 100644
+--- /dev/null
++++ b/utl/chgpswdall.p
+@@ -0,0 +1,169 @@
++define input  parameter iUser as character no-undo.
++define input  parameter iPasNew as character no-undo.
++
++  define temp-table PasSysAdm
++    field fLogin as character  
++    field num as int64 init ?
++    field pasw as character
++    
++ index num flogin num pasw
++ .
++ 
++  
++  
++  
++{cmp/str-glbl.i}
++{utl/search.i}
++define variable mOk as logical no-undo.
++run auth(output mOk) no-error.
++if error-status:error
++then do:
++   return error.
++end.   
++
++define variable mconPar as character no-undo.
++mconPar = ibs.th.gbl.gbl-inipar:conPar.
++define variable mconect as logical no-undo.
++run gbl/dbconn.p
++    (input ibs.th.gbl.gbl-inipar:conPar
++    ,input ?
++    ,input iUser
++    ,input iPasNew
++    ,input-output mconect
++    ) no-error.
++  if userid('{&db-name_schema}':U) = '':U
++  then do:
++     disconnect ub no-error .
++     if mOk
++     then
++        run chgpwd.
++  end.
++  else do:
++     disconnect ub no-error .
++  end.   
++define stream sReadfile.
++define temp-table tt-result no-undo
++field fError as logical serialize-name  "error"
++field fmes as character serialize-name  "mes"
++field fmesjava as character serialize-name  "javaMes".
++
++procedure auth:
++   define output parameter oOk as logical no-undo.
++   define variable vResult as longchar no-undo.
++   run str/runproc.p(searchfile("jre/bin/java.exe"),
++   substitute ("-jar &1 &2", 
++   searchfile("C:\java\authTh\target\AuthTH-1.0-SNAPSHOT-jar-with-dependencies.jar"),
++   replace(substitute ('~{"method":"isUserInGroup","user":"&1","password":"&2"~}',iUser,iPasNew),'"','\"')
++   ),
++   output vResult).
++   if session:debug-alert
++   then
++      copy-lob vResult to file
++      "AutorizeRez.txt".
++      
++   define variable ttH as handle no-undo.
++   ttH = temp-table tt-result:handle.
++   ttH:read-json ("longchar",vResult,"empty")no-error.
++   if error-status:error
++   then do:
++      copy-lob vResult to file
++      "AutorizeRez.txt".
++      message "Не удалось авторизоваться в домене" skip
++      string(vResult) skip
++             "или читайте в файле"  searchfile("AutorizeRez.txt") 
++      view-as alert-box.
++      return.
++      
++   end.
++   find first tt-result no-error.
++   if not available tt-result
++   then do:
++      message "Не удалось авторизоваться в домене" skip
++     "Совсем какая-то анамалия"
++     view-as alert-box.
++     return.
++      
++   end.
++   if tt-result.ferror
++   then do:
++      message "Ошибка авторизации" skip
++     tt-result.fmes skip
++     tt-result.fmesjava
++     view-as alert-box.
++     return error.
++   end.
++   oOk = true.
++end.   
++procedure chgpwd:
++   
++   {utlcomp\crpwd.i}
++   define variable v-connect-option as character no-undo .
++  
++   block-login:
++   for each pasSysadm where pasSysadm.Flogin eq "sysadm"
++   no-lock:
++      v-connect-option = substitute('-U &1 -P &2':u
++                                 ,pasSysadm.Flogin
++                                 ,pasSysadm.pasw
++                                 ).
++      define variable ttt as character no-undo.
++      ttt = substitute(mconPar, v-connect-option, v-connect-option).
++      connect value( substitute(mconPar, v-connect-option, v-connect-option) ) no-error. 
++    
++      if not error-status :error
++      then do:
++         leave block-login.
++      end.
++   end.
++   define variable vAsyncHelper as class ibs.th.file.AsyncHelperth no-undo.
++   vAsyncHelper = new ibs.th.file.AsyncHelperth().
++    vAsyncHelper:myUser = pasSysadm.Flogin.
++    vAsyncHelper:myPass = substitute("nocrypt:&1":U
++                                
++                                ,pasSysadm.pasw 
++                                ).
++    vAsyncHelper:MyBachMode = no.
++    vAsyncHelper:WritelogInter = 5.
++    vAsyncHelper:mProcPublish = this-procedure.
++/*    vAsyncHelper:ChangProPath = changPath.*/
++/*    vAsyncHelper:paramSession = vParamStart.*/
++/*    vAsyncHelper:SetGblPar = false.*/
++/*    if UpdBlank                                                                               */
++/*    then do:                                                                                  */
++/*       vAsyncHelper:MyParamStart = " -ininame "  + GetStartupParam("-ininame") + " " + ConPar.*/
++/*       vAsyncHelper:DbConnect  = no.                                                          */
++/*    end.                                                                                      */
++    vAsyncHelper:AsyncProc("utl/proc-setpwd", substitute("&2&1&3":U 
++                                              ,{&delim-par}
++                                              ,iUser 
++                                              ,iPasNew 
++                                               ),1).
++    
++    run ibs\th\file\waithelper.p (vAsyncHelper,?, 1, substitute ("Меняем пароль TH.")).
++    define variable vLogFile as character no-undo.
++    define variable vSilent as logical no-undo.
++    vLogFile = searchfile(vAsyncHelper:getLog(?)).
++    if vLogFile ne ?
++    then do:
++       input STREAM sReadfile FROM  VALUE(vLogFile).
++       block-read:
++       repeat:
++          define variable vstr as character no-undo.
++          import stream sReadfile unformatted vStr.
++/*          putmes (vStr).                              */
++/*          define variable vtext1 as character no-undo.*/
++/*          define variable vtext3 as character no-undo.*/
++/*          assign                                      */
++/*             vtext1 = entry(1,vStr," ")               */
++/*             vtext3 = entry(3,vStr," ")               */
++/*          no-error.                                   */
++/*          if    vtext1 = "error"                      */
++/*             or vtext3 = "error"                      */
++/*          then do:                                    */
++/*             IsErr = yes.                             */
++/*             leave block-read.                        */
++/*          end.                                        */
++       end.
++       input stream sReadfile close.
++    end.
++end.
+\ No newline at end of file
+diff --git a/utl/proc-async.p b/utl/proc-async.p
+--- a/utl/proc-async.p
++++ b/utl/proc-async.p
+@@ -91,6 +91,27 @@ then do:
+ /*end.*/
+ else
+    run PutMesAsunc ("Error Не переданы параметры.") .
++
++define variable v-err-msg as character no-undo .  
++  catch exAppErrors as class Progress.Lang.AppError :
++    v-err-msg = exAppErrors:ReturnValue .
++    if v-err-msg > "" then . else do :
++      v-err-msg = exAppErrors:GetMessage(1) .
++      if v-err-msg > "" then . else v-err-msg = "AppError в модуле {&FILE-NAME}" .
++    
++    end .
++    run SetGblError(v-err-msg).
++  end catch .
++  catch exProErrors as class Progress.Lang.ProError :
++    v-err-msg = exProErrors:GetMessage(1) . 
++    if v-err-msg > "" then . else v-err-msg = "ProError в модуле {&FILE-NAME}" .
++    run SetGblError( substitute ("ProError &1", v-err-msg )). /*skip exProErrors:CallStack*/ 
++  end catch .
++  catch exAnyErrors as class Progress.Lang.Error:
++    v-err-msg = "Unexpected error в модуле {&FILE-NAME} " + exAnyErrors:GetMessage(1).
++    run SetGblError( substitute ("LangError &1", v-err-msg )). /*skip exProErrors:CallStack*/
++  end catch .
++
+ end.
+ { utl/proc-async.i end_proc}
+ 
+diff --git a/utl/proc-setpwd.p b/utl/proc-setpwd.p
+new file mode 100644
+--- /dev/null
++++ b/utl/proc-setpwd.p
+@@ -0,0 +1,66 @@
++block-level on error undo, throw.
++/*
++$Revision:$
++$Author:$
++$Date:$
++$Workfile:$
++$Archive:$
++
++Автор: Рубан Дмитрий Андреевич 
++Дата создания: 29 апр. 2019 г.
++Author:  Ruban Dmitriy Andreevich
++Creation date: 29 апр. 2019 г.
++
++*/
++
++{ utl/proc-async.i proc_def}
++define variable vss-revision    as character no-undo init "$Revision:$":U .
++define variable vss-author      as character no-undo init "$Author:$":U .
++define variable vss-date        as character no-undo init "$Date:$":U .
++define variable vss-workfile    as character no-undo init "$Workfile:$":U .
++define variable vss-archive     as character no-undo init "$Archive:$":U .
++define variable vss-description as character no-undo init "смена своего пароля".
++
++define variable iUser as character no-undo.
++define variable iPasw as character no-undo.
++iUser = GetPARAMAsunc( 1).
++if iUser eq ? then do:
++   run PutstatAsunc( "error   Получение данных было преврвано пользователем." ).
++   return.
++end.
++if iUser eq "" then do:
++   run PutstatAsunc( "error   Не указан пользователь." ).
++   return.
++end.
++iPasw = GetPARAMAsunc( 2).
++if iPasw eq ? then do:
++   run PutstatAsunc( "error   Получение данных было преврвано пользователем." ).
++   return.
++end.
++if iPasw eq "" then do:
++   run PutstatAsunc( "error   Не указан пароль." ).
++   return.
++end.
++
++run adm/pswd-enc.p
++    (input  encode(iPasw)
++    ,output iPasw
++    ).
++find first sys-ctrl no-error.
++find first user-login exclusive-lock
++           where user-login.db-num     = sys-ctrl.db-num
++             and user-login.user-login = iUser
++           no-error
++           .
++if available user-login
++then do:
++   user-login.user-password-encoded = encode(iPasw).
++   {trg/user.i ub}
++   release user-login no-error.
++   if error-status:error
++   then
++      run PutstatAsunc( substitute ("error   Не удалось сменить пароль. &1"), get-message(1), return-value ).
++end.
++else do:
++   run PutstatAsunc( "error   Нет пользователя с логином." ).
++end.   

@@ -1,0 +1,27 @@
+# HG changeset patch
+# User DRuban
+# Parent  fab014be7d118b1add1eae6f7424a3a3754f3464
+refs #DISP-718 Создание скрипта для автоматического закрытия смен ТН на несколькихААЗС
+открытие смены TH
+http://exp-jira.expertek.local:8080/browse/DISP-718
+
+diff --git a/str/proc-startNewShiftTso.p b/str/proc-startNewShiftTso.p
+--- a/str/proc-startNewShiftTso.p
++++ b/str/proc-startNewShiftTso.p
+@@ -65,8 +65,15 @@ do  on error  undo, return error:
+    if not mWorkShift:crRvsShift(mcicle)
+    then
+       run PutMesAsunc("Не удалось создать сменную сверку").
++   run PutStatAsunc("Открывем новую смену").
++   
++   if not mWorkShift:OpenShiftTh(3)
++   then
++      run PutMesAsunc("Не удалось открыть смену TH").
++   
++   run PutStatAsunc("Выгружаем данные в 1С").
++   
+    /*    выгрузка в 1С-Erp*/
+-
+    run bge/oxml-ini.p no-error.
+    if error-status :error
+    then do:

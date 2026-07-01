@@ -1,0 +1,105 @@
+# HG changeset patch
+# User VSpiridonov
+# Parent  6a9249394c0bce615696124b2afec5d3a7e0dd59
+refs #DEVBO-755 Доработка ЭФ Окно входа в систему
+
+diff --git a/adm/l-i.w b/adm/l-i.w
+--- a/adm/l-i.w
++++ b/adm/l-i.w
+@@ -51,6 +51,7 @@ define variable v-is-copy           as l
+ define variable v-load-cfg          as logical      no-undo.
+ 
+ define variable v-vid-ok            as logical  no-undo .
++DEFINE VARIABLE v-updating          as logical   no-undo init false .
+ define variable v-vid-mes           as character no-undo .
+ define variable v-vid-param         as longchar no-undo .
+ define variable v-vid-descr         as character no-undo .
+@@ -105,6 +106,12 @@ DEFINE VARIABLE password AS CHARACTER FO
+      VIEW-AS FILL-IN 
+      SIZE 20 BY 1 NO-UNDO.
+ 
++DEFINE VARIABLE password_display AS CHARACTER FORMAT "X(16)":U 
++     LABEL "Пароль" 
++     VIEW-AS FILL-IN 
++     SIZE 20 BY 1 NO-UNDO.
++
++
+ DEFINE IMAGE IMAGE-1
+      FILENAME "cmp/ith.bmp":U
+      SIZE 40 BY 8.88.
+@@ -116,6 +123,7 @@ DEFINE FRAME FRAME-A
+      b-OK AT ROW 8.04 COL 11.75
+      name AT ROW 4.96 COL 10 COLON-ALIGNED
+      password AT ROW 6.17 COL 10 COLON-ALIGNED PASSWORD-FIELD 
++     password_display AT ROW 6.17 COL 10 COLON-ALIGNED  PASSWORD-FIELD 
+      b-quit AT ROW 8.04 COL 21.88
+      IMAGE-1 AT ROW 1.08 COL 1.13
+     WITH 1 DOWN NO-BOX OVERLAY 
+@@ -180,10 +188,39 @@ THEN w-login:HIDDEN = no.
+ /* _RUN-TIME-ATTRIBUTES-END */
+ &ANALYZE-RESUME
+ 
++
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL password_display w-login
++ON VALUE-CHANGED OF password_display IN FRAME FRAME-A DO:
++    IF NOT v-updating THEN DO:
++        ASSIGN password:SCREEN-VALUE = password_display:SCREEN-VALUE.
++    END.
++END.
++&ANALYZE-RESUME
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL password_display w-login
++ON ANY-KEY OF password_display IN FRAME FRAME-A DO:
++    IF LASTKEY = KEY-CODE("CTRL-V") THEN DO:
++           ASSIGN 
++           v-updating = TRUE
++           password:SCREEN-VALUE = System.Windows.Forms.Clipboard:GetText()
++           password_display:SCREEN-VALUE = System.Windows.Forms.Clipboard:GetText()
++/*           password_display:SCREEN-VALUE = FILL("*", LENGTH(System.Windows.Forms.Clipboard:GetText()))*/
++           v-updating = FALSE.
++           System.Windows.Forms.Clipboard:Clear().
++           RETURN NO-APPLY.
++    END.
++/*    IF LASTKEY = KEY-CODE("CTRL-C") THEN DO:
++        RETURN NO-APPLY.
++    END.*/
++END.
++&ANALYZE-RESUME
++
+  
+ 
+ 
+ 
++
+ /* ************************  Control Triggers  ************************ */
+ 
+ &Scoped-define SELF-NAME b-OK
+@@ -198,6 +235,7 @@ DO:
+     apply "entry" to name .
+     return no-apply .
+   end.
++ 
+ END.
+ 
+ /* _UIB-CODE-BLOCK-END */
+@@ -248,8 +286,9 @@ end.
+ IMAGE-1 :load-image("cmp/ith.bmp") .
+ 
+ enable
+-  name password b-ok b-quit
++  name password password_display b-ok b-quit
+   with frame {&frame-name} in window {&window-name} .
++  password:VISIBLE = FALSE.
+ assign
+   session :data-entry-return = yes
+ .
+@@ -732,7 +771,7 @@ PROCEDURE enable_UI :
+                These statements here are based on the "Other 
+                Settings" section of the widget Property Sheets.
+ ------------------------------------------------------------------------------*/
+-  ENABLE b-OK IMAGE-1 name password b-quit 
++  ENABLE b-OK IMAGE-1 name password_display b-quit 
+       WITH FRAME FRAME-A IN WINDOW w-login.
+   {&OPEN-BROWSERS-IN-QUERY-FRAME-A}
+   VIEW w-login.

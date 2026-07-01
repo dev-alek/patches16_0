@@ -1,0 +1,64 @@
+# HG changeset patch
+# User SSlivenko
+# Parent  9569039b10023f6799d1cb659c9df03fe6e8a042
+refs #DEVBO-736 Невозможно зайти в ТН из-за ошибки установки даты на объекте. #BTS-2525
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-736
+https://msk-exp-jira.expertek.local/browse/BTS-2525
+
+diff --git a/FixProc/fix-open-date.p b/FixProc/fix-open-date.p
+new file mode 100644
+--- /dev/null
++++ b/FixProc/fix-open-date.p
+@@ -0,0 +1,51 @@
++/*
++Утилита проставит у дате на объекте статус = закрыт.
++1 параметр - номер магазина
++2 параметр - дата, статус которой надо поменять на "зкр"
++*/
++disable triggers for load of ub.obj-date .
++
++{ utl/runpro.i }
++
++define input parameter p-obj-code as character no-undo .
++define input parameter p-date as character no-undo .
++
++define variable v-date as date no-undo init ? .
++define variable v-obj-code as integer no-undo init ? .
++
++v-date = date(p-date) no-error .
++if error-status:error
++or v-date = ?
++then do :
++  message "Введена неверная дата!" view-as alert-box error .
++  return .
++end .
++
++v-obj-code = integer(p-obj-code) no-error .
++if error-status:error
++or v-obj-code = ?
++then do :
++  message "Введен неверный код магазина!" view-as alert-box error .
++  return .
++end .
++
++find first obj-date exclusive-lock where obj-date.obj-type = "маг"
++                                     and obj-date.obj-code = v-obj-code
++                                     and obj-date.sys-date = v-date
++                                     no-error .
++if not available obj-date
++then do :
++  message ("На объекте маг " + p-obj-code + " не найдена дата " + p-date) view-as alert-box .
++  return .
++end .
++
++if obj-date.status_ = "зкр"
++then do :
++  message "Дата и так в статусе 'зкр'" view-as alert-box .
++  return .
++end .
++
++assign obj-date.status_ = "зкр" .
++validate obj-date .
++
++message "Готово!" view-as alert-box .

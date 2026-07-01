@@ -1,0 +1,35 @@
+# HG changeset patch
+# User SSlivenko
+# Parent  5b0cbe5c16a12c92d64df263ad72cfe5c0f07356
+refs #DEVBO-519 ТС ПИоТ ГИС МТ. Изменения в 303 ППРФ.
+Утилита «Загрузка перечня IP TH» вынесена в функции администратора.
+https://msk-exp-jira.expertek.local/browse/DEVBO-519
+
+diff --git a/gbl/menuload.p b/gbl/menuload.p
+--- a/gbl/menuload.p
++++ b/gbl/menuload.p
+@@ -730,6 +730,12 @@ define variable vss-description as character no-undo init "Информация об объекте интерфейса".
+   "yes"
+ }
+ 
++{ gbl/menuload.i
++  {&bef-menuload_adm_function}
++  "'Загрузка перечня IP TH'"
++  "'utl/thipimp.p'"
++}
++
+ /* -------------------------------------------------------------------------- */
+ /* {&bef-menuload_adm_check}                                                      */
+ /* АРМ Администратор   Утилиты/Проверки                                       */
+diff --git a/utl/thipimp.p b/utl/thipimp.p
+--- a/utl/thipimp.p
++++ b/utl/thipimp.p
+@@ -21,7 +21,7 @@ define variable vss-workfile    as chara
+ define variable vss-archive     as character no-undo init "$Archive:$":U .
+ define variable vss-description as character no-undo init "".
+ { cmp/vssrevis.i }
+-{ utl/runpro.i}
++/*{ utl/runpro.i}*/
+ 
+ define variable vfileLog as character no-undo init "Log_THIPImp.log".
+ define variable mFileName as character no-undo init "THIPImp.xslx".

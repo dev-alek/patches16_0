@@ -1,0 +1,26 @@
+# HG changeset patch
+# User DRuban
+# Parent  2302f62ddfb6a0f8dcb1416ffb09409260555c1a
+revs #DEVBO-394 Формирование истории по УПД и интерфейс проссмотра
+
+http://exp-jira.expertek.local:8080/browse/DEVBO-394
+
+diff --git a/nws/call-nws.i b/nws/call-nws.i
+--- a/nws/call-nws.i
++++ b/nws/call-nws.i
+@@ -300,6 +300,15 @@ define variable v-rdb-0-not-news as char
+ ,c-user-log~
+ ,marking-lines~
+ ,marking~
++,c-utd-head~
++,c-utd~
++,c-utd-lines~
++,c-utd-marking-lines~
++,c-utd-err~
++,c-utd-attr~
++,c-utd-lines-attr~
++,c-utd-marking-lines-attr~
++,c-utd-err-attr~
+ ,tran-fuel~
+ ,chk-slip-head~
+ ,chk-slip-string~

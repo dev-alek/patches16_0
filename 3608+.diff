@@ -1,0 +1,66 @@
+# HG changeset patch
+# User ASMorozov
+# Parent  19e4cde4d6a8f850f197fa25773cb306363600a6
+refs #3608 Автозаказы. Доработки в автозаказах.
+
+http://exp-rm/redmine/issues/3608
+
+diff -r 19e4cde4d6a8 cmp/menu.txt
+--- a/cmp/menu.txt	Mon Nov 20 18:01:07 2017 +0300
++++ b/cmp/menu.txt	Mon Nov 20 18:01:20 2017 +0300
+@@ -1318,9 +1318,9 @@
+ m-i "Обслуживание Мобильных блоков EasyFuel"                 "par,utl/ef-serv.p"                                            "m_ef-serv"                "m_shop"                   "chk-obj-active"                                                  "object"  "chk-is-shp,chk-is-ef"                                                           "all,shp"                                  ""  ""
+ s-m "Автозадания и новости"                                  "?"                                                            "m_news"                   "m_serv"                   ""                                                                "object"  "chk-is-off,chk-is-str,chk-is-shp,chk-is-res,chk-is-fin"                         "all,off,str,shp,res,fin,adm"              ""  ""
+ m-i "Настройка СПН"                                          "ext,nws/nws-prp.w"                                            "m_nws-prop"               "m_news"                   "chk-user-adm"                                                    "object"  ""                                                                               "all,adm"                                  ""  ""
+-m-i "Мониторинг СПН"                                         "ext,rep/nwsmon-main.w"                                        "m_nws-monitor"               "m_news"                   "chk-user-adm"                                                    "object"  ""                                                                               "all,adm"                                  ""  ""
++m-i "Мониторинг СПН"                                         "ext,rep/nwsmon-main.w"                                        "m_nws-monitor"            "m_news"                   "chk-user-adm"                                                    "object"  ""                                                                               "all,adm"                                  ""  ""
+ m-i "Настройка online backup"                                "ext,adm/bkp-prp.w"                                            "m_bkp-prop"               "m_news"                   "chk-user-adm"                                                    "object"  ""                                                                               "all,adm"                                  ""  ""
+ m-i "Автоматические задания"                                 "int,m_autopush-exe"                                           "m_autopush"               "m_news"                   ""                                                                "object"  "chk-is-off,chk-is-str,chk-is-shp,chk-is-res,chk-is-fin"                         "all,off,str,shp,res,fin,adm"              ""  ""
+ m-i "Расписание"                                             "par,adm/schedule.w"                                           "m_schedule"               "m_news"                   "chk-user-adm"                                                    "object"  ""                                                                               "all,adm"                                  ""  ""
+ m-i "Документы, пришедшие по новостям"                       "par,str/nwsdchis.w"                                           "m_nwsdchis"               "m_news"                   ""                                                                "object"  "chk-is-off,chk-is-str,chk-is-shp,chk-is-res,chk-is-fin"                         "all,off,str,shp,res,fin,adm"              ""  ""
+ m-i "Выполняющиеся распределенные команды СПН"               "int,m_nwsdistrcmd-exe"                                        "m_nwsdistrcmd"            "m_news"                   ""                                                                "object"  "chk-is-off,chk-is-str,chk-is-shp,chk-is-res,chk-is-fin"                         "all,off,str,shp,res,fin,adm"              ""  ""
+@@ -1322,8 +1322,9 @@
+ m-i "Настройка online backup"                                "ext,adm/bkp-prp.w"                                            "m_bkp-prop"               "m_news"                   "chk-user-adm"                                                    "object"  ""                                                                               "all,adm"                                  ""  ""
+ m-i "Автоматические задания"                                 "int,m_autopush-exe"                                           "m_autopush"               "m_news"                   ""                                                                "object"  "chk-is-off,chk-is-str,chk-is-shp,chk-is-res,chk-is-fin"                         "all,off,str,shp,res,fin,adm"              ""  ""
+ m-i "Расписание"                                             "par,adm/schedule.w"                                           "m_schedule"               "m_news"                   "chk-user-adm"                                                    "object"  ""                                                                               "all,adm"                                  ""  ""
+ m-i "Документы, пришедшие по новостям"                       "par,str/nwsdchis.w"                                           "m_nwsdchis"               "m_news"                   ""                                                                "object"  "chk-is-off,chk-is-str,chk-is-shp,chk-is-res,chk-is-fin"                         "all,off,str,shp,res,fin,adm"              ""  ""
+ m-i "Выполняющиеся распределенные команды СПН"               "int,m_nwsdistrcmd-exe"                                        "m_nwsdistrcmd"            "m_news"                   ""                                                                "object"  "chk-is-off,chk-is-str,chk-is-shp,chk-is-res,chk-is-fin"                         "all,off,str,shp,res,fin,adm"              ""  ""
++m-i "Правила для автозаказов"                                "par,cus/ord-auto.w"                                           "m_ord-auto"               "m_news"                   ""                                                                "object"  "chk-is-off,chk-is-str"                                                          "all,off,str,adm"                          ""  ""
+ s-m "Ассортиментная политика"                                "?"                                                            "m_assort-polit"           "m_serv"                   ""                                                                "object"  "chk-is-off,chk-is-str,chk-is-shp,chk-is-res"                                    "all,off,str,shp,res"                      ""  ""
+ s-m "Ра&зное"                                                "?"                                                            "m_other"                  "m_serv"                   ""                                                                "object"  ""                                                                               "all,off,str,shp,res,fin,bge,adm"          ""  ""
+ m-i "Калькулятор"                                            "ext,gbl/run-calc.p"                                           "m_ms-calc"                "m_other"                  ""                                                                "object"  ""                                                                               "all,off,str,shp,res,fin,bge,adm"          ""  ""
+diff -r 19e4cde4d6a8 cus/cr-zakaz.p
+--- a/cus/cr-zakaz.p	Mon Nov 20 18:01:07 2017 +0300
++++ b/cus/cr-zakaz.p	Mon Nov 20 18:01:20 2017 +0300
+@@ -124,6 +124,7 @@
+ define variable  t-gar       as logical no-undo .
+ define variable  t-min-zapas as logical no-undo .
+ define variable  t-min-ost   as logical no-undo .
++define variable  t-deadline  as logical no-undo .
+ define variable SelectObject as character no-undo .
+ define variable v-nn as integer   no-undo .
+ define variable par-type as character no-undo .
+@@ -196,6 +197,7 @@
+         when string( "p-neg-sale")    then  p-neg-sale = if (entry(2,(entry(i,p-calc-metod)), "=" )) = "yes" then true else false .
+         when string( "t-gar")         then  t-gar      = if (entry(2,(entry(i,p-calc-metod)), "=" )) = "yes" then true else false .
+         when string( "t-min-ost")     then  t-min-ost  = if (entry(2,(entry(i,p-calc-metod)), "=" )) = "yes" then true else false .
++        when string( "t-deadline")    then  t-deadline  = if (entry(2,(entry(i,p-val)), "=" )) = "yes" then true else false .
+         when string( "t-min-zapas")   then  t-min-zapas = if (entry(2,(entry(i,p-calc-metod)), "=" )) = "yes" then true else false .
+         when string( "R-min-rest3")   then  R-min-rest3 = if (entry(2,(entry(i,p-calc-metod)), "=" )) = "yes" then true else false .
+ 
+@@ -244,6 +246,7 @@
+           , input t-gar
+           , input t-min-zapas
+           , input t-min-ost
++          , input t-deadline
+           , input v-cntxt-obj-type
+           , input v-cntxt-obj-code
+           , input p-ord-type
+@@ -288,6 +291,7 @@
+           , input t-gar
+           , input t-min-zapas
+           , input t-min-ost
++          , input t-deadline
+           , input v-cntxt-obj-type
+           , input v-cntxt-obj-code
+           , input p-ord-type

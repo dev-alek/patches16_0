@@ -1,0 +1,1897 @@
+# HG changeset patch
+# User EShklyar
+# Parent  adcef946dcc8018c06d503b89e93a67acceaa28a
+refs #DEVBO-1839 Ошибка при создании партий во внутреннем расходе
+
+http://exp-jira.expertek.local:8080/browse/DEVBO-1839
+
+diff --git a/rep/load-doc.i b/rep/load-doc.i
+--- a/rep/load-doc.i
++++ b/rep/load-doc.i
+@@ -188,10 +188,10 @@ end.
+ { rep/menu-doc.i {&income} {&fact} "'yes'" "'*'"   "'Накладная прихода (Аптека)'"                                    "'cost,sale,rubl,base'" "'rep/r-outrta.p'"   "'no'"                         "'-++++++-'"  "'ODIS'"    "'A4port'"    "''"              ? }
+ { rep/menu-doc.i {&income} "'*'" "'no'" "'*'"      "'Документ ТОРГ12'"                                               "'cost,sale,rubl,base'" "'rep/torg-12.p'"   "'no,all,no-round,no,no'"       "'-++++++-'"  "''"        "''"          "''"              ? }
+ { rep/menu-doc.i {&income} "'*'" "'no'" "'*'"      "'Накладная с артикулом поставщика'"                              "'cost,sale,rubl,base'" "'rep/t12-art.p'"   "''"                            "'-+++++--'"  "''"        "''"          "''"              ? }
+-{ rep/menu-doc.i {&income} "'*'" "'yes'" "'*'"     "'Документ ТОРГ13'"                                               "'cost,sale,rubl,base'" "'rep/torg-13.p'"   "'no,no,no'"                    "'-+++++-+'"  "''"        "''"          "'zum'"           ? }
++{ rep/menu-doc.i {&income} "'*'" "'yes'" "'*'"     "'Документ ТОРГ13'"                                               "'cost,sale,rubl,base'" "'rep/torg-13.p'"   "'no,no,no'"                    "'++++++-+'"  "''"        "''"          "'zum'"           ? }
+ { rep/menu-doc.i {&income} "'*'" "'yes'" "'*'"     "'Документ внутреннего перемещения'"                              "'cost,sale,rubl,base'" "'rep/torg-13x.p'"  "'no,no,no'"                    "'-+++++--'"  "'iab,NG'"  "'HTML'"    "''"              ? }
+ { rep/menu-doc.i {&income}  "'*'" "'yes'" "'*'"    "'Документ внутреннего перемещения с фото товара'"                "'cost,sale,rubl,base'"   "'rep/torg-13x-foto.p'"   "'no,no,no'"                    "'-+++++--'"  "''"                 "'HTML'"  "''"                                  ? }
+-{ rep/menu-doc.i {&income} "'*'" "'yes'" "'*'"     "'Документ  ТОРГ13'"                                              "'cost,sale,rubl,base'" "'rep/torg-13.p'"   "'no,yes,no'"                   "'-+++++--'"  "'zum'"     "''"          "''"              ? }
++{ rep/menu-doc.i {&income} "'*'" "'yes'" "'*'"     "'Документ  ТОРГ13'"                                              "'cost,sale,rubl,base'" "'rep/torg-13.p'"   "'no,yes,no'"                   "'++++++--'"  "'zum'"     "''"          "''"              ? }
+ { rep/menu-doc.i {&income} "'*'" "'yes'" "'*'"     "'Документ ТОРГ13 для ювелирных изделий'"                         "'cost,sale,rubl,base'" "'rep/torg-13.p'"   "'yes,yes,yes'"                 "'-+++++--'"  "'zum'"     "''"          "''"              ? }
+ { rep/menu-doc.i {&income} {&inquiry} "'*'" "'*'"  "'Заказ ТОРГ26'"                                                  "'cost,sale,rubl,base'" "'rep/order2.p'"    "''"                            "'-+++-+--'"  "''"        "''"          "''"              ? }
+ { rep/menu-doc.i {&income} "'*'" "'*'" "'*'"       "'Спецификация к документу'"                                      "'cost,sale,rubl,base'" "'rep/r-specsr.p'"  "{&income}"                     "'--------'"  "''"        "''"          "''"              ? }
+diff --git a/rep/menu-doc.i b/rep/menu-doc.i
+--- a/rep/menu-doc.i
++++ b/rep/menu-doc.i
+@@ -193,6 +193,7 @@ initial "@(#)$Workfile$ $Revision$".
+                             end.
+                             run menu-doc-set-visible-options in this-procedure (
+                                   input tmp#list.print-options
++                                , output tmp#list.type-parts-enabled   
+                                 , output tmp#list.type-price-enabled
+                                 , output tmp#list.type-scale-enabled
+                                 , output tmp#list.type-val-enabled
+@@ -200,7 +201,7 @@ initial "@(#)$Workfile$ $Revision$".
+                                 , output tmp#list.sort-gr-enabled
+                                 , output tmp#list.print-graft-enabled
+                                 , output tmp#list.no-vat-enabled
+-                                , output tmp#list.type-parts-enabled                                
++                                                             
+                             ).
+                         end.
+                     end.
+@@ -333,6 +334,7 @@ initial "@(#)$Workfile$ $Revision$".
+     /*==========================================================================*/
+     procedure menu-doc-set-visible-options :
+     define input parameter p-print-options          as character        no-undo.
++    define output parameter p-type-parts-enabled    as logical          no-undo.
+     define output parameter p-type-price-enabled    as logical          no-undo.
+     define output parameter p-type-scale-enabled    as logical          no-undo.
+     define output parameter p-type-val-enabled      as logical          no-undo.
+@@ -340,7 +342,7 @@ initial "@(#)$Workfile$ $Revision$".
+     define output parameter p-sort-gr-enabled       as logical          no-undo.
+     define output parameter p-print-graft-enabled   as logical          no-undo.
+     define output parameter p-no-vat-enabled        as logical          no-undo.
+-    define output parameter p-type-parts-enabled    as logical          no-undo.  
++      
+     do
+     on error undo, return error
+     :
+@@ -432,7 +434,6 @@ initial "@(#)$Workfile$ $Revision$".
+                                       + ( if buf_tmp#list.sort-gr-enabled     = yes then "+":U else "-":U )
+                                       + ( if buf_tmp#list.print-graft-enabled = yes then "+":U else "-":U )
+                                       + ( if buf_tmp#list.no-vat-enabled      = yes then "+":U else "-":U )
+-                                      + ( if buf_tmp#list.type-parts-enabled  = yes then "+":U else "-":U )
+         .
+     end.
+     end procedure. /* menu-doc-create-options-string */
+diff --git a/rep/torg-13.p b/rep/torg-13.p
+--- a/rep/torg-13.p
++++ b/rep/torg-13.p
+@@ -1127,7 +1127,7 @@ tqnty = 0
+     .
+     if costprice
+     then do:
+-      if t-doc.ext-doc-type = {&TDEDT_Pri_Perem} then do:
++      if t-doc.ext-doc-type = {&TDEDT_Pri_Perem} or t-doc.ext-doc-type = {&TDEDT_Ras_Perem} then do: 
+       { str/in-vatp-line.i calc doc-line. t-doc. g }
+       end.
+       else do:
+diff --git a/str/chk-prt.p b/str/chk-prt.p
+--- a/str/chk-prt.p
++++ b/str/chk-prt.p
+@@ -43,7 +43,7 @@ find ub.doc-line exclusive-lock
+   .
+ 
+ /* проверяем по признакам */
+-if t-doc.ext-doc-type = {&TDEDT_Pri_Perem} or t-doc.ext-doc-type = {&TDEDT_Pri_Vnesh} then do:
++if t-doc.ext-doc-type = {&TDEDT_Pri_Perem} or t-doc.ext-doc-type = {&TDEDT_Ras_Perem} or t-doc.ext-doc-type = {&TDEDT_Pri_Vnesh} then do:
+ for each ub.gds-dtl
+   where ub.gds-dtl.doc-code  = ub.doc-line.doc-code
+     and ub.gds-dtl.artic     = ub.doc-line.artic
+diff --git a/str/in-vatp-line.i b/str/in-vatp-line.i
+--- a/str/in-vatp-line.i
++++ b/str/in-vatp-line.i
+@@ -234,7 +234,7 @@ assign
+                                       in-vatp-parts{5}.artic     = {2}artic     and
+                                       in-vatp-parts{5}.prod-type = {2}prod-type and
+                                       in-vatp-parts{5}.prod-code = {2}prod-code and
+-                                      in-vatp-parts{5}.part-code = string({2}line-num)
++                                      string({2}line-num) = entry(2,in-vatp-parts{5}.part-code,"/")
+                                       
+                          use-index out-code no-lock:
+           accumulate  in-vatp-parts{5}.road-tax-base  * in-vatp-parts{5}.fact-qnty (total)
+@@ -258,6 +258,7 @@ assign
+                       {&accum-vat-parts}  (total)
+                       .
+       end.
++
+       ASSIGN
+         road-tax-base-loc{5}   = if {2}fact-qnty <> 0 then (accum total in-vatp-parts{5}.road-tax-base  * in-vatp-parts{5}.fact-qnty) / {2}fact-qnty  else 0
+         road-tax-rubl-loc{5}   = if {2}fact-qnty <> 0 then (accum total in-vatp-parts{5}.road-tax-rubl  * in-vatp-parts{5}.fact-qnty) / {2}fact-qnty  else 0
+diff --git a/str/lib-trn.p b/str/lib-trn.p
+--- a/str/lib-trn.p
++++ b/str/lib-trn.p
+@@ -3266,6 +3266,7 @@ else do:
+                   input        -1,
+                   input        if v-gds-mark then ("copy-ret" + {&delim-par} + ca_lib-trn_ret-doc.doc-code) else ""
+                 ) no-error.
++              
+               if chg-qnty <> fix-qnty then do:
+                 undo, return error substitute( "Не удалось скопировать полностью товар: &1 &2 &3 во внешнюю приходную накладную."
+                                                ,ca_gds-dtl.artic
+@@ -3499,7 +3500,8 @@ else do:
+                             undo, return error return-value.
+                         end.
+                       end.
+-                      if chg-qnty <> fix-qnty then do:
++                      
++                      if chg-qnty <> fix-qnty and ca_trn-doc.ext-doc-type <> {&TDEDT_Pri_Vnesh} then do:
+                           undo, return error substitute ("Не удалось скопировать полностью товар: &1 &2 &3 во внешнюю приходную накладную.",
+                                                         ca_gds-dtl.artic,
+                                                         ca_gds-dtl.prod-type,
+diff --git a/str/out-doc.w b/str/out-doc.w
+--- a/str/out-doc.w
++++ b/str/out-doc.w
+@@ -6642,7 +6642,8 @@ do on stop undo, return error:
+     find ub.doc-line where ub.doc-line.doc-code = ub.gds-dtl.doc-code
+                           and ub.doc-line.prod-code = ub.gds-dtl.prod-code
+                           and ub.doc-line.prod-type = ub.gds-dtl.prod-type
+-                          and ub.doc-line.artic     = ub.gds-dtl.artic exclusive.
++                          and ub.doc-line.artic     = ub.gds-dtl.artic 
++                          and ub.gds-dtl.line-num = if ub.gds-dtl.line-num <> 0 then ub.doc-line.line-num else 0 exclusive .
+ 
+     define variable l-inv-on as logical no-undo .
+ 
+diff --git a/str/out-vatp-line.i b/str/out-vatp-line.i
+--- a/str/out-vatp-line.i
++++ b/str/out-vatp-line.i
+@@ -301,7 +301,7 @@ else do:
+                                and out-vatp_parts{5}.artic      = {2}artic
+                                and out-vatp_parts{5}.prod-type  = {2}prod-type
+                                and out-vatp_parts{5}.prod-code  = {2}prod-code
+-                               and out-vatp_parts{5}.part-code  = string({2}line-num) no-lock :
++                               and string({2}line-num) = entry(2,out-vatp_parts{5}.part-code,"/") no-lock :
+     if out-vatp_parts{5}.purch-code = {&bef-consignation-code} then do:
+       { str/in-vatp.i calc-parts out-vatp_parts{5}. {3} " " o{5} }
+       assign
+diff --git a/str/parts-l.w b/str/parts-l.w
+--- a/str/parts-l.w
++++ b/str/parts-l.w
+@@ -102,6 +102,7 @@ define variable v-marking-type as charac
+ 
+ define new shared buffer  parts for ub.parts  .
+ define buffer  buf_trn for ub.trn-doc  .
++define buffer  buf_gds-prt for ub.gds-prt .
+ 
+ FUNCTION get-in-code-date RETURNS CHARACTER
+   ( input p-recid as recid ) :
+@@ -288,43 +289,45 @@ define variable v-is-petrol     as logic
+ define variable v-is-pieces     as logical no-undo init false .
+ define variable v-data-changed  as logical no-undo init false .
+ 
+-define variable v-reserv-pl-code            as logical   no-undo init ? .
+-define variable v-pl-code                   as integer   no-undo init 0 .
+-define variable v-goods-twounit             as logical   no-undo .
+-define variable v-goods-alcohol-prod        as logical   no-undo .
+-define variable v-free-parts-qnty           as decimal   no-undo .
+-define variable v-free-parts-fact-qnty      as decimal   no-undo .
+-define variable v-free-parts-cli-qnty       as decimal   no-undo .
+-define variable v-free-parts-price-base     as decimal   no-undo .
+-define variable v-free-parts-price-rubl     as decimal   no-undo .
+-define variable v-out-parts-qnty            as decimal   no-undo .
+-define variable v-out-parts-fact-qnty       as decimal   no-undo .
+-define variable v-out-parts-cli-qnty        as decimal   no-undo .
+-define variable v-out-parts-price-base      as decimal   no-undo .
+-define variable v-out-parts-price-rubl      as decimal   no-undo .
+-define variable v-new-free-parts-qnty       as decimal   no-undo .
+-define variable v-new-free-parts-fact-qnty  as decimal   no-undo .
+-define variable v-new-free-parts-cli-qnty   as decimal   no-undo .
+-define variable v-new-free-parts-price-base as decimal   no-undo .
+-define variable v-new-free-parts-price-rubl as decimal   no-undo .
+-define variable v-new-out-parts-qnty        as decimal   no-undo .
+-define variable v-new-out-parts-fact-qnty   as decimal   no-undo .
+-define variable v-new-out-parts-cli-qnty    as decimal   no-undo .
+-define variable v-new-out-parts-price-base  as decimal   no-undo .
+-define variable v-new-out-parts-price-rubl  as decimal   no-undo .
+-define variable rid                         as recid     no-undo .
+-define variable conf-par                    as character no-undo .    /* для чтения параметра конфигурации */
+-define variable par-type                    as character no-undo .    /* тип параметра конфигурации */
+-define variable old-mode                    as character no-undo .
+-define variable old-handle                  as handle    no-undo .
+-define variable old-type                    as character no-undo .
+-define variable old-stat                    as character no-undo .
+-define variable old-flag                    as logical   no-undo .
+-define variable old-internal                as logical   no-undo .
+-define variable del-list                    as character no-undo.
+-define variable filter-point                as character no-undo init "parts-l" .
+-define variable sort-column-name            as character no-undo .
+-define variable v-mode-name                 as character no-undo .
++          define variable v-reserv-pl-code            as logical   no-undo init ? .
++          define variable v-pl-code                   as integer   no-undo init 0 .
++          define variable v-goods-twounit             as logical   no-undo .
++          define variable v-goods-alcohol-prod        as logical   no-undo .
++          define variable v-free-parts-qnty           as decimal   no-undo .
++          define variable v-free-parts-fact-qnty      as decimal   no-undo .
++          define variable v-old-free-parts-fact-qnty  as decimal   no-undo .
++          define variable v-free-parts-cli-qnty       as decimal   no-undo .
++          define variable v-free-parts-price-base     as decimal   no-undo .
++          define variable v-free-parts-price-rubl     as decimal   no-undo .
++          define variable v-out-parts-qnty            as decimal   no-undo .
++          define variable v-out-parts-fact-qnty       as decimal   no-undo .
++          define variable v-old-out-parts-fact-qnty   as decimal   no-undo .
++          define variable v-out-parts-cli-qnty        as decimal   no-undo .
++          define variable v-out-parts-price-base      as decimal   no-undo .
++          define variable v-out-parts-price-rubl      as decimal   no-undo .
++          define variable v-new-free-parts-qnty       as decimal   no-undo .
++          define variable v-new-free-parts-fact-qnty  as decimal   no-undo .
++          define variable v-new-free-parts-cli-qnty   as decimal   no-undo .
++          define variable v-new-free-parts-price-base as decimal   no-undo .
++          define variable v-new-free-parts-price-rubl as decimal   no-undo .
++          define variable v-new-out-parts-qnty        as decimal   no-undo .
++          define variable v-new-out-parts-fact-qnty   as decimal   no-undo .
++          define variable v-new-out-parts-cli-qnty    as decimal   no-undo .
++          define variable v-new-out-parts-price-base  as decimal   no-undo .
++          define variable v-new-out-parts-price-rubl  as decimal   no-undo .
++          define variable rid                         as recid     no-undo .
++          define variable conf-par                    as character no-undo .    /* для чтения параметра конфигурации */
++          define variable par-type                    as character no-undo .    /* тип параметра конфигурации */
++          define variable old-mode                    as character no-undo .
++          define variable old-handle                  as handle    no-undo .
++          define variable old-type                    as character no-undo .
++          define variable old-stat                    as character no-undo .
++          define variable old-flag                    as logical   no-undo .
++          define variable old-internal                as logical   no-undo .
++          define variable del-list                    as character no-undo.
++          define variable filter-point                as character no-undo init "parts-l" .
++          define variable sort-column-name            as character no-undo .
++          define variable v-mode-name                 as character no-undo .
+ 
+ &SCOP NEW NEW
+ 
+@@ -4242,37 +4245,55 @@ END PROCEDURE.
+ 
+ &ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE save-changes Dialog-Frame
+ PROCEDURE save-changes :
+-/* -----------------------------------------------------------
+-  Purpose:
+-  Parameters:  <none>
+-  Notes:
+--------------------------------------------------------------*/
+-
+-  define variable v-need-rsrv      as logical   no-undo .
+-  define variable v-doc-qnty-cli   as decimal   no-undo .
+-  define variable v-doc-qnty-base  as decimal   no-undo .
+-  define variable v-fact-qnty-cli  as decimal   no-undo .
+-  define variable v-fact-qnty-base as decimal   no-undo .
+-  define variable v-doc-density    as decimal   no-undo .
+-  define variable v-fact-density   as decimal   no-undo .
+-  define variable v-inv-rec        as recid     no-undo .
++  /* -----------------------------------------------------------
++    Purpose:
++    Parameters:  <none>
++    Notes:
++  -------------------------------------------------------------*/
++
++  define variable v-need-rsrv      as logical no-undo .
++  define variable v-doc-qnty-cli   as decimal no-undo .
++  define variable v-doc-qnty-base  as decimal no-undo .
++  define variable v-fact-qnty-cli  as decimal no-undo .
++  define variable v-fact-qnty-base as decimal no-undo .
++  define variable v-doc-density    as decimal no-undo .
++  define variable v-fact-density   as decimal no-undo .
++  define variable v-inv-rec        as recid   no-undo .
+ 
+   define buffer buf_trn-doc  for ub.trn-doc .
+   define buffer buf_goods    for ub.goods .
+   define buffer buf_doc-line for ub.doc-line .
++  define buffer bf_doc-line  for ub.doc-line .
+   define buffer buf_parts    for ub.parts .
+   define buffer buf_doc-pl   for ub.doc-pl .
+ 
++  define variable v-chg-free-qnty   as decimal no-undo .
++  define variable v-chg-out-qnty    as decimal no-undo .
++  define variable v-check-cli-qnty  as logical no-undo .
++  define variable v-diff-qnty       as decimal no-undo .
++  define variable v-free-parts-fact as decimal no-undo .
++  define variable v-out-parts-fact  as decimal no-undo .
++  define variable v-price-rubl      as decimal no-undo .
++  define variable v-doc-qnty        as decimal no-undo .
++  define variable v-line            as integer no-undo .
++  define variable v-first           as logical no-undo .
++  define variable v-vat-pc          like ub.doc-line.vat-pc no-undo.
++  define variable v-slt-pc          like ub.doc-line.slt-pc no-undo.
++  define variable v-host-code       like sysconf.host-code no-undo.
++  define variable v-tax-date        as date    no-undo.
++  define variable v-total-qnty      as decimal no-undo .
+   if v-edit-parts = true
+-  then do:
++    then 
++  do:
+     do transaction
+-    on error undo, return error
+-    :
++      on error undo, return error
++      :
+       find first buf_trn-doc no-lock
+         where buf_trn-doc.doc-code = p-doc-code
+         no-error .
+       if not available buf_trn-doc
+-      then do:
++        then 
++      do:
+         message
+           vss-workfile vss-revision vss-description skip
+           "Ошибка задания входных параметров" skip
+@@ -4287,7 +4308,8 @@ PROCEDURE save-changes :
+         where buf_goods.gds-code = p-gds-code
+         no-error .
+       if not available buf_goods
+-      then do:
++        then 
++      do:
+         message
+           vss-workfile vss-revision vss-description skip
+           "Ошибка задания входных параметров" skip
+@@ -4296,68 +4318,478 @@ PROCEDURE save-changes :
+           "Код товара" p-gds-code skip
+           view-as alert-box error .
+         undo, return error .
+-        end.      
++      end.      
+ 
+       /*Для внутреннего расхода*/
+-      if buf_trn-doc.ext-doc-type = {&TDEDT_Ras_Perem} then 
++      if buf_trn-doc.ext-doc-type = {&TDEDT_Ras_Perem} then
+       do:
+         define variable v-part-code like buf_parts.part-code no-undo .
+         define variable v-out-code  like buf_parts.out-code no-undo .
+         define buffer bf_parts for ub.parts .
+-           
+-        for each buf_parts exclusive-lock
+-          where buf_parts.out-code  = buf_trn-doc.doc-code
+-          and buf_parts.obj-type  = buf_trn-doc.obj-type
+-          and buf_parts.obj-code  = buf_trn-doc.obj-code
+-          and buf_parts.artic     = buf_goods.artic
+-          and buf_parts.prod-type = buf_goods.prod-type
+-          and buf_parts.prod-code = buf_goods.prod-code
++        v-old-free-parts-fact-qnty = v-free-parts-fact-qnty .
++        for each bf_parts exclusive-lock
++          where bf_parts.out-code  = buf_trn-doc.doc-code
++          and bf_parts.obj-type  = buf_trn-doc.obj-type
++          and bf_parts.obj-code  = buf_trn-doc.obj-code
++          and bf_parts.artic     = buf_goods.artic
++          and bf_parts.prod-type = buf_goods.prod-type
++          and bf_parts.prod-code = buf_goods.prod-code
+           on error undo, return error return-value
+           :
+-/*          find first buf_doc-line no-lock                                */
+-/*            where buf_doc-line.doc-code  = buf_trn-doc.doc-code          */
+-/*            and buf_doc-line.artic     = buf_parts.artic                 */
+-/*            and buf_doc-line.prod-type = buf_parts.prod-type             */
+-/*            and buf_doc-line.prod-code = buf_parts.prod-code             */
+-/*            and buf_doc-line.price-base = buf_parts.price-base no-error .*/
+-/*          if not available (buf_doc-line) then                           */
+-/*          do:                                                            */
+-/*            assign                                                       */
+-/*              v-part-code         = buf_parts.part-code                  */
+-/*              v-out-code          = buf_parts.out-code                   */
+-/*/*              buf_parts.part-code = buf_parts.part-code + "_1"*/       */
+-/*            buf_parts.out-code = {&free-code} .                          */
+-            /*Создание линии накладной*/
+-            run str/out-add-line.p (parparentproc,
+-              recid(buf_trn-doc),
+-              ?,
+-              ?,
+-              recid(buf_goods),
+-              {&add-def},
+-              ?,
+-              buf_parts.qnty) no-error.   
+-/*            run gbl/inidebug.p.                              */
+-/*            for first bf_parts exclusive-lock                */
+-/*              where bf_parts.out-code  = buf_trn-doc.doc-code*/
+-/*              and bf_parts.obj-type  = buf_trn-doc.obj-type  */
+-/*              and bf_parts.obj-code  = buf_trn-doc.obj-code  */
+-/*              and bf_parts.artic     = buf_goods.artic       */
+-/*              and bf_parts.prod-type = buf_goods.prod-type   */
+-/*              and bf_parts.prod-code = buf_goods.prod-code   */
+-/*/*              and bf_parts.part-code = v-part-code + "_1"*/*/
+-/*/*              and bf_parts.out-code = {&free-code}*/       */
+-/*              on error undo, return error return-value       */
+-/*              :                                              */
+-/*              assign                                         */
+-/*                bf_parts.part-code = v-part-code             */
+-/*                bf_parts.out-code  = v-out-code.             */
+-/*                                                             */
+-/*            end.                                             */
+-            leave .
+-          end.  
+-/*        end.*/
++          find first buf_doc-line no-lock
++            where buf_doc-line.doc-code  = buf_trn-doc.doc-code
++            and buf_doc-line.artic     = bf_parts.artic
++            and buf_doc-line.prod-type = bf_parts.prod-type
++            and buf_doc-line.prod-code = bf_parts.prod-code
++            and buf_doc-line.line-num = integer(entry(2,bf_parts.part-code,"/")) no-error .
++          if not available (buf_doc-line) then
++          do:
++          /*Запускаем процедуру создания новой линии документа*/
++            { gbl/hostcode.i
++          buf_trn-doc.obj-type
++         buf_trn-doc.obj-code
++          v-host-code
++        }          
++            if buf_trn-doc.fact-date <> ?
++              then 
++            do:
++              assign
++                v-tax-date = buf_trn-doc.fact-date
++                .
++            end.
++            else 
++            do:
++              assign
++                v-tax-date = ?
++                .
++              { gbl/pftxvalg.i
++          buf_goods.gds-code
++          {&vat-tax-code}
++          v-tax-date
++          v-host-code
++          buf_trn-doc.obj-type
++          buf_trn-doc.obj-code
++          v-vat-pc
++          no-error
++        }
++              find first sysconf where sysconf.host-code = buf_trn-doc.host-code.
++              { str/st-sltpc.i
++          recid(buf_goods)
++          recid(buf_trn-doc)
++          sysconf.cash-pay
++          v-slt-pc
++        }        
++              { str/crdoclin.i
++          buf_trn-doc.doc-code
++          buf_goods.artic
++          buf_goods.prod-type
++          buf_goods.prod-code
++          buf_trn-doc.obj-type
++          buf_trn-doc.obj-code
++          buf_trn-doc.status_
++          buf_trn-doc.ext-doc-type
++          buf_goods.prt-root
++          v-vat-pc
++          v-slt-pc
++          sysconf.cons-vat-pc
++          no-error
++        }
++              if error-status :error
++                then
++              do:
++                message "Ошибка при создании линии товара " buf_goods.artic " "  buf_goods.prod-type " " buf_goods.prod-code skip
++                  return-value skip
++                  error-status:get-message(1)
++                  view-as alert-box error.
++                return no-apply.
++              end.
++            end.
++ 
++            find first bf_doc-line exclusive-lock
++              where bf_doc-line.doc-code  = buf_trn-doc.doc-code
++              and bf_doc-line.artic     = bf_parts.artic
++              and bf_doc-line.prod-type = bf_parts.prod-type
++              and bf_doc-line.prod-code = bf_parts.prod-code
++              and bf_doc-line.line-num = integer(entry(2,bf_parts.part-code,"/")) no-error .
++            if available (bf_doc-line) then
++            do:
++              assign
++                bf_doc-line.unit-cli      = buf_goods.unit-cli
++                bf_doc-line.cli-base-rate = buf_goods.cli-base-rate
++                bf_doc-line.doc-qnty      = bf_parts.qnty 
++                bf_doc-line.cli-qnty      = bf_parts.qnty 
++                bf_doc-line.fact-qnty     = bf_parts.fact-qnty
++                bf_doc-line.price-rubl    = bf_parts.price-rubl
++                bf_doc-line.price-base    = bf_parts.price-base
++                bf_doc-line.price-cli     = bf_parts.price-cli
++                .    
++              /*Создаем gds-dtl*/
++              /* ищем/создаем корневой признак */
++              find buf_gds-prt where buf_gds-prt.upper-code = buf_goods.prt-root no-lock.
++                     
++              { str/crgdsdtl.i
++      buf_trn-doc.obj-code
++      buf_trn-doc.obj-type
++      buf_trn-doc.doc-code
++      bf_doc-line.artic
++      bf_doc-line.prod-code
++      bf_doc-line.prod-type
++      buf_gds-prt.node-code
++      bf_doc-line.line-num
++      yes
++      no-error
++    }
++              if error-status :error then 
++              do:
++                message
++                  vss-workfile vss-revision vss-description skip
++                  "Ощибка при создании корневого признака" skip
++                  "Документ" buf_doc-line.doc-code skip
++                  "Артикул" bf_doc-line.artic bf_doc-line.prod-type bf_doc-line.prod-code skip
++                  error-status :get-message(1) skip
++                  return-value skip
++                  view-as alert-box information .
++                undo, return error .
++              end.
++              /*    end.*/
++              find first ub.gds-dtl
++                where ub.gds-dtl.doc-code  = buf_trn-doc.doc-code
++                and ub.gds-dtl.artic     = bf_doc-line.artic
++                and ub.gds-dtl.prod-code = bf_doc-line.prod-code
++                and ub.gds-dtl.prod-type = bf_doc-line.prod-type
++                and ub.gds-dtl.prt-code  = buf_gds-prt.node-code
++                and ub.gds-dtl.line-num  = bf_doc-line.line-num
++                .
++              assign
++                ub.gds-dtl.price-base  = ?
++                ub.gds-dtl.price-rubl  = ?
++                ub.gds-dtl.discnt-type = yes /* процент */
++                ub.gds-dtl.discnt-base = 0
++                ub.gds-dtl.discnt-rubl = 0
++                ub.gds-dtl.discnt-pc   = 0
++                .
++              assign
++                ub.gds-dtl.price-base = bf_doc-line.price-base
++                ub.gds-dtl.price-rubl = bf_doc-line.price-rubl
++                .  
++              /*скидка*/
++              assign
++                ub.gds-dtl.discnt-base = ub.gds-dtl.price-base * ub.gds-dtl.discnt-pc / 100
++                ub.gds-dtl.discnt-rubl = ub.gds-dtl.price-rubl * ub.gds-dtl.discnt-pc / 100
++                .
++
++            end.
++          end.
++ 
++        end.
++
++        for each buf_doc-line exclusive-lock
++          where buf_doc-line.doc-code  = buf_trn-doc.doc-code
++          and buf_doc-line.artic     = buf_goods.artic
++          and buf_doc-line.prod-type = buf_goods.prod-type
++          and buf_doc-line.prod-code = buf_goods.prod-code:
++
++          /* Для ПН */
++          for each buf_parts no-lock
++            where buf_parts.out-code  = buf_trn-doc.doc-code
++            and buf_parts.obj-type  = buf_doc-line.obj-type
++            and buf_parts.obj-code  = buf_doc-line.obj-code
++            and buf_parts.artic     = buf_doc-line.artic
++            and buf_parts.prod-type = buf_doc-line.prod-type
++            and buf_parts.prod-code = buf_doc-line.prod-code
++            on error undo, return error return-value
++            :
++            if buf_parts.in-code = buf_parts.out-code then 
++            do:
++              run create-bar-code-parts (
++                buf_goods.gds-code  ,
++                buf_parts.part-code ,
++                buf_parts.in-code   ,
++                buf_goods.unit-base ) no-error .
++            end.
++          end.      
++
++          if v-reserv-pl-code = true then 
++          do:
++            run trndocrs-pl-gds-request in this-procedure
++              (input  buf_doc-line.doc-code         /* p-doc-code    */
++              ,input  buf_trn-doc.doc-type      /* p-doc-type    */
++              ,input  buf_doc-line.obj-type         /* p-obj-type    */
++              ,input  buf_doc-line.obj-code         /* p-obj-code    */
++              ,input  buf_doc-line.artic            /* p-artic       */
++              ,input  buf_doc-line.prod-type        /* p-prod-type   */
++              ,input  buf_doc-line.prod-code        /* p-prod-code   */
++              ,input  "after":u                /* p-field-accum */
++              ) .
++            run trndocrs-pl-gds-calc-rsrv in this-procedure .
++
++            assign
++              v-doc-density  = buf_doc-line.doc-density
++              v-fact-density = buf_doc-line.fact-density
++              .
++
++            for each buf_doc-pl exclusive-lock
++              where buf_doc-pl.out-code = buf_trn-doc.doc-code
++              and buf_doc-pl.gds-code = buf_goods.gds-code
++              and buf_doc-pl.obj-type = buf_doc-line.obj-type
++              and buf_doc-pl.obj-code = buf_doc-line.obj-code
++              on error undo, return error return-value
++              :
++              run trndocrs-pl-gds-accum in this-procedure
++                (input buf_doc-pl.pl-code                                                     /* p-pl-code       */
++                ,input 0.0                                                                    /* p-rsrv-qnty     */
++                ,input ( if v-need-rsrv-gds = true then - buf_doc-pl.cli-doc-qnty else 0.0 )  /* p-cli-rsrv-qnty */
++                ,input 0.0                                                                    /* p-fact-qnty     */
++                ,input - buf_doc-pl.cli-fact-qnty                                             /* p-cli-fact-qnty */
++                ) no-error .
++              if error-status :error
++                then 
++              do:
++                message
++                  vss-workfile vss-revision vss-description skip
++                  "Ошибка при изменении разрезервированных количеств trndocrs-pl-gds-accum" skip
++                  error-status :get-message(1) skip
++                  return-value skip
++                  view-as alert-box error .
++                undo, return error return-value .
++              end.
++              delete buf_doc-pl .
++            end.
++            for each buf_parts no-lock
++              where buf_parts.out-code  = buf_trn-doc.doc-code
++              and buf_parts.obj-type  = buf_doc-line.obj-type
++              and buf_parts.obj-code  = buf_doc-line.obj-code
++              and buf_parts.artic     = buf_doc-line.artic
++              and buf_parts.prod-type = buf_doc-line.prod-type
++              and buf_parts.prod-code = buf_doc-line.prod-code
++              and buf_doc-line.line-num = integer(entry(2,buf_parts.part-code,"/"))
++              on error undo, return error return-value
++              :
++              if buf_trn-doc.ext-doc-type = {&TDEDT_Ras_Vnesh_VP}
++                and buf_trn-doc.status_ <> {&inquiry}
++                then 
++              do:
++                assign
++                  v-doc-density  = 1.0 / buf_parts.cli-base-rate
++                  v-fact-density = v-doc-density
++                  .
++              end.
++
++              find first buf_doc-pl exclusive-lock
++                where buf_doc-pl.obj-type = buf_doc-line.obj-type
++                and buf_doc-pl.obj-code = buf_doc-line.obj-code
++                and buf_doc-pl.pl-code  = buf_parts.pl-code
++                and buf_doc-pl.out-code = buf_trn-doc.doc-code
++                and buf_doc-pl.gds-code = buf_goods.gds-code
++                no-error .
++              if not available buf_doc-pl then 
++              do:
++                create buf_doc-pl.
++                assign
++                  buf_doc-pl.obj-type      = buf_doc-line.obj-type
++                  buf_doc-pl.obj-code      = buf_doc-line.obj-code
++                  buf_doc-pl.pl-code       = buf_parts.pl-code
++                  buf_doc-pl.out-code      = buf_trn-doc.doc-code
++                  buf_doc-pl.gds-code      = buf_goods.gds-code
++                  buf_doc-pl.cli-qnty      = 0.0
++                  buf_doc-pl.doc-qnty      = 0.0
++                  buf_doc-pl.cli-doc-qnty  = 0.0
++                  buf_doc-pl.fact-qnty     = 0.0
++                  buf_doc-pl.cli-fact-qnty = 0.0
++                  .
++              end.
++              assign
++                buf_doc-pl.cli-qnty      = buf_doc-pl.cli-qnty      + buf_parts.qnty / buf_parts.cli-base-rate
++                buf_doc-pl.doc-qnty      = buf_doc-pl.doc-qnty      + buf_parts.qnty
++                buf_doc-pl.cli-doc-qnty  = buf_doc-pl.cli-doc-qnty  + buf_parts.qnty * v-doc-density
++                buf_doc-pl.fact-qnty     = buf_doc-pl.fact-qnty     + buf_parts.fact-qnty
++                buf_doc-pl.cli-fact-qnty = buf_doc-pl.cli-fact-qnty + buf_parts.fact-qnty * v-fact-density
++
++                .
++            end. /* for each buf_parts */
++            assign
++              v-doc-qnty-cli   = 0.0
++              v-doc-qnty-base  = 0.0
++              v-fact-qnty-cli  = 0.0
++              v-fact-qnty-base = 0.0
++              .
++            for each buf_doc-pl share-lock
++              where buf_doc-pl.obj-type = buf_doc-line.obj-type
++              and buf_doc-pl.obj-code = buf_doc-line.obj-code
++              and buf_doc-pl.out-code = buf_trn-doc.doc-code
++              and buf_doc-pl.gds-code = buf_goods.gds-code
++              on error undo, return error return-value
++              :
++              assign
++                v-doc-qnty-base  = v-doc-qnty-base  + buf_doc-pl.doc-qnty
++                v-doc-qnty-cli   = v-doc-qnty-cli   + buf_doc-pl.cli-doc-qnty
++                v-fact-qnty-base = v-fact-qnty-base + buf_doc-pl.fact-qnty
++                v-fact-qnty-cli  = v-fact-qnty-cli  + buf_doc-pl.cli-fact-qnty
++                .
++              run trndocrs-pl-gds-accum in this-procedure
++                (input buf_doc-pl.pl-code                                                   /* p-pl-code       */
++                ,input 0.0                                                                  /* p-rsrv-qnty     */
++                ,input ( if v-need-rsrv-gds = true then buf_doc-pl.cli-doc-qnty else 0.0 )  /* p-cli-rsrv-qnty */
++                ,input 0.0                                                                  /* p-fact-qnty     */
++                ,input buf_doc-pl.cli-fact-qnty                                             /* p-cli-fact-qnty */
++                ) no-error .
++              if error-status :error then 
++              do:
++                message
++                  vss-workfile vss-revision vss-description skip
++                  "Ошибка при изменении зарезервированных количеств trndocrs-pl-gds-accum" skip
++                  error-status :get-message(1) skip
++                  return-value skip
++                  view-as alert-box error .
++                undo, return error return-value .
++              end.
++            end.
++
++            if v-is-petrol = true
++              and v-is-pieces = false
++              then 
++            do:
++              assign
++                buf_doc-line.cli-qnty     = v-doc-qnty-cli
++                buf_doc-line.doc-density  = v-doc-qnty-cli  / v-doc-qnty-base
++                buf_doc-line.fact-density = v-fact-qnty-cli / v-fact-qnty-base
++                .
++            end. /* petrol */
++          end.
++          /*      if buf_trn-doc.ext-doc-type <> {&TDEDT_Ras_Perem} then do:*/
++          run rsrgdsck in this-procedure
++            (input  buf_doc-line.doc-code         /* p-doc-code              */
++            ,input  buf_trn-doc.doc-type          /* p-doc-type              */
++            ,input  buf_doc-line.obj-type         /* p-obj-type              */
++            ,input  buf_doc-line.obj-code         /* p-obj-code              */
++            ,input  buf_doc-line.artic            /* p-artic                 */
++            ,input  buf_doc-line.prod-type        /* p-prod-type             */
++            ,input  buf_doc-line.prod-code        /* p-prod-code             */
++            ,input  buf_doc-line.line-num         /* p-line-num              */
++            ,output v-new-free-parts-qnty         /* p-free-parts-qnty       */
++            ,output v-new-free-parts-fact-qnty    /* p-free-parts-fact-qnty  */
++            ,output v-new-free-parts-cli-qnty     /* p-free-parts-cli-qnty   */
++            ,output v-new-free-parts-price-base   /* p-free-parts-price-base */
++            ,output v-new-free-parts-price-rubl   /* p-free-parts-price-rubl */
++            ,output v-new-out-parts-qnty          /* p-out-parts-qnty        */
++            ,output v-new-out-parts-fact-qnty     /* p-out-parts-fact-qnty   */
++            ,output v-new-out-parts-cli-qnty      /* p-out-parts-cli-qnty    */
++            ,output v-new-out-parts-price-base    /* p-out-parts-price-base  */
++            ,output v-new-out-parts-price-rubl    /* p-out-parts-price-rubl  */
++            ) no-error .
++          if error-status :error
++            then 
++          do:
++            message
++              vss-workfile vss-revision vss-description skip
++              "Ошибка при просмотре зарезервированных партий" skip
++              "Объект" buf_doc-line.obj-type buf_doc-line.obj-code skip
++              "Артикул" buf_doc-line.artic buf_doc-line.prod-type buf_doc-line.prod-code skip
++              error-status :get-message(1)
++              return-value skip
++              view-as alert-box .
++            undo, return error .
++          end.
++          /*      end .*/
++
++          v-free-parts-fact = v-free-parts-fact + v-new-free-parts-fact-qnty .
++          v-out-parts-fact = v-out-parts-fact + v-new-out-parts-fact-qnty .
++        
++          assign
++            v-chg-free-qnty = v-free-parts-fact - v-old-free-parts-fact-qnty
++            v-chg-out-qnty  = v-out-parts-fact  - v-old-out-parts-fact-qnty
++            .
++            v-old-free-parts-fact-qnty = v-old-free-parts-fact-qnty + v-chg-free-qnty .
++            v-old-out-parts-fact-qnty = v-old-out-parts-fact-qnty - v-chg-out-qnty .
++            
++          if v-chg-free-qnty = 0 and v-chg-out-qnty = 0 then v-need-rsrv-gds = false .
++          else v-need-rsrv-gds = true .
++          if v-need-rsrv-gds
++            then 
++          do:
++            run trg/rsrv-gds.p
++              (input parparentproc
++              ,buffer buf_doc-line    /* doc-line        */
++              ,input  v-chg-free-qnty /* v-chg-free-qnty */
++              ,input  v-chg-out-qnty  /* v-chg-out-qnty  */
++              ,input table temp-trndocrs-gds-dtl-rsrv
++              ,input table temp-trndocrs-pl-gds-rsrv
++              ) no-error.
++            if error-status :error
++              then 
++            do:
++              if error-status :get-message(1) <> ""
++                then 
++              do:
++                message
++                  vss-workfile vss-revision vss-description skip
++                  "Невозможно зарезервировать товар по признакам" skip
++                  "Объект" buf_doc-line.obj-type buf_doc-line.obj-code skip
++                  "Артикул" buf_doc-line.artic buf_doc-line.prod-type buf_doc-line.prod-code skip
++                  error-status :get-message(1) skip
++                  return-value skip
++                  view-as alert-box .
++              end.
++              undo, return error .
++            end.
++
++            assign
++              v-check-cli-qnty = (buf_trn-doc.doc-type = {&income}
++                              and buf_trn-doc.internal = no
++                              )
++              .
++
++          end.
++          else 
++          do:
++            if v-need-check-diff-qnty = true
++              then 
++            do:
++
++              assign
++                v-diff-qnty = v-chg-qnty - (v-chg-free-qnty + v-chg-out-qnty)
++                .
++              if v-diff-qnty <> 0
++                then 
++              do:
++                message
++                  "Нужно создать партии с общим количеством" v-chg-qnty skip
++                  "Недостающее количество" v-diff-qnty skip
++                  view-as alert-box information .
++                undo, return error .
++              end.
++            end.
++          end.
++          if v-reserv-pl-code = true
++            and v-is-petrol = true
++            and v-is-pieces = false
++            then 
++          do:
++          { str/corinvln.i
++          buf_doc-line.doc-code
++          buf_doc-line.artic
++          buf_doc-line.prod-type
++          buf_doc-line.prod-code
++          0
++          0
++          "buf_doc-line.price-rubl / buf_doc-line.fact-density"
++          "buf_doc-line.price-base / buf_doc-line.fact-density"
++          v-fact-qnty-cli
++          buf_doc-line.fact-density
++          v-inv-rec
++          no-error
++        }
++            if error-status :error
++              or v-inv-rec = ?
++              then 
++            do:
++              undo, return error return-value .
++            end.
++          end. /* petrol */
++        end.
+       end.
+-
++      else 
++      do:
+         find last buf_doc-line exclusive-lock
+           where buf_doc-line.doc-code  = buf_trn-doc.doc-code
+           and buf_doc-line.artic     = buf_goods.artic
+@@ -4396,287 +4828,300 @@ PROCEDURE save-changes :
+           end.
+         end.      
+ 
+-      if v-reserv-pl-code = true then do:
+-        run trndocrs-pl-gds-request in this-procedure
+-          (input  buf_doc-line.doc-code         /* p-doc-code    */
+-          ,input  buf_trn-doc.doc-type      /* p-doc-type    */
+-          ,input  buf_doc-line.obj-type         /* p-obj-type    */
+-          ,input  buf_doc-line.obj-code         /* p-obj-code    */
+-          ,input  buf_doc-line.artic            /* p-artic       */
+-          ,input  buf_doc-line.prod-type        /* p-prod-type   */
+-          ,input  buf_doc-line.prod-code        /* p-prod-code   */
+-          ,input  "after":u                /* p-field-accum */
+-          ) .
+-        run trndocrs-pl-gds-calc-rsrv in this-procedure .
+-
+-        assign
+-          v-doc-density  = buf_doc-line.doc-density
+-          v-fact-density = buf_doc-line.fact-density
+-        .
+-
+-        for each buf_doc-pl exclusive-lock
+-          where buf_doc-pl.out-code = buf_trn-doc.doc-code
++        if v-reserv-pl-code = true then 
++        do:
++          run trndocrs-pl-gds-request in this-procedure
++            (input  buf_doc-line.doc-code         /* p-doc-code    */
++            ,input  buf_trn-doc.doc-type      /* p-doc-type    */
++            ,input  buf_doc-line.obj-type         /* p-obj-type    */
++            ,input  buf_doc-line.obj-code         /* p-obj-code    */
++            ,input  buf_doc-line.artic            /* p-artic       */
++            ,input  buf_doc-line.prod-type        /* p-prod-type   */
++            ,input  buf_doc-line.prod-code        /* p-prod-code   */
++            ,input  "after":u                /* p-field-accum */
++            ) .
++          run trndocrs-pl-gds-calc-rsrv in this-procedure .
++
++          assign
++            v-doc-density  = buf_doc-line.doc-density
++            v-fact-density = buf_doc-line.fact-density
++            .
++
++          for each buf_doc-pl exclusive-lock
++            where buf_doc-pl.out-code = buf_trn-doc.doc-code
+             and buf_doc-pl.gds-code = buf_goods.gds-code
+             and buf_doc-pl.obj-type = buf_doc-line.obj-type
+             and buf_doc-pl.obj-code = buf_doc-line.obj-code
+-        on error undo, return error return-value
+-        :
+-          run trndocrs-pl-gds-accum in this-procedure
+-            (input buf_doc-pl.pl-code                                                     /* p-pl-code       */
+-            ,input 0.0                                                                    /* p-rsrv-qnty     */
+-            ,input ( if v-need-rsrv-gds = true then - buf_doc-pl.cli-doc-qnty else 0.0 )  /* p-cli-rsrv-qnty */
+-            ,input 0.0                                                                    /* p-fact-qnty     */
+-            ,input - buf_doc-pl.cli-fact-qnty                                             /* p-cli-fact-qnty */
+-            ) no-error .
+-          if error-status :error
+-          then do:
+-            message
+-              vss-workfile vss-revision vss-description skip
+-              "Ошибка при изменении разрезервированных количеств trndocrs-pl-gds-accum" skip
+-              error-status :get-message(1) skip
+-              return-value skip
+-              view-as alert-box error .
+-            undo, return error return-value .
++            on error undo, return error return-value
++            :
++            run trndocrs-pl-gds-accum in this-procedure
++              (input buf_doc-pl.pl-code                                                     /* p-pl-code       */
++              ,input 0.0                                                                    /* p-rsrv-qnty     */
++              ,input ( if v-need-rsrv-gds = true then - buf_doc-pl.cli-doc-qnty else 0.0 )  /* p-cli-rsrv-qnty */
++              ,input 0.0                                                                    /* p-fact-qnty     */
++              ,input - buf_doc-pl.cli-fact-qnty                                             /* p-cli-fact-qnty */
++              ) no-error .
++            if error-status :error
++              then 
++            do:
++              message
++                vss-workfile vss-revision vss-description skip
++                "Ошибка при изменении разрезервированных количеств trndocrs-pl-gds-accum" skip
++                error-status :get-message(1) skip
++                return-value skip
++                view-as alert-box error .
++              undo, return error return-value .
++            end.
++            delete buf_doc-pl .
+           end.
+-          delete buf_doc-pl .
+-        end.
+-        for each buf_parts no-lock
+-          where buf_parts.out-code  = buf_trn-doc.doc-code
++          for each buf_parts no-lock
++            where buf_parts.out-code  = buf_trn-doc.doc-code
+             and buf_parts.obj-type  = buf_doc-line.obj-type
+             and buf_parts.obj-code  = buf_doc-line.obj-code
+             and buf_parts.artic     = buf_doc-line.artic
+             and buf_parts.prod-type = buf_doc-line.prod-type
+             and buf_parts.prod-code = buf_doc-line.prod-code
+-        on error undo, return error return-value
+-        :
+-          if buf_trn-doc.ext-doc-type = {&TDEDT_Ras_Vnesh_VP}
+-            and buf_trn-doc.status_ <> {&inquiry}
+-          then do:
+-            assign
+-              v-doc-density  = 1.0 / buf_parts.cli-base-rate
+-              v-fact-density = v-doc-density
+-            .
+-          end.
+-
+-          find first buf_doc-pl exclusive-lock
+-            where buf_doc-pl.obj-type = buf_doc-line.obj-type
++            on error undo, return error return-value
++            :
++            if buf_trn-doc.ext-doc-type = {&TDEDT_Ras_Vnesh_VP}
++              and buf_trn-doc.status_ <> {&inquiry}
++              then 
++            do:
++              assign
++                v-doc-density  = 1.0 / buf_parts.cli-base-rate
++                v-fact-density = v-doc-density
++                .
++            end.
++
++            find first buf_doc-pl exclusive-lock
++              where buf_doc-pl.obj-type = buf_doc-line.obj-type
+               and buf_doc-pl.obj-code = buf_doc-line.obj-code
+               and buf_doc-pl.pl-code  = buf_parts.pl-code
+               and buf_doc-pl.out-code = buf_trn-doc.doc-code
+               and buf_doc-pl.gds-code = buf_goods.gds-code
+-            no-error .
+-          if not available buf_doc-pl then do:
+-            create buf_doc-pl.
++              no-error .
++            if not available buf_doc-pl then 
++            do:
++              create buf_doc-pl.
++              assign
++                buf_doc-pl.obj-type      = buf_doc-line.obj-type
++                buf_doc-pl.obj-code      = buf_doc-line.obj-code
++                buf_doc-pl.pl-code       = buf_parts.pl-code
++                buf_doc-pl.out-code      = buf_trn-doc.doc-code
++                buf_doc-pl.gds-code      = buf_goods.gds-code
++                buf_doc-pl.cli-qnty      = 0.0
++                buf_doc-pl.doc-qnty      = 0.0
++                buf_doc-pl.cli-doc-qnty  = 0.0
++                buf_doc-pl.fact-qnty     = 0.0
++                buf_doc-pl.cli-fact-qnty = 0.0
++                .
++            end.
+             assign
+-              buf_doc-pl.obj-type     = buf_doc-line.obj-type
+-              buf_doc-pl.obj-code     = buf_doc-line.obj-code
+-              buf_doc-pl.pl-code      = buf_parts.pl-code
+-              buf_doc-pl.out-code     = buf_trn-doc.doc-code
+-              buf_doc-pl.gds-code     = buf_goods.gds-code
+-              buf_doc-pl.cli-qnty      = 0.0
+-              buf_doc-pl.doc-qnty      = 0.0
+-              buf_doc-pl.cli-doc-qnty  = 0.0
+-              buf_doc-pl.fact-qnty     = 0.0
+-              buf_doc-pl.cli-fact-qnty = 0.0
+-            .
+-          end.
++              buf_doc-pl.cli-qnty      = buf_doc-pl.cli-qnty      + buf_parts.qnty / buf_parts.cli-base-rate
++              buf_doc-pl.doc-qnty      = buf_doc-pl.doc-qnty      + buf_parts.qnty
++              buf_doc-pl.cli-doc-qnty  = buf_doc-pl.cli-doc-qnty  + buf_parts.qnty * v-doc-density
++              buf_doc-pl.fact-qnty     = buf_doc-pl.fact-qnty     + buf_parts.fact-qnty
++              buf_doc-pl.cli-fact-qnty = buf_doc-pl.cli-fact-qnty + buf_parts.fact-qnty * v-fact-density
++
++              .
++          end. /* for each buf_parts */
+           assign
+-            buf_doc-pl.cli-qnty      = buf_doc-pl.cli-qnty      + buf_parts.qnty / buf_parts.cli-base-rate
+-            buf_doc-pl.doc-qnty      = buf_doc-pl.doc-qnty      + buf_parts.qnty
+-            buf_doc-pl.cli-doc-qnty  = buf_doc-pl.cli-doc-qnty  + buf_parts.qnty * v-doc-density
+-            buf_doc-pl.fact-qnty     = buf_doc-pl.fact-qnty     + buf_parts.fact-qnty
+-            buf_doc-pl.cli-fact-qnty = buf_doc-pl.cli-fact-qnty + buf_parts.fact-qnty * v-fact-density
+-
+-          .
+-        end. /* for each buf_parts */
+-        assign
+-          v-doc-qnty-cli   = 0.0
+-          v-doc-qnty-base  = 0.0
+-          v-fact-qnty-cli  = 0.0
+-          v-fact-qnty-base = 0.0
+-        .
+-        for each buf_doc-pl share-lock
+-          where buf_doc-pl.obj-type = buf_doc-line.obj-type
++            v-doc-qnty-cli   = 0.0
++            v-doc-qnty-base  = 0.0
++            v-fact-qnty-cli  = 0.0
++            v-fact-qnty-base = 0.0
++            .
++          for each buf_doc-pl share-lock
++            where buf_doc-pl.obj-type = buf_doc-line.obj-type
+             and buf_doc-pl.obj-code = buf_doc-line.obj-code
+             and buf_doc-pl.out-code = buf_trn-doc.doc-code
+             and buf_doc-pl.gds-code = buf_goods.gds-code
+-        on error undo, return error return-value
+-        :
+-          assign
+-            v-doc-qnty-base  = v-doc-qnty-base  + buf_doc-pl.doc-qnty
+-            v-doc-qnty-cli   = v-doc-qnty-cli   + buf_doc-pl.cli-doc-qnty
+-            v-fact-qnty-base = v-fact-qnty-base + buf_doc-pl.fact-qnty
+-            v-fact-qnty-cli  = v-fact-qnty-cli  + buf_doc-pl.cli-fact-qnty
++            on error undo, return error return-value
++            :
++            assign
++              v-doc-qnty-base  = v-doc-qnty-base  + buf_doc-pl.doc-qnty
++              v-doc-qnty-cli   = v-doc-qnty-cli   + buf_doc-pl.cli-doc-qnty
++              v-fact-qnty-base = v-fact-qnty-base + buf_doc-pl.fact-qnty
++              v-fact-qnty-cli  = v-fact-qnty-cli  + buf_doc-pl.cli-fact-qnty
++              .
++            run trndocrs-pl-gds-accum in this-procedure
++              (input buf_doc-pl.pl-code                                                   /* p-pl-code       */
++              ,input 0.0                                                                  /* p-rsrv-qnty     */
++              ,input ( if v-need-rsrv-gds = true then buf_doc-pl.cli-doc-qnty else 0.0 )  /* p-cli-rsrv-qnty */
++              ,input 0.0                                                                  /* p-fact-qnty     */
++              ,input buf_doc-pl.cli-fact-qnty                                             /* p-cli-fact-qnty */
++              ) no-error .
++            if error-status :error then 
++            do:
++              message
++                vss-workfile vss-revision vss-description skip
++                "Ошибка при изменении зарезервированных количеств trndocrs-pl-gds-accum" skip
++                error-status :get-message(1) skip
++                return-value skip
++                view-as alert-box error .
++              undo, return error return-value .
++            end.
++          end.
++
++          if v-is-petrol = true
++            and v-is-pieces = false
++            then 
++          do:
++            assign
++              buf_doc-line.cli-qnty     = v-doc-qnty-cli
++              buf_doc-line.doc-density  = v-doc-qnty-cli  / v-doc-qnty-base
++              buf_doc-line.fact-density = v-fact-qnty-cli / v-fact-qnty-base
++              .
++          end. /* petrol */
++        end.
++        /*      if buf_trn-doc.ext-doc-type <> {&TDEDT_Ras_Perem} then do:*/
++        run rsrgdsck in this-procedure
++          (input  buf_doc-line.doc-code         /* p-doc-code              */
++          ,input  buf_trn-doc.doc-type          /* p-doc-type              */
++          ,input  buf_doc-line.obj-type         /* p-obj-type              */
++          ,input  buf_doc-line.obj-code         /* p-obj-code              */
++          ,input  buf_doc-line.artic            /* p-artic                 */
++          ,input  buf_doc-line.prod-type        /* p-prod-type             */
++          ,input  buf_doc-line.prod-code        /* p-prod-code             */
++          ,input  buf_doc-line.line-num         /* p-line-num              */
++          ,output v-new-free-parts-qnty         /* p-free-parts-qnty       */
++          ,output v-new-free-parts-fact-qnty    /* p-free-parts-fact-qnty  */
++          ,output v-new-free-parts-cli-qnty     /* p-free-parts-cli-qnty   */
++          ,output v-new-free-parts-price-base   /* p-free-parts-price-base */
++          ,output v-new-free-parts-price-rubl   /* p-free-parts-price-rubl */
++          ,output v-new-out-parts-qnty          /* p-out-parts-qnty        */
++          ,output v-new-out-parts-fact-qnty     /* p-out-parts-fact-qnty   */
++          ,output v-new-out-parts-cli-qnty      /* p-out-parts-cli-qnty    */
++          ,output v-new-out-parts-price-base    /* p-out-parts-price-base  */
++          ,output v-new-out-parts-price-rubl    /* p-out-parts-price-rubl  */
++          ) no-error .
++        if error-status :error
++          then 
++        do:
++          message
++            vss-workfile vss-revision vss-description skip
++            "Ошибка при просмотре зарезервированных партий" skip
++            "Объект" buf_doc-line.obj-type buf_doc-line.obj-code skip
++            "Артикул" buf_doc-line.artic buf_doc-line.prod-type buf_doc-line.prod-code skip
++            error-status :get-message(1)
++            return-value skip
++            view-as alert-box .
++          undo, return error .
++        end.
++        /*      end .*/
++
++
++        assign
++          v-chg-free-qnty = v-new-free-parts-fact-qnty - v-free-parts-fact-qnty
++          v-chg-out-qnty  = v-new-out-parts-fact-qnty  - v-out-parts-fact-qnty
+           .
+-          run trndocrs-pl-gds-accum in this-procedure
+-            (input buf_doc-pl.pl-code                                                   /* p-pl-code       */
+-            ,input 0.0                                                                  /* p-rsrv-qnty     */
+-            ,input ( if v-need-rsrv-gds = true then buf_doc-pl.cli-doc-qnty else 0.0 )  /* p-cli-rsrv-qnty */
+-            ,input 0.0                                                                  /* p-fact-qnty     */
+-            ,input buf_doc-pl.cli-fact-qnty                                             /* p-cli-fact-qnty */
+-            ) no-error .
+-          if error-status :error then do:
++
++        if v-need-rsrv-gds
++          then 
++        do:
++          run trg/rsrv-gds.p
++            (input parparentproc
++            ,buffer buf_doc-line    /* doc-line        */
++            ,input  v-chg-free-qnty /* v-chg-free-qnty */
++            ,input  v-chg-out-qnty  /* v-chg-out-qnty  */
++            ,input table temp-trndocrs-gds-dtl-rsrv
++            ,input table temp-trndocrs-pl-gds-rsrv
++            ) no-error.
++          if error-status :error
++            then 
++          do:
++            if error-status :get-message(1) <> ""
++              then 
++            do:
++              message
++                vss-workfile vss-revision vss-description skip
++                "Невозможно зарезервировать товар по признакам" skip
++                "Объект" buf_doc-line.obj-type buf_doc-line.obj-code skip
++                "Артикул" buf_doc-line.artic buf_doc-line.prod-type buf_doc-line.prod-code skip
++                error-status :get-message(1) skip
++                return-value skip
++                view-as alert-box .
++            end.
++            undo, return error .
++          end.
++
++                  /* проверяем целостность товара */
++          { gbl/gdscheck.i
++                    buf_doc-line.obj-type
++                    buf_doc-line.obj-code
++                    buf_doc-line.artic
++                    buf_doc-line.prod-type
++                    buf_doc-line.prod-code
++                    ?
++                    "''"
++                    no-error
++                  }
++          if error-status :error
++            then
++          do:
+             message
+               vss-workfile vss-revision vss-description skip
+-              "Ошибка при изменении зарезервированных количеств trndocrs-pl-gds-accum" skip
++              "Ошибка при проверке целостности товара" skip
++              "Объект" buf_doc-line.obj-type buf_doc-line.obj-code skip
++              "Артикул" buf_doc-line.artic buf_doc-line.prod-type buf_doc-line.prod-code skip
+               error-status :get-message(1) skip
+               return-value skip
+               view-as alert-box error .
+-            undo, return error return-value .
++            undo, return error .
+           end.
+-        end.
+-
+-        if v-is-petrol = true
+-          and v-is-pieces = false
+-        then do:
++
+           assign
+-            buf_doc-line.cli-qnty     = v-doc-qnty-cli
+-            buf_doc-line.doc-density  = v-doc-qnty-cli  / v-doc-qnty-base
+-            buf_doc-line.fact-density = v-fact-qnty-cli / v-fact-qnty-base
+-          .
+-        end. /* petrol */
+-      end.
+-/*      if buf_trn-doc.ext-doc-type <> {&TDEDT_Ras_Perem} then do:*/
+-      run rsrgdsck in this-procedure
+-        (input  buf_doc-line.doc-code         /* p-doc-code              */
+-        ,input  buf_trn-doc.doc-type          /* p-doc-type              */
+-        ,input  buf_doc-line.obj-type         /* p-obj-type              */
+-        ,input  buf_doc-line.obj-code         /* p-obj-code              */
+-        ,input  buf_doc-line.artic            /* p-artic                 */
+-        ,input  buf_doc-line.prod-type        /* p-prod-type             */
+-        ,input  buf_doc-line.prod-code        /* p-prod-code             */
+-        ,input  buf_doc-line.line-num         /* p-line-num              */
+-        ,output v-new-free-parts-qnty         /* p-free-parts-qnty       */
+-        ,output v-new-free-parts-fact-qnty    /* p-free-parts-fact-qnty  */
+-        ,output v-new-free-parts-cli-qnty     /* p-free-parts-cli-qnty   */
+-        ,output v-new-free-parts-price-base   /* p-free-parts-price-base */
+-        ,output v-new-free-parts-price-rubl   /* p-free-parts-price-rubl */
+-        ,output v-new-out-parts-qnty          /* p-out-parts-qnty        */
+-        ,output v-new-out-parts-fact-qnty     /* p-out-parts-fact-qnty   */
+-        ,output v-new-out-parts-cli-qnty      /* p-out-parts-cli-qnty    */
+-        ,output v-new-out-parts-price-base    /* p-out-parts-price-base  */
+-        ,output v-new-out-parts-price-rubl    /* p-out-parts-price-rubl  */
+-        ) no-error .
+-      if error-status :error
+-      then do:
+-        message
+-          vss-workfile vss-revision vss-description skip
+-          "Ошибка при просмотре зарезервированных партий" skip
+-          "Объект" buf_doc-line.obj-type buf_doc-line.obj-code skip
+-          "Артикул" buf_doc-line.artic buf_doc-line.prod-type buf_doc-line.prod-code skip
+-          error-status :get-message(1)
+-          return-value skip
+-          view-as alert-box .
+-        undo, return error .
+-      end.
+-/*      end .*/
+-      define variable v-chg-free-qnty as decimal no-undo .
+-      define variable v-chg-out-qnty  as decimal no-undo .
+-
+-      assign
+-        v-chg-free-qnty = v-new-free-parts-fact-qnty - v-free-parts-fact-qnty
+-        v-chg-out-qnty  = v-new-out-parts-fact-qnty  - v-out-parts-fact-qnty
+-      .
+-
+-      if v-need-rsrv-gds
+-      then do:
+-        run trg/rsrv-gds.p
+-          (input parparentproc
+-          ,buffer buf_doc-line    /* doc-line        */
+-          ,input  v-chg-free-qnty /* v-chg-free-qnty */
+-          ,input  v-chg-out-qnty  /* v-chg-out-qnty  */
+-          ,input table temp-trndocrs-gds-dtl-rsrv
+-          ,input table temp-trndocrs-pl-gds-rsrv
+-          ) no-error.
+-        if error-status :error
+-        then do:
+-          if error-status :get-message(1) <> ""
+-          then do:
++            v-check-cli-qnty = (buf_trn-doc.doc-type = {&income}
++                              and buf_trn-doc.internal = no
++                              )
++            .
++
++          run trg/doclnchk.p
++            (input buf_doc-line.doc-code
++            ,input buf_doc-line.artic
++            ,input buf_doc-line.prod-type
++            ,input buf_doc-line.prod-code
++            ,input v-check-cli-qnty
++            ) no-error .
++          if error-status :error
++            then 
++          do:
+             message
+-              vss-workfile vss-revision vss-description skip
+-              "Невозможно зарезервировать товар по признакам" skip
++              /* vss-workfile vss-revision vss-description skip */
++              "Проверка строки документа" skip
+               "Объект" buf_doc-line.obj-type buf_doc-line.obj-code skip
+               "Артикул" buf_doc-line.artic buf_doc-line.prod-type buf_doc-line.prod-code skip
+               error-status :get-message(1) skip
+               return-value skip
+               view-as alert-box .
+-          end.
+-          undo, return error .
+-        end.
+-
+-        /* проверяем целостность товара */
+-        { gbl/gdscheck.i
+-          buf_doc-line.obj-type
+-          buf_doc-line.obj-code
+-          buf_doc-line.artic
+-          buf_doc-line.prod-type
+-          buf_doc-line.prod-code
+-          ?
+-          "''"
+-          no-error
+-        }
+-        if error-status :error
+-        then do:
+-          message
+-            vss-workfile vss-revision vss-description skip
+-            "Ошибка при проверке целостности товара" skip
+-            "Объект" buf_doc-line.obj-type buf_doc-line.obj-code skip
+-            "Артикул" buf_doc-line.artic buf_doc-line.prod-type buf_doc-line.prod-code skip
+-            error-status :get-message(1) skip
+-            return-value skip
+-            view-as alert-box error .
+-          undo, return error .
+-        end.
+-
+-        define variable v-check-cli-qnty as logical no-undo .
+-
+-        assign
+-          v-check-cli-qnty = (buf_trn-doc.doc-type = {&income}
+-                              and buf_trn-doc.internal = no
+-                              )
+-        .
+-
+-        run trg/doclnchk.p
+-          (input buf_doc-line.doc-code
+-          ,input buf_doc-line.artic
+-          ,input buf_doc-line.prod-type
+-          ,input buf_doc-line.prod-code
+-          ,input v-check-cli-qnty
+-          ) no-error .
+-        if error-status :error
+-        then do:
+-          message
+-            /* vss-workfile vss-revision vss-description skip */
+-            "Проверка строки документа" skip
+-            "Объект" buf_doc-line.obj-type buf_doc-line.obj-code skip
+-            "Артикул" buf_doc-line.artic buf_doc-line.prod-type buf_doc-line.prod-code skip
+-            error-status :get-message(1) skip
+-            return-value skip
+-            view-as alert-box .
+-          undo, return error .
+-        end.
+-      end.
+-      else do:
+-        if v-need-check-diff-qnty = true
+-        then do:
+-          define variable v-diff-qnty as decimal   no-undo .
+-          assign
+-            v-diff-qnty = v-chg-qnty - (v-chg-free-qnty + v-chg-out-qnty)
+-          .
+-          if v-diff-qnty <> 0
+-          then do:
+-            message
+-              "Нужно создать партии с общим количеством" v-chg-qnty skip
+-              "Недостающее количество" v-diff-qnty skip
+-              view-as alert-box information .
+             undo, return error .
+           end.
+         end.
+-      end.
+-      if v-reserv-pl-code = true
+-        and v-is-petrol = true
+-        and v-is-pieces = false
+-      then do:
++        else 
++        do:
++          if v-need-check-diff-qnty = true
++            then 
++          do:
++
++            assign
++              v-diff-qnty = v-chg-qnty - (v-chg-free-qnty + v-chg-out-qnty)
++              .
++            if v-diff-qnty <> 0
++              then 
++            do:
++              message
++                "Нужно создать партии с общим количеством" v-chg-qnty skip
++                "Недостающее количество" v-diff-qnty skip
++                view-as alert-box information .
++              undo, return error .
++            end.
++          end.
++        end.
++        if v-reserv-pl-code = true
++          and v-is-petrol = true
++          and v-is-pieces = false
++          then 
++        do:
+         { str/corinvln.i
+           buf_doc-line.doc-code
+           buf_doc-line.artic
+@@ -4691,14 +5136,17 @@ PROCEDURE save-changes :
+           v-inv-rec
+           no-error
+         }
+-        if error-status :error
+-          or v-inv-rec = ?
+-        then do:
+-          undo, return error return-value .
++          if error-status :error
++            or v-inv-rec = ?
++            then 
++          do:
++            undo, return error return-value .
++          end.
+         end.
+-     end. /* petrol */
+-     end. /* transaction */
+-  end.
++      end.
++    end.
++  end.  
++
+ 
+ END PROCEDURE.
+ 
+diff --git a/trg/doc-lind.p b/trg/doc-lind.p
+--- a/trg/doc-lind.p
++++ b/trg/doc-lind.p
+@@ -98,6 +98,7 @@ on stop   undo main-block, return error 
+   if available ub.trn-doc
+   and (ub.trn-doc.ext-doc-type = {&TDEDT_Pri_Vnesh} or ub.trn-doc.ext-doc-type = {&TDEDT_Ras_Perem})
+   then do:
++
+     for each ub.parts exclusive-lock
+        where ub.parts.out-code  = ub.doc-line.doc-code
+          and ub.parts.obj-type  = ub.doc-line.obj-type
+@@ -105,6 +106,7 @@ on stop   undo main-block, return error 
+          and ub.parts.artic     = ub.doc-line.artic
+          and ub.parts.prod-type = ub.doc-line.prod-type
+          and ub.parts.prod-code = ub.doc-line.prod-code
++         and ub.doc-line.line-num = integer(entry(2,ub.parts.part-code,"/"))
+     on error undo main-block, return error substitute( "&1&2&3", vss-workfile, {&new-line}, return-value )
+     :
+       for each ub.parts-root where ub.parts-root.doc-code       = ub.parts.out-code
+@@ -229,6 +231,7 @@ on stop   undo main-block, return error 
+        and ub.gds-dtl.artic     = ub.doc-line.artic
+        and ub.gds-dtl.prod-type = ub.doc-line.prod-type
+        and ub.gds-dtl.prod-code = ub.doc-line.prod-code
++       and ub.doc-line.line-num = if ub.gds-dtl.line-num <> 0 then ub.gds-dtl.line-num else 0
+   on error undo main-block, return error substitute( "&1&2&3", vss-workfile, {&new-line}, return-value )
+   :
+     delete ub.gds-dtl .
+diff --git a/trg/partcopy.i b/trg/partcopy.i
+--- a/trg/partcopy.i
++++ b/trg/partcopy.i
+@@ -79,30 +79,51 @@ procedure partcopy :
+   on error undo, return error return-value
+   :
+ 
++    /*Для правильного проставления номер партии для внутреннего перемещения*/
+     for first buf_trn-doc no-lock where buf_trn-doc.doc-code = p-out-code :
+-      if buf_trn-doc.ext-doc-type = {&TDEDT_Ras_Perem} then do:
+-      if num-entries (buf_orig_parts.part-code,"/") > 1 and buf_orig_parts.out-code = {&free-code} then do:
+-        find first buf_doc-line no-lock where buf_doc-line.doc-code = buf_trn-doc.doc-code and
+-        buf_doc-line.line-num = integer(entry(2,buf_orig_parts.part-code,"/")) no-error .
+-        if not available (buf_doc-line) then do:
+-        for last buf_doc-line no-lock where buf_doc-line.doc-code = buf_trn-doc.doc-code:
+-        buf_orig_parts.part-code =  entry(1,buf_orig_parts.part-code,"/") + "/" + string(buf_doc-line.line-num + 1) .
+-        end.
++      if buf_trn-doc.ext-doc-type = {&TDEDT_Ras_Perem} then 
++      do:
++        if num-entries (buf_orig_parts.part-code,"/") > 1 and buf_orig_parts.out-code = {&free-code} then 
++        do:
++          find first buf_doc-line no-lock where buf_doc-line.doc-code = buf_trn-doc.doc-code and
++            buf_doc-line.line-num = integer(entry(2,buf_orig_parts.part-code,"/")) no-error .
++          if not available (buf_doc-line) then 
++          do:
++            for last buf_doc-line no-lock where buf_doc-line.doc-code = buf_trn-doc.doc-code:
++              buf_orig_parts.part-code =  entry(1,buf_orig_parts.part-code,"/") + "/" + string(buf_doc-line.line-num + 1) no-error.
++            end.
++          end.
+         end.
+-      end.
+-      else do:
+-        find first buf_doc-line no-lock where buf_doc-line.doc-code = buf_trn-doc.doc-code and
+-        buf_doc-line.artic = buf_orig_parts.artic and
+-        buf_doc-line.prod-code = buf_orig_parts.prod-code and
+-        buf_doc-line.prod-type = buf_orig_parts.prod-type and
+-        buf_doc-line.doc-qnty = 0 no-error .
+-        if not available (buf_doc-line) then do:
+-        for last buf_doc-line no-lock where buf_doc-line.doc-code = buf_trn-doc.doc-code:
+-        buf_orig_parts.part-code =  entry(1,buf_orig_parts.part-code,"/") + "/" + string(buf_doc-line.line-num + 1) .
++        else 
++        do:
++          /*Ищем документ новый созданный*/
++          find first buf_doc-line no-lock where buf_doc-line.doc-code = buf_trn-doc.doc-code and
++            buf_doc-line.artic = buf_orig_parts.artic and
++            buf_doc-line.prod-code = buf_orig_parts.prod-code and
++            buf_doc-line.prod-type = buf_orig_parts.prod-type and
++            buf_doc-line.doc-qnty = 0 no-error .
++          if not available (buf_doc-line) then 
++          do:
++            /*Смотрим к этой же партии относится или нет*/
++            find first buf_doc-line no-lock where buf_doc-line.doc-code = buf_trn-doc.doc-code and
++              buf_doc-line.artic = buf_orig_parts.artic and
++              buf_doc-line.prod-code = buf_orig_parts.prod-code and
++              buf_doc-line.prod-type = buf_orig_parts.prod-type and
++              buf_doc-line.doc-qnty <> 0  and
++              buf_doc-line.price-base = buf_orig_parts.price-base no-error .
++            if available (buf_doc-line) then 
++            do:
++              buf_orig_parts.part-code =  entry(1,buf_orig_parts.part-code,"/") + "/" + string(buf_doc-line.line-num) no-error.
++            end.
++            else 
++            do:
++              for last buf_doc-line no-lock where buf_doc-line.doc-code = buf_trn-doc.doc-code:
++                buf_orig_parts.part-code =  entry(1,buf_orig_parts.part-code,"/") + "/" + string(buf_doc-line.line-num + 1) no-error.
++              end.
++            end.
++          end.
++          else buf_orig_parts.part-code =  entry(1,buf_orig_parts.part-code,"/") + "/" + string(buf_doc-line.line-num) no-error.
+         end.
+-        end.
+-        else buf_orig_parts.part-code =  buf_orig_parts.part-code + "/" + string(buf_doc-line.line-num) .
+-      end.
+       end.
+     end.
+     if p-free-output-copy = true
+@@ -123,6 +144,7 @@ procedure partcopy :
+ 
+     if buf_orig_parts.out-code <> p-out-code
+     then do:
++      if p-out-code = {&free-code} and buf_orig_parts.out-code <> {&free-code} and buf_orig_parts.qnty <> 0 then buf_orig_parts.part-code = "" no-error .
+       /* ищем партию и создаем партию, если ее нет */
+       find first buf_parts exclusive-lock
+         where buf_parts.obj-type  = buf_orig_parts.obj-type
+@@ -164,13 +186,14 @@ procedure partcopy :
+           buf_parts.real-qnty = 0
+           buf_parts.cli-qnty  = 0
+         .
+-
+-
++        if p-out-code = {&free-code} then buf_parts.part-code = "" no-error.
+         /* сделаем партию доступной для поиска через первичный индекс */
+         /* todo - возможно это не нужно, так как блок выделен в отдельную процедуру */
+         validate buf_parts .
+       end.
+-      
++      else do:
++        if p-out-code = {&free-code} then buf_parts.part-code = "" no-error .
++      end.
+       run gen-key-rec IN THIS-PROCEDURE (  input {&table_parts}
+                                         ,input (buffer buf_orig_parts:handle)
+                                         ,output orig-part-key-rec).
+diff --git a/trg/partrqst.i b/trg/partrqst.i
+--- a/trg/partrqst.i
++++ b/trg/partrqst.i
+@@ -99,135 +99,159 @@ procedure partrqst :
+     define buffer buf_doc-line for ub.doc-line .
+     define buffer buf_trn-doc for ub.trn-doc .
+     define variable summ-line as integer no-undo .
++    define variable summ-parts as integer no-undo .
+     define variable v-parts-fact-multiplier as decimal   no-undo .
+-       
+-   /*Определение есть ли две строчки с одинаковым товаров в приходной накладной*/
+-   find first buf_trn-doc no-lock where buf_trn-doc.doc-code = p-doc-code and
+-                                        (buf_trn-doc.ext-doc-type = {&TDEDT_Pri_Vnesh} or 
+-                                         buf_trn-doc.ext-doc-type = {&TDEDT_Pri_Perem}) no-error .
+-   if available (buf_trn-doc) then do:
++    define variable v-part-code as character no-undo .
++    
++      
++    /*Определение есть ли две строчки с одинаковым товаров в приходной накладной*/
++    find first buf_trn-doc no-lock where buf_trn-doc.doc-code = p-doc-code
++      /*    and                                                                                  */
++      /*                                        (buf_trn-doc.ext-doc-type = {&TDEDT_Pri_Vnesh} or*/
++      /*                                         buf_trn-doc.ext-doc-type = {&TDEDT_Pri_Perem})  */
++      no-error .
++    if available (buf_trn-doc) then 
++    do:
+       for each buf_doc-line no-lock where buf_doc-line.doc-code = p-doc-code and
+-                                          buf_doc-line.artic = p-artic and
+-                                          buf_doc-line.prod-code = p-prod-code and
+-                                          buf_doc-line.prod-type = p-prod-type and
+-                                          buf_doc-line.obj-code = p-obj-code and
+-                                          buf_doc-line.obj-type = p-obj-type:
+-      summ-line = summ-line + 1 .                                             
++        buf_doc-line.artic = p-artic and
++        buf_doc-line.prod-code = p-prod-code and
++        buf_doc-line.prod-type = p-prod-type and
++        buf_doc-line.obj-code = p-obj-code and
++        buf_doc-line.obj-type = p-obj-type:
++        summ-line = summ-line + 1 .                                             
+       end.                                             
+-   end.
+-                                                 
+-   if summ-line > 1 then do:
++    end.
+     for each buf_parts no-lock
+       where buf_parts.out-code  = p-doc-code
++      and buf_parts.obj-type  = p-obj-type
++      and buf_parts.obj-code  = p-obj-code
++      and buf_parts.artic     = p-artic
++      and buf_parts.prod-type = p-prod-type
++      and buf_parts.prod-code = p-prod-code
++      on error undo, return error return-value
++      : 
++      if num-entries (buf_parts.part-code,"/") = 2 and (v-part-code = "" or v-part-code <> buf_parts.part-code) then 
++      do:
++        summ-parts = summ-parts + 1 .
++        v-part-code = buf_parts.part-code .
++      end.
++    end.                                              
++    if summ-line > 1 and summ-parts = summ-line then 
++    do:
++      for each buf_parts no-lock
++        where buf_parts.out-code  = p-doc-code
+         and buf_parts.obj-type  = p-obj-type
+         and buf_parts.obj-code  = p-obj-code
+         and buf_parts.artic     = p-artic
+         and buf_parts.prod-type = p-prod-type
+         and buf_parts.prod-code = p-prod-code
+         and string(p-line-num) = entry(2, buf_parts.part-code, "/")
+-    on error undo, return error return-value
+-    :
+-      assign
+-        v-parts-fact-multiplier = 1
+-      .
+-      if buf_parts.qnty <> 0 then do:
++        on error undo, return error return-value
++        : 
+         assign
+-          v-parts-fact-multiplier = buf_parts.fact-qnty / buf_parts.qnty
+-        .
+-      end.
++          v-parts-fact-multiplier = 1
++          .
++        if buf_parts.qnty <> 0 then 
++        do:
++          assign
++            v-parts-fact-multiplier = buf_parts.fact-qnty / buf_parts.qnty
++            .
++        end.
+ 
+-      assign
+-        p-total-parts-qnty            = p-total-parts-qnty       + buf_parts.qnty
+-        p-total-parts-fact-qnty       = p-total-parts-fact-qnty  + buf_parts.fact-qnty
+-        p-total-parts-cli-qnty        = p-total-parts-cli-qnty   + buf_parts.cli-qnty
+-        p-total-parts-fact-cli-qnty   = p-total-parts-fact-cli-qnty
++        assign
++          p-total-parts-qnty           = p-total-parts-qnty       + buf_parts.qnty
++          p-total-parts-fact-qnty      = p-total-parts-fact-qnty  + buf_parts.fact-qnty
++          p-total-parts-cli-qnty       = p-total-parts-cli-qnty   + buf_parts.cli-qnty
++          p-total-parts-fact-cli-qnty  = p-total-parts-fact-cli-qnty
+                                       + buf_parts.cli-qnty * v-parts-fact-multiplier
+-        p-total-parts-price-cli       = p-total-parts-price-cli  + buf_parts.cli-qnty  * buf_parts.price-cli
+-        p-total-parts-price-base      = p-total-parts-price-base + buf_parts.fact-qnty * buf_parts.price-base
+-        p-total-parts-price-rubl      = p-total-parts-price-rubl + buf_parts.fact-qnty * buf_parts.price-rubl
+-        p-total-parts-transport-base  = p-total-parts-transport-base
++          p-total-parts-price-cli      = p-total-parts-price-cli  + buf_parts.cli-qnty  * buf_parts.price-cli
++          p-total-parts-price-base     = p-total-parts-price-base + buf_parts.fact-qnty * buf_parts.price-base
++          p-total-parts-price-rubl     = p-total-parts-price-rubl + buf_parts.fact-qnty * buf_parts.price-rubl
++          p-total-parts-transport-base = p-total-parts-transport-base
+                                       + buf_parts.fact-qnty
+                                         * (if   buf_parts.transport-base <> ?
+                                           then buf_parts.transport-base
+                                           else 0
+                                           )
+-        p-total-parts-transport-rubl  = p-total-parts-transport-rubl
++          p-total-parts-transport-rubl = p-total-parts-transport-rubl
+                                       + buf_parts.fact-qnty
+                                         * (if   buf_parts.transport-rubl <> ?
+                                           then buf_parts.transport-rubl
+                                           else 0
+                                           )
+-        p-total-parts-other-base      = p-total-parts-other-base
++          p-total-parts-other-base     = p-total-parts-other-base
+                                       + buf_parts.fact-qnty
+                                         * (if   buf_parts.other-base <> ?
+                                           then buf_parts.other-base
+                                           else 0
+                                           )
+-        p-total-parts-other-rubl      = p-total-parts-other-rubl
++          p-total-parts-other-rubl     = p-total-parts-other-rubl
+                                       + buf_parts.fact-qnty
+                                         * (if   buf_parts.other-rubl <> ?
+                                           then buf_parts.other-rubl
+                                           else 0
+                                           )
+-      .
+-    end.      
+-   end.
+-   else do:                                           
+-    for each buf_parts no-lock
+-      where buf_parts.out-code  = p-doc-code
++          .
++      end.      
++    end.
++    else 
++    do:                                           
++      for each buf_parts no-lock
++        where buf_parts.out-code  = p-doc-code
+         and buf_parts.obj-type  = p-obj-type
+         and buf_parts.obj-code  = p-obj-code
+         and buf_parts.artic     = p-artic
+         and buf_parts.prod-type = p-prod-type
+         and buf_parts.prod-code = p-prod-code
+-    on error undo, return error return-value
+-    :
++        on error undo, return error return-value
++        :
+ 
+ 
+-      assign
+-        v-parts-fact-multiplier = 1
+-      .
+-      if buf_parts.qnty <> 0 then do:
+         assign
+-          v-parts-fact-multiplier = buf_parts.fact-qnty / buf_parts.qnty
+-        .
+-      end.
++          v-parts-fact-multiplier = 1
++          .
++        if buf_parts.qnty <> 0 then 
++        do:
++          assign
++            v-parts-fact-multiplier = buf_parts.fact-qnty / buf_parts.qnty
++            .
++        end.
+ 
+-      assign
+-        p-total-parts-qnty            = p-total-parts-qnty       + buf_parts.qnty
+-        p-total-parts-fact-qnty       = p-total-parts-fact-qnty  + buf_parts.fact-qnty
+-        p-total-parts-cli-qnty        = p-total-parts-cli-qnty   + buf_parts.cli-qnty
+-        p-total-parts-fact-cli-qnty   = p-total-parts-fact-cli-qnty
++        assign
++          p-total-parts-qnty           = p-total-parts-qnty       + buf_parts.qnty
++          p-total-parts-fact-qnty      = p-total-parts-fact-qnty  + buf_parts.fact-qnty
++          p-total-parts-cli-qnty       = p-total-parts-cli-qnty   + buf_parts.cli-qnty
++          p-total-parts-fact-cli-qnty  = p-total-parts-fact-cli-qnty
+                                       + buf_parts.cli-qnty * v-parts-fact-multiplier
+-        p-total-parts-price-cli       = p-total-parts-price-cli  + buf_parts.cli-qnty  * buf_parts.price-cli
+-        p-total-parts-price-base      = p-total-parts-price-base + buf_parts.fact-qnty * buf_parts.price-base
+-        p-total-parts-price-rubl      = p-total-parts-price-rubl + buf_parts.fact-qnty * buf_parts.price-rubl
+-        p-total-parts-transport-base  = p-total-parts-transport-base
++          p-total-parts-price-cli      = p-total-parts-price-cli  + buf_parts.cli-qnty  * buf_parts.price-cli
++          p-total-parts-price-base     = p-total-parts-price-base + buf_parts.fact-qnty * buf_parts.price-base
++          p-total-parts-price-rubl     = p-total-parts-price-rubl + buf_parts.fact-qnty * buf_parts.price-rubl
++          p-total-parts-transport-base = p-total-parts-transport-base
+                                       + buf_parts.fact-qnty
+                                         * (if   buf_parts.transport-base <> ?
+                                           then buf_parts.transport-base
+                                           else 0
+                                           )
+-        p-total-parts-transport-rubl  = p-total-parts-transport-rubl
++          p-total-parts-transport-rubl = p-total-parts-transport-rubl
+                                       + buf_parts.fact-qnty
+                                         * (if   buf_parts.transport-rubl <> ?
+                                           then buf_parts.transport-rubl
+                                           else 0
+                                           )
+-        p-total-parts-other-base      = p-total-parts-other-base
++          p-total-parts-other-base     = p-total-parts-other-base
+                                       + buf_parts.fact-qnty
+                                         * (if   buf_parts.other-base <> ?
+                                           then buf_parts.other-base
+                                           else 0
+                                           )
+-        p-total-parts-other-rubl      = p-total-parts-other-rubl
++          p-total-parts-other-rubl     = p-total-parts-other-rubl
+                                       + buf_parts.fact-qnty
+                                         * (if   buf_parts.other-rubl <> ?
+                                           then buf_parts.other-rubl
+                                           else 0
+                                           )
+-      .
+-    end.
++          .
++      end.
+     end.
+   end.
+ 
+diff --git a/trg/rsrv-dtl.p b/trg/rsrv-dtl.p
+--- a/trg/rsrv-dtl.p
++++ b/trg/rsrv-dtl.p
+@@ -1240,9 +1240,12 @@ if ObjSrv:Env:ParametrsOfSection:GetSect
+                             + substitute( "Удалось зарезервировать &1.&2&2", chg-qnty, {&new-line} )
+                             + substitute( "&1", v-error-message )
+         .
+-        message
+-          v-error-message skip
+-          view-as alert-box information .
++        if ub.trn-doc.ext-doc-type <> {&TDEDT_Ras_Perem} and ub.trn-doc.ext-doc-type <> {&TDEDT_Pri_Vnesh} then 
++        do:
++          message
++            v-error-message skip
++            view-as alert-box information .
++        end.
+       end.
+ 
+       run trndocrs-need-rsrv in this-procedure
+diff --git a/trg/rsrv-gds.p b/trg/rsrv-gds.p
+--- a/trg/rsrv-gds.p
++++ b/trg/rsrv-gds.p
+@@ -587,7 +587,46 @@ on error undo main-block, return error
+       undo, return error .
+     end.
+   end.
++  /*Проверять только при после первого прохода во внутренем расходе*/
++  define buffer bf_doc-line for ub.doc-line .
+ 
++  if ub.trn-doc.ext-doc-type = {&TDEDT_Ras_Perem} then 
++  do:
++    find last bf_doc-line no-lock where bf_doc-line.doc-code = buf_doc-line.doc-code and
++      bf_doc-line.artic = buf_doc-line.artic and
++      bf_doc-line.prod-code = buf_doc-line.prod-code and
++      bf_doc-line.prod-type = buf_doc-line.prod-type and
++      bf_doc-line.obj-code = buf_doc-line.obj-code and
++      bf_doc-line.obj-type = buf_doc-line.obj-type no-error .
++    if bf_doc-line.line-num = buf_doc-line.line-num then 
++    do:
++      { gbl/gdscheck.i
++    buf_doc-line.obj-type
++    buf_doc-line.obj-code
++    buf_doc-line.artic
++    buf_doc-line.prod-type
++    buf_doc-line.prod-code
++    v-root-node
++    "''"
++    no-error
++  }
++      if error-status :error then 
++      do:
++        message
++          vss-workfile vss-revision vss-description skip
++          "Ошибка при проверке целостности товара" skip
++          "Объект" buf_doc-line.obj-type buf_doc-line.obj-code skip
++          "Артикул" buf_doc-line.artic buf_doc-line.prod-type buf_doc-line.prod-code skip
++          "Проверка целостности товара до резервирования" skip
++          error-status :get-message(1) skip
++          return-value skip
++          view-as alert-box .
++        undo, return error .
++      end.
++    end.
++  end.
++  else 
++  do:
+   { gbl/gdscheck.i
+     buf_doc-line.obj-type
+     buf_doc-line.obj-code
+@@ -598,16 +637,18 @@ on error undo main-block, return error
+     "''"
+     no-error
+   }
+-  if error-status :error then do:
+-    message
+-      vss-workfile vss-revision vss-description skip
+-      "Ошибка при проверке целостности товара" skip
+-      "Объект" buf_doc-line.obj-type buf_doc-line.obj-code skip
+-      "Артикул" buf_doc-line.artic buf_doc-line.prod-type buf_doc-line.prod-code skip
+-      "Проверка целостности товара до резервирования" skip
+-      error-status :get-message(1) skip
+-      return-value skip
+-      view-as alert-box .
+-    undo, return error .
++    if error-status :error then 
++    do:
++      message
++        vss-workfile vss-revision vss-description skip
++        "Ошибка при проверке целостности товара" skip
++        "Объект" buf_doc-line.obj-type buf_doc-line.obj-code skip
++        "Артикул" buf_doc-line.artic buf_doc-line.prod-type buf_doc-line.prod-code skip
++        "Проверка целостности товара до резервирования" skip
++        error-status :get-message(1) skip
++        return-value skip
++        view-as alert-box .
++      undo, return error .
++    end.
+   end.
+ end.
+\ No newline at end of file

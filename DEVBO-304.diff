@@ -1,0 +1,20 @@
+# HG changeset patch
+# User SSlivenko
+# Parent  2e2e582bb19fdfb46cb441b237a9b55cf1356096
+refs #DEVBO-304 Некорректное формирование НДС приходной партии товара при внутреннем перемещении. #BTS-1202
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-304
+https://msk-exp-jira.expertek.local/browse/BTS-1202
+
+diff --git a/utl/trndocmv-1c.p b/utl/trndocmv-1c.p
+--- a/utl/trndocmv-1c.p
++++ b/utl/trndocmv-1c.p
+@@ -528,7 +528,7 @@ on error undo, return error return-value
+         buf_parts.price-rubl = TempDocPart.price-rubl
+         buf_parts.price-base = TempDocPart.price-rubl
+         buf_parts.price-cli  = TempDocPart.price-rubl
+-        buf_parts.VAT-pc     = buf_doc-line.vat-pc
++        buf_parts.VAT-pc     = if TempDocPart.vat-pc <> ? then TempDocPart.vat-pc else buf_doc-line.vat-pc
+         
+         buf_parts.purch-code = buf_trn-doc.purch-code
+         

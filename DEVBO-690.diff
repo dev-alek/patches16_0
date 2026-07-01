@@ -1,0 +1,19 @@
+# HG changeset patch
+# User EShklyar
+# Parent  5711a3ac7488e1961add0ae37c6ab5f9ef1a2a6a
+refs #DEVBO-690 Отчет Торг29, в раздел "Расход" учитываются возвраты
+
+http://exp-jira.expertek.local:8080/browse/DEVBO-690
+
+diff --git a/rep/r-trg29d.p b/rep/r-trg29d.p
+--- a/rep/r-trg29d.p
++++ b/rep/r-trg29d.p
+@@ -1966,7 +1966,7 @@ for each buf_temp-inkas where
+   end.
+       if v-inc then do:
+     find first buf_temp-cp where
+-                  buf_temp-cp.doc-code = buf_temp-inkas.ret-doc-code
++		(buf_temp-cp.doc-code = buf_temp-inkas.ret-doc-code or buf_temp-cp.doc-code = buf_temp-inkas.ras-doc-code)                   
+           and buf_temp-cp.gds-code = buf_bar-code.gds-code
+           and buf_temp-cp.cdpay-code = buf_chk-gds-pay.pay-code
+           and buf_temp-cp.curr-code = buf_chk-gds-pay.curr-code no-error.

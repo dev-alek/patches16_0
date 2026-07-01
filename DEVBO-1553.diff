@@ -1,0 +1,7 @@
+# HG changeset patch
+# User EShklyar
+# Parent  439f4e3f5bfe40c60819fb017030b06c0bc2a665
+refs #DEVBO-1553 Перекрывание наименований параметров в экранных формах
+
+http://exp-jira.expertek.local:8080/browse/DEVBO-1553
+

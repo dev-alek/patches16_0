@@ -1,0 +1,29 @@
+# HG changeset patch
+# User SSlivenko
+# Parent  7b247fee3895ab953a5a2dc669b71fef3bb39d75
+refs #DEVBO-1155 ЗИ 215: Автозаполнения накладной НП
+
+http://exp-jira.expertek.local:8080/browse/DEVBO-1155
+Запрет на ручной ввод (копирование) qr-кода
+
+diff -r 7b247fee3895 str/trnscanqr.w
+--- a/str/trnscanqr.w	Чт дек 23 11:38:04 2021 +0300
++++ b/str/trnscanqr.w	Чт дек 23 12:56:44 2021 +0300
+@@ -286,7 +286,7 @@
+   end.
+   
+   apply "entry" to v-mark in frame {&FRAME-NAME}.
+-  v-mark:READ-ONLY IN FRAME {&frame-name}       = TRUE .
++/*  v-mark:READ-ONLY IN FRAME {&frame-name}        = TRUE .*/
+   
+   disable v-sts with frame {&frame-name}.
+   
+@@ -433,7 +433,7 @@
+   end.
+   
+   v-json-str = v-mark:screen-value .
+-  v-scan-str = "".
++  v-scan-str = "" .
+   
+   if trim(v-json-str) = ""
+   then do :

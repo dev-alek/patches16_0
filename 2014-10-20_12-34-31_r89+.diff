@@ -1,0 +1,29 @@
+# HG changeset patch
+# Parent f48ccb2dd4e211843204684a84046a0f514d5ebf
+cmp/str-glbt.p for refs #3307 and #3290
+
+diff -r f48ccb2dd4e2 -r a99596b57ca3 cmp/str-glbt.p
+--- a/cmp/str-glbt.p	Wed Oct 15 16:53:46 2014 +0400
++++ b/cmp/str-glbt.p	Mon Oct 20 12:35:36 2014 +0400
+@@ -260,7 +260,7 @@
+ /* атрибут объектный -  Взаиморасчеты -Платежи */
+ { cmp/cr-prep.i 1 attr-fin-doc  fin-doc fin-doc fin-doc fin-doc  }
+ { cmp/cr-prepc.i 1 prop-list-attr-fin-doc
+-"suffix-pko,prefix-pko,current-pko,suffix-rko,prefix-rko,current-rko,head-position,director,snr-accnt,cash-book,uchet,dpt-option,dpt-dflt-name,dpt-dflt-type,dpt-dflt-code"
++"suffix-pko,prefix-pko,current-pko,suffix-rko,prefix-rko,current-rko,head-position,director,snr-accnt,cash-book,uchet,dpt-option,dpt-dflt-name,dpt-dflt-type,dpt-dflt-code,page-cash-book"
+ attr-fin-doc }
+ 
+ 
+@@ -541,10 +541,10 @@
+ attr-petrol
+ }
+ 
+-/* Настройки работы с персоналом*/
++/* Настройки работы с пользователями и персоналом*/
+ { cmp/cr-prep.i 1 attr-staff-options staff " " staff }
+ { cmp/cr-prepc.i 1 prop-list-attr-staff-options
+-"noanshftstaff"
++"noanshftstaff,obyznumbukv,minparol"
+ attr-staff-options
+ }
+ 

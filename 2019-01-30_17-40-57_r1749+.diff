@@ -1,0 +1,78 @@
+# HG changeset patch
+# User ASMorozov
+# Parent  b8511ed14eeca7ee18c9b81d1aa380ce923bc6bc
+gopa
+
+diff -r b8511ed14eec ibs/th/gbl/collection/asubjects.cls
+--- a/ibs/th/gbl/collection/asubjects.cls	Fri Jan 25 15:56:04 2019 +0300
++++ b/ibs/th/gbl/collection/asubjects.cls	Wed Jan 30 18:04:08 2019 +0300
+@@ -17,6 +17,7 @@
+ 
+ using Progress.Lang.*.
+ using ibs.th.gbl.collection.*.
++using ibs.th.gbl.*.
+ 
+ 
+ class ibs.th.gbl.collection.asubjects implements isubjects:
+@@ -45,6 +46,7 @@
+     
+   constructor public asubjects ( arg as log ):
+     
++    gopa:gg = gopa:gg + 1.
+     IsDelChildObj = arg.
+     
+   end constructor.
+@@ -55,7 +57,7 @@
+ ------------------------------------------------------------------------------*/
+     
+   constructor public asubjects (  ):
+-    
++    gopa:gg = gopa:gg + 1.
+     
+   end constructor.
+ 
+@@ -135,6 +137,7 @@
+   ------------------------------------------------------------------------------*/
+   destructor public asubjects ( ):
+     
++    gopa:gg = gopa:gg - 1.
+     if IsDelChildObj 
+     then 
+       for each ttListObj:
+diff -r b8511ed14eec ibs/th/gbl/gopa.cls
+--- /dev/null	Thu Jan 01 00:00:00 1970 +0000
++++ b/ibs/th/gbl/gopa.cls	Wed Jan 30 18:04:08 2019 +0300
+@@ -0,0 +1,32 @@
++ 
++ /*------------------------------------------------------------------------
++    File        : gopa
++    Purpose     : 
++    Syntax      : 
++    Description : 
++    Author(s)   : asmorozov
++    Created     : Wed Jan 30 17:34:59 MSK 2019
++    Notes       : 
++  ----------------------------------------------------------------------*/
++
++using Progress.Lang.*.
++
++
++class ibs.th.gbl.gopa:
++  
++  define static property gg as int
++    get.
++    set (arg as int):
++      gg = arg.
++      if gg = 10000
++        then run gbl/inidebug.p.
++    end.
++
++  
++  constructor static gopa ( ):
++    
++    
++    
++  end constructor.
++
++end class.
+\ No newline at end of file

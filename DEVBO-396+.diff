@@ -1,0 +1,31 @@
+# HG changeset patch
+# User BelovaMM
+# Parent  05fd402b9de8ec22b0cd2dc3c35d5d9384a8ded7
+refs #DEVBO-396 Реализация функционала онлайн-проверки КМ, которые записаны в БД ТН, при добавлении в документ расхода внешнего #BTS-1487
+
+Добавлена реализация BTS-1487 (DEVBO-396)
+
+https://msk-exp-jira.expertek.local/browse/BTS-1487
+https://msk-exp-jira.expertek.local/browse/DEVBO-396
+
+diff --git a/str/chs-alcmarks.w b/str/chs-alcmarks.w
+--- a/str/chs-alcmarks.w
++++ b/str/chs-alcmarks.w
+@@ -1005,7 +1005,7 @@ PROCEDURE save_update :
+           return.
+         end.  
+                 
+-        /*vStatusCheckMark = marking:checkScanMark(t_doc.obj-code, v-mark, vcodident, no, output vRunedOffLineCheck) no-error.
++        vStatusCheckMark = marking:checkScanMark(t_doc.obj-code, v-mark, vcodident, no, output vRunedOffLineCheck) no-error.
+         if error-status:error then
+         do:
+             run dispmessage (
+@@ -1026,7 +1026,7 @@ PROCEDURE save_update :
+               "Проверка марки дала отрицательный результат, марка не может быть добавлена в документ."
+               ).
+             return.
+-        end.*/
++        end.
+       end.
+       when {&TDEDT_Ras_Perem} then
+       do:

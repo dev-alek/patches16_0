@@ -1,0 +1,69 @@
+# HG changeset patch
+# User SSlivenko
+# Parent  8f47734ef9a9815af19f4b725444f6a4b32d7eea
+refs #DEVBO-19 Расширение выгрузки документов в 1С (ЗИ 78 Возврат поставщику)
+
+http://exp-jira:8080/browse/DEVBO-19
+
+diff -r 8f47734ef9a9 -r 4f9e20d057eb ibs/th/bge/1crn/subjects/trn-gd-doc.cls
+--- a/ibs/th/bge/1crn/subjects/trn-gd-doc.cls	Tue Nov 12 17:22:59 2019 +0300
++++ b/ibs/th/bge/1crn/subjects/trn-gd-doc.cls	Tue Nov 12 18:07:37 2019 +0300
+@@ -87,6 +87,15 @@
+   define variable isDel            as logical   no-undo.
+   define variable v-bufhnd         as handle    no-undo.
+   define variable v-user-name      as character no-undo.
++  define variable v-reasons-for-return as character no-undo .
++  
++  define variable par-type          as character no-undo.
++  define variable v-value-character as character no-undo .
++  define variable v-value-date      as date      no-undo .
++  define variable v-value-decimal   as decimal   no-undo .
++  define variable v-value-integer   as integer   no-undo .
++  define variable v-value-logical   as logical   no-undo .
++  define variable v-tth             as handle    no-undo .
+ 
+ 
+   method public void CrContentToSW (insw as handle):
+@@ -144,8 +153,29 @@
+       buf_trn-doc.creid
+       v-user-name }
+     
+-    if buf_trn-doc.reason-code = 23 and buf_trn-doc.ext-doc-type = {&TDEDT_Ras_Vnesh} /*особый случай для расхода внешнего, если код основание 23 то это идет в 1С как возврат поставщику*/
+-    then do:
++    delete object v-tth no-error.
++    run adm/shattri.p (
++           input "get":U
++          ,input buf_trn-doc.obj-type
++          ,input buf_trn-doc.obj-code
++          ,input {&attr-nakl_par}
++          ,input  "reasons-for-return"
++          ,output v-reasons-for-return
++          ,output v-value-date
++          ,output v-value-decimal
++          ,output v-value-integer
++          ,output v-value-logical
++          ,output par-type
++          ,INPUT-OUTPUT table-handle v-tth
++          ) no-error .
++    if error-status :error  then v-reasons-for-return = "".
++    delete object v-tth no-error.
++    
++/*    if buf_trn-doc.reason-code = 23 and buf_trn-doc.ext-doc-type = {&TDEDT_Ras_Vnesh} /*особый случай для расхода внешнего, если код основание 23 то это идет в 1С как возврат поставщику*/*/
++/*    then do:  
++    /* Возврат поставщику через расход */                                                                                                                                                                             */
++    if lookup( string(buf_trn-doc.reason-code), v-reasons-for-return) > 0 and buf_trn-doc.ext-doc-type = {&TDEDT_Ras_Vnesh}
++    then do :
+       v-doc-type-ERPRN = "2".
+       if v-is-petrol-trn
+         then StartDocTrnFuel().
+@@ -639,6 +669,10 @@
+         write-data-element ("psn-wrkr", string-mth (buf_trn-doc.wrkr)).
+         write-data-element ("psn-agnt", string-mth (buf_trn-doc.agnt)).
+         write-data-element ("psn-boss", string-mth (buf_trn-doc.boss)).
++        if buf_trn-doc.out-code > "" and v-doc-type-ERPRN = "2"
++        then do :
++          write-data-element ("source-doc", buf_trn-doc.out-code).
++        end.
+   end.
+ 
+   method private void EndDocTrn ():

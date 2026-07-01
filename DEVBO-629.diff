@@ -1,0 +1,908 @@
+# HG changeset patch
+# User ARostovtsev
+# Parent  dca10ee6fb040a71ae2bdc37a7469ee024bcea98
+refs #DEVBO-629 Большой размер УБД. РН-Москва. TH 16.0 #BTS-1871
+Уменьшение физического размера БД
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-629
+https://msk-exp-jira.expertek.local/browse/BTS-1871
+
+diff --git a/adm/l-i-pressdb.w b/adm/l-i-pressdb.w
+new file mode 100644
+--- /dev/null
++++ b/adm/l-i-pressdb.w
+@@ -0,0 +1,559 @@
++&ANALYZE-SUSPEND _VERSION-NUMBER UIB_v8r12 GUI
++&ANALYZE-RESUME
++&Scoped-define WINDOW-NAME w-login
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CUSTOM _DEFINITIONS w-login 
++/*------------------------------------------------------------------------
++
++  File: 
++
++  Description: 
++
++  Input Parameters:
++      <none>
++
++  Output Parameters:
++      <none>
++
++  Author: 
++
++  Created: 03/02/20 - 10:54 am
++
++------------------------------------------------------------------------*/
++/*          This .W file was created with the Progress AppBuilder.       */
++/*----------------------------------------------------------------------*/
++
++/* ***************************  Definitions  ************************** */
++
++/* Parameters Definitions ---                                           */
++{cmp\str-glbl.i }
++{ cmp/trg-def.i new }
++{ utl/cut-load.i &filename="press_db.log"}
++/* Local Variable Definitions ---                                       */
++
++define variable vWrkDir  as character no-undo init "press-db".
++define variable vTables  as character no-undo init "tables.txt".
++define variable vFileLog as character no-undo.
++
++define stream sToFile.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++&ANALYZE-SUSPEND _UIB-PREPROCESSOR-BLOCK 
++
++/* ********************  Preprocessor Definitions  ******************** */
++
++&Scoped-define PROCEDURE-TYPE WINDOW
++&Scoped-define DB-AWARE no
++
++/* Name of designated FRAME-NAME and/or first browse and/or first query */
++&Scoped-define FRAME-NAME FRAME-A
++
++/* Standard List Definitions                                            */
++&Scoped-Define ENABLED-OBJECTS b-OK f-db-src name password f-db-rec ~
++log-edit b-quit 
++&Scoped-Define DISPLAYED-OBJECTS f-db-src f-db-rec log-edit 
++
++/* Custom List Definitions                                              */
++/* List-1,List-2,List-3,List-4,List-5,List-6                            */
++
++/* _UIB-PREPROCESSOR-BLOCK-END */
++&ANALYZE-RESUME
++
++
++
++/* ***********************  Control Definitions  ********************** */
++
++/* Define the widget handle for the window                              */
++DEFINE VAR w-login AS WIDGET-HANDLE NO-UNDO.
++
++/* Definitions of the field level widgets                               */
++DEFINE BUTTON b-OK  NO-FOCUS
++     LABEL "&Сжать":L 
++     SIZE 13 BY 1
++     BGCOLOR 15 .
++
++DEFINE BUTTON b-quit AUTO-END-KEY  NO-FOCUS
++     LABEL "&Закрыть":L 
++     SIZE 12.4 BY 1.
++
++DEFINE VARIABLE log-edit AS CHARACTER 
++     VIEW-AS EDITOR SCROLLBAR-VERTICAL
++     SIZE 74 BY 7.91 NO-UNDO.
++
++DEFINE VARIABLE f-db-rec AS CHARACTER FORMAT "X(256)":U INITIAL "c:~\baza~\etalon~\ub" 
++     LABEL "БД приемник" 
++     VIEW-AS FILL-IN 
++     SIZE 57.4 BY 1 TOOLTIP "Укажите полный путь к БД-приемник. Например: c:\baza\etalon\db" NO-UNDO.
++
++DEFINE VARIABLE f-db-src AS CHARACTER FORMAT "X(256)":U INITIAL "c:~\baza~\ubd~\ub" 
++     LABEL "БД источник" 
++     VIEW-AS FILL-IN 
++     SIZE 57.2 BY 1 TOOLTIP "Укажите полный путь к БД-источник. Например: c:\baza\ubd\db." NO-UNDO.
++
++DEFINE VARIABLE name AS CHARACTER FORMAT "X(12)":U INITIAL "адм" 
++     LABEL "Логин" 
++     VIEW-AS FILL-IN 
++     SIZE 20 BY 1 NO-UNDO.
++
++DEFINE VARIABLE password AS CHARACTER FORMAT "X(16)":U INITIAL "адм" 
++     LABEL "Пароль" 
++     VIEW-AS FILL-IN 
++     SIZE 20 BY 1 NO-UNDO.
++
++
++/* ************************  Frame Definitions  *********************** */
++
++DEFINE FRAME FRAME-A
++     b-OK AT ROW 7.19 COL 13
++     f-db-src AT ROW 1.76 COL 4.6 WIDGET-ID 2
++     name AT ROW 3 COL 16.8 COLON-ALIGNED
++     password AT ROW 4.29 COL 16.8 COLON-ALIGNED PASSWORD-FIELD 
++     f-db-rec AT ROW 5.57 COL 3.6 WIDGET-ID 14
++     log-edit AT ROW 8.57 COL 4 NO-LABEL WIDGET-ID 12
++     b-quit AT ROW 7.19 COL 26
++    WITH 1 DOWN NO-BOX OVERLAY 
++         SIDE-LABELS THREE-D 
++         AT COL 1 ROW 1
++         SIZE 79.8 BY 16.14.
++
++
++/* *********************** Procedure Settings ************************ */
++
++&ANALYZE-SUSPEND _PROCEDURE-SETTINGS
++/* Settings for THIS-PROCEDURE
++   Type: WINDOW
++ */
++&ANALYZE-RESUME _END-PROCEDURE-SETTINGS
++
++/* *************************  Create Window  ************************** */
++
++&ANALYZE-SUSPEND _CREATE-WINDOW
++IF SESSION:DISPLAY-TYPE = "GUI":U THEN
++  CREATE WINDOW w-login ASSIGN
++         HIDDEN             = YES
++         TITLE              = "Trade House 16.0"
++         COLUMN             = 27
++         ROW                = 7.57
++         HEIGHT             = 16.14
++         WIDTH              = 80
++         MAX-HEIGHT         = 48.43
++         MAX-WIDTH          = 384
++         VIRTUAL-HEIGHT     = 48.43
++         VIRTUAL-WIDTH      = 384
++         RESIZE             = no
++         SCROLL-BARS        = yes
++         STATUS-AREA        = no
++         BGCOLOR            = ?
++         FGCOLOR            = ?
++         THREE-D            = yes
++         MESSAGE-AREA       = no
++         SENSITIVE          = yes.
++ELSE {&WINDOW-NAME} = CURRENT-WINDOW.
++/* END WINDOW DEFINITION                                                */
++&ANALYZE-RESUME
++
++
++
++/* ***********  Runtime Attributes and AppBuilder Settings  *********** */
++
++&ANALYZE-SUSPEND _RUN-TIME-ATTRIBUTES
++/* SETTINGS FOR FRAME FRAME-A
++   FRAME-NAME UNDERLINE                                                 */
++/* SETTINGS FOR BUTTON b-OK IN FRAME FRAME-A
++   NO-DISPLAY                                                           */
++/* SETTINGS FOR BUTTON b-quit IN FRAME FRAME-A
++   NO-DISPLAY                                                           */
++/* SETTINGS FOR FILL-IN f-db-rec IN FRAME FRAME-A
++   ALIGN-L                                                              */
++/* SETTINGS FOR FILL-IN f-db-src IN FRAME FRAME-A
++   ALIGN-L                                                              */
++ASSIGN 
++       log-edit:READ-ONLY IN FRAME FRAME-A        = TRUE.
++
++/* SETTINGS FOR FILL-IN name IN FRAME FRAME-A
++   NO-DISPLAY                                                           */
++/* SETTINGS FOR FILL-IN password IN FRAME FRAME-A
++   NO-DISPLAY                                                           */
++IF SESSION:DISPLAY-TYPE = "GUI":U AND VALID-HANDLE(w-login)
++THEN w-login:HIDDEN = no.
++
++/* _RUN-TIME-ATTRIBUTES-END */
++&ANALYZE-RESUME
++
++ 
++
++
++
++/* ************************  Control Triggers  ************************ */
++
++&Scoped-define SELF-NAME b-OK
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL b-OK w-login
++ON CHOOSE OF b-OK IN FRAME FRAME-A /* Сжать */
++DO:
++  define variable vConnect       as character no-undo.
++  define variable v-user-entered as logical   no-undo init false .
++  define variable vDbSrc         as character no-undo.
++  define variable vDbRec         as character no-undo.
++
++  assign
++    f-db-src
++    name
++    password
++    f-db-rec
++  .
++
++  if search(trim(f-db-src) + ".db") = ? then
++  do:
++    message
++     "Не найдена БД источнк."
++      view-as alert-box information .
++    apply "entry" to f-db-src .
++    return no-apply .
++  end.
++  if search(trim(f-db-rec) + ".db") = ? then
++  do:
++    message
++     "Не найдена БД приемник."
++      view-as alert-box information .
++    apply "entry" to f-db-rec .
++    return no-apply .
++  end.
++
++  if name :screen-value = ""
++  then do:
++    message
++      "Введите имя пользователя"
++      view-as alert-box information .
++    apply "entry" to name .
++    return no-apply .
++  end.
++  
++  assign
++    vDbSrc = substitute("-db &1 -ld ub -1", trim(f-db-src)) 
++    vDbRec = substitute("-db &1 -ld &2 -1 -U sysadm -P sysadm -i" ,trim(f-db-rec), "dst") 
++    vConnect = vDbSrc   
++               + (if     name ne "" 
++                     and name ne ?
++                  then " &1 "
++                  else " ")
++  .
++  run gbl/dbconnnodisc.p
++    (input vConnect
++    ,input ? /* v-fltConnect */
++    ,input name
++    ,input password
++    ,input-output v-user-entered
++    ) no-error.
++  if error-status:error
++  then do:
++     message return-value view-as alert-box.
++     return no-apply.
++  end.
++   
++  if userid('{&db-name_schema}':U) = '':U
++  then do:
++    message
++      "Ошибка при подключении к базе данных" skip
++      "Неизвестный пользователь" skip
++      view-as alert-box error .
++    disconnect ub no-error .
++    quit.
++  end.
++
++   run gbl/dbconnnodisc.p
++    (input vDbRec
++    ,input ? /* v-fltConnect */
++    ,input name
++    ,input password
++    ,input-output v-user-entered
++    ) no-error.
++  if error-status:error
++  then do:
++     message return-value view-as alert-box.
++    disconnect ub no-error .
++     quit.
++  end.
++  
++  if userid('dst':U) = '':U
++  then do:
++    message
++      "Ошибка при подключении к базе данных" skip
++      "Неизвестный пользователь" skip
++      view-as alert-box error .
++    disconnect ub no-error .
++    quit.
++  end.
++
++  assign
++    session :data-entry-return = no 
++  .
++
++  /* --------------------- Если произошло подключение к базе данных --------------------- */
++  if v-user-entered then
++  do:
++    message
++      'Вы уверены, что хотите произвести перенос данных в другую БД для сжатия базы?' skip
++      view-as alert-box question buttons yes-no update v-ok as logical.
++    if v-ok <> true then do:
++      return no-apply .
++    end.
++
++    disable b-OK b-quit with frame {&frame-name}.
++         
++    run utl/pressdbbef.p (
++      input vWrkDir,
++      input vTables,
++      input this-procedure :handle
++    ) no-error.
++    if error-status :error then do:
++       message
++         substitute( "Ошибка при выполнении подготовительных процедур!" ) skip
++         return-value skip
++         error-status :get-message ( error-status :num-messages )
++         view-as alert-box error
++       .
++       disconnect ub.
++       disconnect dst.
++       enable b-OK b-quit with frame {&frame-name}.
++       return no-apply.
++    end.
++    disconnect ub.
++    disconnect dst.
++
++    run utl/pressdbdump.p (
++      input search(vWrkDir + "\" + vTables),
++      f-db-src,
++      input this-procedure :handle
++    ) no-error.
++    if error-status :error then do:
++      message
++       substitute( "Ошибка при выполнении выгрузки данных БД!" ) skip
++       return-value skip
++       error-status :get-message ( error-status :num-messages )
++       view-as alert-box error
++      .
++      enable b-OK b-quit with frame {&frame-name}.
++      return no-apply.
++    end.
++
++    run utl/pressdbload.p (
++      input vWrkDir,
++      f-db-rec,
++      input this-procedure :handle
++    ) no-error.
++    if error-status :error then do:
++      message
++       substitute( "Ошибка при выполнении зарузки данных БД!" ) skip
++       return-value skip
++       error-status :get-message ( error-status :num-messages )
++       view-as alert-box error
++      .
++      enable b-OK b-quit with frame {&frame-name}.
++      return no-apply.
++    end.
++
++    /* соеденяемся с БД-приемник для пересчета sequence */
++    run gbl/dbconnnodisc.p
++      (input substitute("-db &1 -ld &2 -1 -U sysadm -P sysadm -i" ,trim(f-db-rec), "ub")
++      ,input ? /* v-fltConnect */
++      ,input name
++      ,input password
++      ,input-output v-user-entered
++      ) no-error.
++    run write-to-log in this-procedure
++    ( string(today, '99/99/9999') + " " + string(time, 'HH:MM') + 
++      " Восстановливаем Sequences" + {&new-line}
++    ,this-procedure
++    ).
++    run adm/restseqr.p
++      ( input "rest-no-msg":U
++       ,input "":U
++       ,input no
++      ) no-error .
++    disconnect ub.
++
++    run write-to-log in this-procedure
++    ( string(today, '99/99/9999') + " " + string(time, 'HH:MM') + 
++      " Удаление временных файлов." + {&new-line}
++    ,this-procedure
++    ).
++
++    os-delete value(vWrkDir + "\") recursive.
++    if os-error <> 0 then do:
++      message
++       substitute( "Ошибка при удалении временных файлов!" ) skip
++       substitute( "Код ошибки: &1.", os-error )
++       view-as alert-box error
++      .
++      enable b-OK b-quit with frame {&frame-name}.
++      return no-apply.
++    end.
++    
++    run write-to-log in this-procedure
++    ( string(today, '99/99/9999') + " " + string(time, 'HH:MM') + 
++      " Перенос БД завершен." + {&new-line}
++    ,this-procedure
++    ).
++
++    message
++      "Перенос БД завершен."
++      view-as alert-box error
++    .
++
++    enable b-OK b-quit with frame {&frame-name}.
++  end.
++  else do:
++    if error-status :error then 
++    do:
++      message
++        "Ошибка при подключении к БД" skip
++        error-status :get-message(1) skip
++        return-value skip
++        view-as alert-box error .
++      disconnect ub no-error .
++    end.
++    else
++    do:
++      message
++        "Ошибка при подключении к базе данных" skip
++        "Обратитесь к администратору" skip
++        "Строка подключения к БД:" skip
++        vConnect skip
++        view-as alert-box error .
++      enable b-OK b-quit with frame {&frame-name}.
++    end.
++  end.
++END.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++&UNDEFINE SELF-NAME
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CUSTOM _MAIN-BLOCK w-login 
++
++
++/* Parent the dialog-box to the ACTIVE-WINDOW, if there is no parent.   */
++IF VALID-HANDLE(ACTIVE-WINDOW) AND FRAME {&FRAME-NAME}:PARENT eq ?
++THEN FRAME {&FRAME-NAME}:PARENT = ACTIVE-WINDOW.
++
++{ gbl/app_help.i &disable-button=yes }
++
++on "ENTRY" of b-ok do:
++  if lastkey = keycode ("RETURN") then do:
++    apply "CHOOSE" to b-ok in frame {&frame-name}.
++  end.
++end.
++
++on window-close of {&window-name} do:
++  apply "end-error" to frame {&frame-name}.
++end.
++
++
++MAIN-BLOCK:
++DO ON ERROR   UNDO MAIN-BLOCK, LEAVE MAIN-BLOCK
++   ON END-KEY UNDO MAIN-BLOCK, LEAVE MAIN-BLOCK:
++  ASSIGN
++    CURRENT-WINDOW             = {&WINDOW-NAME}
++    SESSION:SYSTEM-ALERT-BOXES = (CURRENT-WINDOW:MESSAGE-AREA = NO)
++    session:three-d = yes
++  .
++
++  PAUSE 0 BEFORE-HIDE.
++
++  if session:date-format <> "dmy":U
++  or session:numeric-decimal-point <> ".":U
++  or session:numeric-separator <> ",":U
++  then do:
++    message
++      "Неправильные установки сессии progress!" skip
++      "Формат даты должен быть - " "'dmy'":U skip
++      "Десятичный разделитель - " "'.'":U skip
++      "Разделитель тысяч - " "','":U skip
++      view-as alert-box error .
++    quit.
++  end.
++
++  run enable_UI in this-procedure .
++
++  WAIT-FOR GO OF frame {&FRAME-NAME} focus name.
++END.
++RUN disable_UI in this-procedure.
++quit.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++/* **********************  Internal Procedures  *********************** */
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE callback-write-to-log w-login 
++PROCEDURE callback-write-to-log :
++/*------------------------------------------------------------------------------
++  Purpose:     
++  Parameters:  <none>
++  Notes:       
++------------------------------------------------------------------------------*/
++  define input parameter p-msg-str as character no-undo .
++
++  define variable lok as logical   no-undo .
++
++  do with frame {&frame-name}
++  on error undo, return error return-value
++  :
++    assign
++      lok = log-edit :move-to-eof( )
++      lok = log-edit :insert-string( p-msg-str )
++      lok = log-edit :move-to-eof( )
++    .
++  end. /* do with frame */
++
++END PROCEDURE.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE disable_UI w-login  _DEFAULT-DISABLE
++PROCEDURE disable_UI :
++/*------------------------------------------------------------------------------
++  Purpose:     DISABLE the User Interface
++  Parameters:  <none>
++  Notes:       Here we clean-up the user-interface by deleting
++               dynamic widgets we have created and/or hide 
++               frames.  This procedure is usually called when
++               we are ready to "clean-up" after running.
++------------------------------------------------------------------------------*/
++  /* Delete the WINDOW we created */
++  IF SESSION:DISPLAY-TYPE = "GUI":U AND VALID-HANDLE(w-login)
++  THEN DELETE WIDGET w-login.
++  IF THIS-PROCEDURE:PERSISTENT THEN DELETE PROCEDURE THIS-PROCEDURE.
++END PROCEDURE.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE enable_UI w-login  _DEFAULT-ENABLE
++PROCEDURE enable_UI :
++/*------------------------------------------------------------------------------
++  Purpose:     ENABLE the User Interface
++  Parameters:  <none>
++  Notes:       Here we display/view/enable the widgets in the
++               user-interface.  In addition, OPEN all queries
++               associated with each FRAME and BROWSE.
++               These statements here are based on the "Other 
++               Settings" section of the widget Property Sheets.
++------------------------------------------------------------------------------*/
++  DISPLAY f-db-src f-db-rec log-edit 
++      WITH FRAME FRAME-A IN WINDOW w-login.
++  ENABLE b-OK f-db-src name password f-db-rec log-edit b-quit 
++      WITH FRAME FRAME-A IN WINDOW w-login.
++  {&OPEN-BROWSERS-IN-QUERY-FRAME-A}
++  VIEW w-login.
++END PROCEDURE.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
+diff --git a/cleandb/00045000.p b/cleandb/00045000.p
+--- a/cleandb/00045000.p
++++ b/cleandb/00045000.p
+@@ -162,8 +162,13 @@ procedure saveLastPriceList:
+          and buf_price-list.fact-order > in-price-list.fact-order
+          and buf_price-list.fact-order < find-fact-order
+   no-error.
+-  if not avail buf_price-list then
+-  do:
++  if not avail buf_price-list and 
++     /* проверим, что такая запись уже не создавалась */
++     not can-find(first buf_price-list no-lock where
++                        buf_price-list.doc-num     = v-doc-num
++                    and buf_price-list.price-type = in-price-list.price-type
++                    and buf_price-list.b-code     = in-price-list.b-code) 
++  then do:
+     create buf_price-list.
+     buffer-copy in-price-list to buf_price-list assign
+       buf_price-list.doc-num     = v-doc-num
+diff --git a/cleandb/00199000.p b/cleandb/00199000.p
+--- a/cleandb/00199000.p
++++ b/cleandb/00199000.p
+@@ -1,7 +1,7 @@
+ block-level on error undo, throw.
+ /*
+ 
+-Чистка БД. Архиф финансовых док-тов.
++Чистка БД. Архив финансовых док-тов.
+ 
+ Автор: Ростовцев Александр
+ Дата создания: 09/10/2025
+@@ -10,7 +10,7 @@ Creation date: 10/09/25
+ 
+ */
+ 
+-&scop Tables Архиф финансовых док-тов
++&scop Tables Архив финансовых док-тов
+ /*&scop Tables arh-fin-doc-an ~*/
+ /*arh-fin-doc-an-attr ~        */
+ /*arh-fin-doc-an-nal ~         */
+diff --git a/cleandb/dellinkrec.i b/cleandb/dellinkrec.i
+--- a/cleandb/dellinkrec.i
++++ b/cleandb/dellinkrec.i
+@@ -5,6 +5,9 @@ for each {1} exclusive-lock
+     {2}
+ on error undo, return error
+ :
+-      delete {1}.
++      delete {1} no-error.
++      if error-status:error then
++        undo, return error error-status:get-message(1).
++      
+       vDeleted = vDeleted + 1.
+ end.
+diff --git a/utl/cut-load.i b/utl/cut-load.i
+--- a/utl/cut-load.i
++++ b/utl/cut-load.i
+@@ -38,7 +38,7 @@ PROCEDURE write-to-log :
+ 
+     if  valid-handle(p-call-back)
+     and lookup('callback-write-to-log', p-call-back :internal-entries) > 0
+-    and p-call-back <> this-procedure :handle
++/*    and p-call-back <> this-procedure :handle*/
+     then do:
+       run callback-write-to-log in p-call-back
+         (input p-msg-str
+diff --git a/utl/pressdbbef.p b/utl/pressdbbef.p
+new file mode 100644
+--- /dev/null
++++ b/utl/pressdbbef.p
+@@ -0,0 +1,87 @@
++block-level on error undo, throw.
++/*
++
++$Revision: aea5316774be, 0, rls $
++$Author: sibinek-soft $
++$Date: 20/01/2026 $
++$Workfile: pressdbbef.p $
++$Archive: utl/pressdbbef.p $
++
++Сжатие БД. Выгрузка списка таблиц базы.
++
++Автор: Ростовцев Александр
++Дата создания: 20.01.2026
++Author: Aleksandr Rostovtsev
++Creation date: 20/01/2026
++
++*/
++
++/* Parameters Definitions ---                                           */
++
++
++define input parameter iWrkDir as character no-undo.
++define input parameter iTables as character no-undo.
++define input parameter p-handle-callback     as handle    no-undo . /* вопросительный знак или указатель на вызываемую процедуру */
++
++define variable vss-revision    as character no-undo init "$Revision: aea5316774be, 0, rls $":U .
++define variable vss-author      as character no-undo init "$Author: sibintek-soft $":U .
++define variable vss-date        as character no-undo init "$Date: 20/01/2026 $":U .
++define variable vss-workfile    as character no-undo init "$Workfile: pressdbbef.p $":U .
++define variable vss-archive     as character no-undo init "$Archive: utl/pressdbbef.p $":U .
++define variable vss-description as character no-undo init "Сжатие БД. Выгрузка списка таблиц базы.".
++{ cmp/str-glbl.i }
++{ utl/cut-load.i &filename="press_db.log"}
++
++find first dst.sys-ctrl no-lock no-error.
++if avail dst.sys-ctrl then
++  return error 'Сжатие БД невозможно, т.к. база-приемник уже имеет данные.'.
++
++define variable vFullTables as character no-undo.
++define buffer old-user for ub._user.
++define buffer new-user for dst._user.
++define stream sToFile.
++
++os-create-dir value(iWrkDir).
++
++vFullTables = substitute("&1\&2",iWrkDir,iTables).
++
++output stream sToFile to value(vFullTables).
++
++if search(vFullTables) = ? then
++  return error substitute("Не удалось открыть файл &1", vFullTables).
++
++run write-to-log in this-procedure
++   ( string(today, '99/99/9999') + " " + string(time, 'HH:MM') + 
++     {&new-line} + "Формируем список таблиц для выгрузки." + {&new-line}
++   ,p-handle-callback
++).
++
++for each dst._file no-lock where
++         not dst._file._file-name begins "_"
++:
++  put stream sToFile unformatted dst._file._file-name skip.
++end.
++
++output stream sToFile close.
++
++run write-to-log in this-procedure
++   ( string(today, '99/99/9999') + " " + string(time, 'HH:MM') + 
++     {&new-line} + "Переносим пользователей." + {&new-line}
++   ,p-handle-callback
++).
++
++do
++on error undo, return error SUBSTITUTE("&1 &2 &3", return-value, error-status:get-message(1), error-status:get-message(2)):
++  for each old-user no-lock
++  on error undo, return error SUBSTITUTE("&1 &2 &3", return-value, error-status:get-message(1), error-status:get-message(2))
++  :
++    find first new-user no-lock
++      where new-user._userid = old-user._userid
++      no-error .
++    if not available new-user then do:
++      create new-user.
++      buffer-copy old-user except _TenantId to new-user.
++    end.
++  end.
++end.
++
+diff --git a/utl/pressdbdump.p b/utl/pressdbdump.p
+new file mode 100644
+--- /dev/null
++++ b/utl/pressdbdump.p
+@@ -0,0 +1,76 @@
++block-level on error undo, throw.
++/*
++
++$Revision: aea5316774be, 0, rls $
++$Author: sibinek-soft $
++$Date: 20/01/2026 $
++$Workfile: pressdbdump.p $
++$Archive: utl/pressdbdump.p $
++
++Сжатие БД. Выгрузка данных таблиц БД.
++
++Автор: Ростовцев Александр
++Дата создания: 20.01.2026
++Author: Aleksandr Rostovtsev
++Creation date: 20/01/2026
++
++*/
++
++/* Parameters Definitions ---                                           */
++
++
++define input parameter iFileTables as character no-undo.
++define input parameter iDbSrc      as character no-undo.
++define input parameter p-handle-callback     as handle    no-undo . /* вопросительный знак или указатель на вызываемую процедуру */
++
++define variable vss-revision    as character no-undo init "$Revision: aea5316774be, 0, rls $":U .
++define variable vss-author      as character no-undo init "$Author: sibintek-soft $":U .
++define variable vss-date        as character no-undo init "$Date: 20/01/2026 $":U .
++define variable vss-workfile    as character no-undo init "$Workfile: pressdbdump.p $":U .
++define variable vss-archive     as character no-undo init "$Archive: utl/pressdbdump.p $":U .
++define variable vss-description as character no-undo init "Сжатие БД. Выгрузка данных таблиц БД.".
++{ cmp/str-glbl.i }
++{ utl/cut-load.i &filename="press_db.log"}
++
++define variable vTable   as character no-undo.
++define variable vDumpDir as character no-undo.
++define variable vCmd     as character no-undo.
++define variable vLetter  as character no-undo.
++define variable vError   as integer   no-undo.
++define stream sFromFile. 
++
++vDumpDir = substring(iFileTables, 1, r-index(iFileTables,"\") - 1).
++
++input stream sFromFile from value(iFileTables). 
++
++run write-to-log in this-procedure
++   ( "Выгружаем данные таблиц БД в " + vDumpDir + "." + {&new-line}
++   ,p-handle-callback
++).
++
++
++repeat:
++  import stream sFromFile vTable.  
++
++  if vLetter ne substring(vTable, 1, 1) then
++  do:
++    vLetter= substring(vTable, 1, 1).
++    run write-to-log in this-procedure
++       ( string(today, '99/99/9999') + " " + string(time, 'HH:MM') + 
++         " Выгружаем таблицы " + vLetter + "*." + {&new-line}
++       ,p-handle-callback
++    ).
++  end.
++  vCmd = substitute(
++    "&4 &1 -C dump &2 &3",
++    iDbSrc,
++    vTable,
++    vDumpDir,
++    entry(1,search("proutil.bat"),".")).
++  os-command silent value(vCmd).
++  vError = os-error.
++  if vError <> 0 then
++    return error substitute("Таблица &1; Ошибка &2.", vTable, vError).
++end.
++
++input stream sFromFile close.
+diff --git a/utl/pressdbload.p b/utl/pressdbload.p
+new file mode 100644
+--- /dev/null
++++ b/utl/pressdbload.p
+@@ -0,0 +1,90 @@
++block-level on error undo, throw.
++/*
++
++$Revision: aea5316774be, 0, rls $
++$Author: sibinek-soft $
++$Date: 21/01/2026 $
++$Workfile: pressdbload.p $
++$Archive: utl/pressdbload.p $
++
++Сжатие БД. Загрузка данных таблиц БД.
++
++Автор: Ростовцев Александр
++Дата создания: 21.01.2026
++Author: Aleksandr Rostovtsev
++Creation date: 21/01/2026
++
++*/
++
++/* Parameters Definitions ---                                           */
++
++
++define input parameter iDumpDir as character no-undo.
++define input parameter iDbRec   as character no-undo.
++define input parameter p-handle-callback     as handle    no-undo . /* вопросительный знак или указатель на вызываемую процедуру */
++
++define variable vss-revision    as character no-undo init "$Revision: aea5316774be, 0, rls $":U .
++define variable vss-author      as character no-undo init "$Author: sibintek-soft $":U .
++define variable vss-date        as character no-undo init "$Date: 20/01/2026 $":U .
++define variable vss-workfile    as character no-undo init "$Workfile: pressdbdump.p $":U .
++define variable vss-archive     as character no-undo init "$Archive: utl/pressdbdump.p $":U .
++define variable vss-description as character no-undo init "Сжатие БД. Выгрузка данных таблиц БД.".
++{ cmp/str-glbl.i }
++{ utl/cut-load.i &filename="press_db.log"}
++
++define variable vNameFull  as character no-undo.
++define variable vNameShort as character no-undo.
++define variable vType      as character no-undo.
++define variable vCmd       as character no-undo.
++define variable vLetter    as character no-undo.
++define variable vError     as integer   no-undo.
++define stream sFromDir. 
++
++input stream sFromDir from os-dir(".\" + iDumpDir). 
++
++run write-to-log in this-procedure
++   ( "Загружаем данные в новую БД." + {&new-line}
++   ,p-handle-callback
++).
++
++repeat:
++  import stream sFromDir vNameShort vNameFull vType.  
++  
++  if vType <> "F" or entry(2,vNameShort,".") <> "bd" then
++    next. 
++  
++  if vLetter ne substring(vNameShort, 1, 1) then
++  do:
++    vLetter= substring(vNameShort, 1, 1).
++    run write-to-log in this-procedure
++       ( string(today, '99/99/9999') + " " + string(time, 'HH:MM') + 
++         " Загружаем таблицы " + vLetter + "*." + {&new-line}
++       ,p-handle-callback
++    ).
++  end.
++  vCmd = substitute(
++    "&3 &1 -C load &2 build indexes",
++    iDbRec,
++    vNameFull,
++    entry(1,search("proutil.bat"),".")).
++  os-command silent value(vCmd).
++  vError = os-error.
++  if vError <> 0 then
++    return error substitute("Таблица &1; Ошибка &2.", entry(1,vNameShort,"."), vError).
++end.
++
++input stream sFromDir close.
++
++/*  run write-to-log in this-procedure                                  */
++/*     ( string(today, '99/99/9999') + " " + string(time, 'HH:MM') +    */
++/*       " Перестраиваем индексы." + {&new-line}                        */
++/*     ,p-handle-callback                                               */
++/*  ).                                                                  */
++/*vCmd = substitute(                                                    */
++/*    "c:\dlc1172\bin\proutil &1 -C idxbuild all",                      */
++/*    iDbRec).                                                          */
++/*os-command silent value(vCmd).                                        */
++/*vError = os-error.                                                    */
++/*if vError <> 0 then                                                   */
++/*  return error substitute("Ошибка перестроения индексов &1.", vError).*/
++  
+\ No newline at end of file

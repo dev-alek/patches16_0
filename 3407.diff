@@ -1,0 +1,1181 @@
+# HG changeset patch
+# User SShalanin
+# Parent  51340dc89f650277993921e2f0ba16dce955d5bf
+refs#3407 Фильтр по коду талона в интерфейса партий серийных МЦ
+
+http://exp-rm/redmine/issues/3407
+
+diff -r 51340dc89f65 -r 7611e6fb1d87 str/wthparts.w
+--- a/str/wthparts.w	Thu Apr 30 17:39:30 2015 +0300
++++ b/str/wthparts.w	Thu Apr 30 17:41:15 2015 +0300
+@@ -1,6 +1,6 @@
+ &ANALYZE-SUSPEND _VERSION-NUMBER AB_v10r12 GUI
+ &ANALYZE-RESUME
+-/* Connected Databases
++/* Connected Databases 
+ */
+ &Scoped-define WINDOW-NAME CURRENT-WINDOW
+ &Scoped-define FRAME-NAME Dialog-Frame
+@@ -4,7 +4,7 @@
+ */
+ &Scoped-define WINDOW-NAME CURRENT-WINDOW
+ &Scoped-define FRAME-NAME Dialog-Frame
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CUSTOM _DEFINITIONS Dialog-Frame
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CUSTOM _DEFINITIONS Dialog-Frame 
+ /*
+ 
+ $Revision$
+@@ -33,9 +33,9 @@
+ /* Parameters Definitions ---                                           */
+ 
+ define input parameter parparentproc as widget-handle no-undo .
+-define input parameter p-curr-host-code like ub.sysconf.host-code no-undo .
+-define input parameter p-curr-obj-type  like ub.clients.obj-type no-undo .
+-define input parameter p-curr-obj-code  like ub.clients.obj-code no-undo .
++define input parameter p-curr-host-code like sysconf.host-code no-undo .
++define input parameter p-curr-obj-type  like clients.obj-type no-undo .
++define input parameter p-curr-obj-code  like clients.obj-code no-undo .
+ define input parameter p-coll-point     as character no-undo .  /*Справочник, Документ, Выбор, wth-ser*/
+ define input parameter p-edit-mode  as character no-undo . /*Редактирование, просмотр*/
+ define input parameter p-wth-code   as integer   no-undo.
+@@ -44,8 +44,8 @@
+ define input parameter p-db-num     as INTEGER no-undo.
+ define input parameter p-wth-doc    as character no-undo.
+ define input parameter p-w-p-code   as INTEGER no-undo.
+-define input parameter p-cli-type  like ub.clients.obj-type no-undo .
+-define input parameter p-cli-code  like ub.clients.obj-code no-undo .
++define input parameter p-cli-type  like clients.obj-type no-undo .
++define input parameter p-cli-code  like clients.obj-code no-undo .
+ define input parameter p-type      as character no-undo.
+ 
+ 
+@@ -87,7 +87,6 @@
+ define variable v-obj-name as char no-undo.
+ 
+ 
+-
+ DEFINE BUFFER b-wth-doc   FOR ub.wth-doc.
+ DEFINE BUFFER b-wealth    FOR ub.wealth.
+ DEFINE BUFFER b-wth-par   FOR ub.wth-par.
+@@ -103,7 +102,7 @@
+ &ANALYZE-RESUME
+ 
+ 
+-&ANALYZE-SUSPEND _UIB-PREPROCESSOR-BLOCK
++&ANALYZE-SUSPEND _UIB-PREPROCESSOR-BLOCK 
+ 
+ /* ********************  Preprocessor Definitions  ******************** */
+ 
+@@ -118,8 +117,8 @@
+ &Scoped-define INTERNAL-TABLES X_wth-parts
+ 
+ /* Definitions for BROWSE br-parts                                      */
+-&Scoped-define FIELDS-IN-QUERY-br-parts mark-string( recid(X_wth-parts), rid-list ) get-ser-name(X_wth-parts.ser-code,X_wth-parts.db-num) @ v-serName X_wth-parts.fact-rangeFrom X_wth-parts.fact-rangeTo X_wth-parts.fact-qnty get-cli-name(X_wth-parts.obj-type,X_wth-parts.obj-code ) @ v-obj-name get-w-p-name(X_wth-parts.w-p-code, X_wth-parts.obj-type,X_wth-parts.obj-code) @ v-w-p-name get-wthparts-out-code(X_wth-parts.out-code) @ v-out-name X_wth-parts.in-code X_wth-parts.price-rubl X_wth-parts.beg-dt X_wth-parts.end-dt get-cli-name(X_wth-parts.sale-obj-type,X_wth-parts.sale-obj-code ) get-cli-name(X_wth-parts.cli-type,X_wth-parts.cli-code ) get-cli-name(X_wth-parts.out-obj-type,X_wth-parts.out-obj-code ) X_wth-parts.fact-date X_wth-parts.shift-date X_wth-parts.shift-num get-cli-name(X_wth-parts.in-obj-type,X_wth-parts.out-obj-code ) get-cli-name(X_wth-parts.supp-type,X_wth-parts.supp-code ) X_wth-parts.doc-code X_wth-parts.doc-rangeFrom X_wth-parts.doc-rangeTo X_wth-parts.qnty-doc X_wth-parts.price-base X_wth-parts.VAT-pc X_wth-parts.host-code ENTRY(LOOKUP(X_wth-parts.ext-doc-type, {&WDEDT_List}), {&WDEDT_List-full}) X_wth-parts.fact-num X_wth-parts.fact-order X_wth-parts.wth-code X_wth-parts.par-code substitute('&1-&2',X_wth-parts.ser-code,X_wth-parts.db-num) @ v-SerDb X_wth-parts.stts X_wth-parts.TYPE
+-&Scoped-define ENABLED-FIELDS-IN-QUERY-br-parts
++&Scoped-define FIELDS-IN-QUERY-br-parts mark-string( recid(X_wth-parts), rid-list ) get-ser-name(X_wth-parts.ser-code,X_wth-parts.db-num) @ v-serName X_wth-parts.fact-rangeFrom X_wth-parts.fact-rangeTo X_wth-parts.fact-qnty get-cli-name(X_wth-parts.obj-type,X_wth-parts.obj-code ) @ v-obj-name get-w-p-name(X_wth-parts.w-p-code, X_wth-parts.obj-type,X_wth-parts.obj-code) @ v-w-p-name get-wthparts-out-code(X_wth-parts.out-code) @ v-out-name X_wth-parts.in-code X_wth-parts.price-rubl X_wth-parts.beg-dt X_wth-parts.end-dt get-cli-name(X_wth-parts.sale-obj-type,X_wth-parts.sale-obj-code ) get-cli-name(X_wth-parts.cli-type,X_wth-parts.cli-code ) get-cli-name(X_wth-parts.out-obj-type,X_wth-parts.out-obj-code ) X_wth-parts.fact-date X_wth-parts.shift-date X_wth-parts.shift-num get-cli-name(X_wth-parts.in-obj-type,X_wth-parts.out-obj-code ) get-cli-name(X_wth-parts.supp-type,X_wth-parts.supp-code ) X_wth-parts.doc-code X_wth-parts.doc-rangeFrom X_wth-parts.doc-rangeTo X_wth-parts.qnty-doc X_wth-parts.price-base X_wth-parts.VAT-pc X_wth-parts.host-code ENTRY(LOOKUP(X_wth-parts.ext-doc-type, {&WDEDT_List}), {&WDEDT_List-full}) X_wth-parts.fact-num X_wth-parts.fact-order X_wth-parts.wth-code X_wth-parts.par-code substitute('&1-&2',X_wth-parts.ser-code,X_wth-parts.db-num) @ v-SerDb X_wth-parts.stts X_wth-parts.TYPE   
++&Scoped-define ENABLED-FIELDS-IN-QUERY-br-parts   
+ &Scoped-define SELF-NAME br-parts
+ &Scoped-define QUERY-STRING-br-parts FOR EACH X_wth-parts NO-LOCK INDEXED-REPOSITION
+ &Scoped-define OPEN-QUERY-br-parts OPEN QUERY {&SELF-NAME} FOR EACH X_wth-parts NO-LOCK INDEXED-REPOSITION.
+@@ -132,13 +131,13 @@
+     ~{&OPEN-QUERY-br-parts}
+ 
+ /* Standard List Definitions                                            */
+-&Scoped-Define ENABLED-OBJECTS b-exit b-quit B-mark B-mark-all ~
+-B-cancel-mark B-sel b-lkp B-add B-chg B-del B-sch B-print B-hist B-Help ~
+-RECT-1 RECT-8 rsfl-obj br-parts bar-str fl-wth-name fl-par-val fl-par-price ~
+-fl-doc-code fl-doc-date fl-doc-ext-type text-sts Fn-rs-obj
+-&Scoped-Define DISPLAYED-OBJECTS rsfl-ch rsfl-obj bar-str fl-wth-name ~
+-fl-par-val fl-gds fl-par-price fl-doc-code fl-doc-date fl-doc-ext-type ~
+-text-sts Fn-rs-obj
++&Scoped-Define ENABLED-OBJECTS b-exit RECT-1 RECT-8 b-quit B-mark ~
++B-mark-all B-cancel-mark B-sel b-lkp B-add B-chg B-del B-sch B-print B-hist ~
++B-Help rsfl-obj br-parts bar-str code-str fl-wth-name fl-par-val ~
++fl-par-price fl-doc-code fl-doc-date fl-doc-ext-type text-sts Fn-rs-obj 
++&Scoped-Define DISPLAYED-OBJECTS rsfl-ch rsfl-obj bar-str code-str ~
++fl-wth-name fl-par-val fl-gds fl-par-price fl-doc-code fl-doc-date ~
++fl-doc-ext-type text-sts Fn-rs-obj 
+ 
+ /* Custom List Definitions                                              */
+ /* List-1,List-2,List-3,List-4,List-5,List-6                            */
+@@ -149,10 +148,10 @@
+ 
+ /* ************************  Function Prototypes ********************** */
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION-FORWARD get-cli-name Dialog-Frame
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION-FORWARD get-cli-name Dialog-Frame 
+ FUNCTION get-cli-name RETURNS CHARACTER
+   ( f-cli-type AS CHAR, f-cli-code as int  )  FORWARD.
+ 
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+@@ -153,13 +152,13 @@
+ FUNCTION get-cli-name RETURNS CHARACTER
+   ( f-cli-type AS CHAR, f-cli-code as int  )  FORWARD.
+ 
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION-FORWARD get-ser-name Dialog-Frame
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION-FORWARD get-ser-name Dialog-Frame 
+ FUNCTION get-ser-name RETURNS CHARACTER
+   ( pfser-code AS INT, pfser-db AS INT )  FORWARD.
+ 
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+@@ -160,13 +159,13 @@
+ FUNCTION get-ser-name RETURNS CHARACTER
+   ( pfser-code AS INT, pfser-db AS INT )  FORWARD.
+ 
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION-FORWARD get-w-p-name Dialog-Frame
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION-FORWARD get-w-p-name Dialog-Frame 
+ FUNCTION get-w-p-name RETURNS CHARACTER
+   ( vf-w-p-code AS int ,vf-obj-type as char, vf-obj-code as int )  FORWARD.
+ 
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+@@ -167,10 +166,10 @@
+ FUNCTION get-w-p-name RETURNS CHARACTER
+   ( vf-w-p-code AS int ,vf-obj-type as char, vf-obj-code as int )  FORWARD.
+ 
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION-FORWARD get-wthparts-out-code Dialog-Frame
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION-FORWARD get-wthparts-out-code Dialog-Frame 
+ FUNCTION get-wthparts-out-code RETURNS CHARACTER
+   ( vf-out-code AS CHAR )  FORWARD.
+ 
+@@ -183,7 +182,7 @@
+ /* Define a dialog box                                                  */
+ 
+ /* Definitions of the field level widgets                               */
+-DEFINE BUTTON B-add
+-     LABEL "&Добавить"
++DEFINE BUTTON B-add 
++     LABEL "&Добавить" 
+      SIZE 10 BY 1.
+ 
+@@ -188,6 +187,6 @@
+      SIZE 10 BY 1.
+ 
+-DEFINE BUTTON B-cancel-mark
+-     LABEL "-"
++DEFINE BUTTON B-cancel-mark 
++     LABEL "-" 
+      SIZE 3 BY 1 TOOLTIP "Снять все выделения".
+ 
+@@ -192,6 +191,6 @@
+      SIZE 3 BY 1 TOOLTIP "Снять все выделения".
+ 
+-DEFINE BUTTON B-chg
+-     LABEL "&Изменить"
++DEFINE BUTTON B-chg 
++     LABEL "&Изменить" 
+      SIZE 10 BY 1.
+ 
+@@ -196,6 +195,6 @@
+      SIZE 10 BY 1.
+ 
+-DEFINE BUTTON B-del
+-     LABEL "&Удалить"
++DEFINE BUTTON B-del 
++     LABEL "&Удалить" 
+      SIZE 10 BY 1.
+ 
+@@ -200,6 +199,6 @@
+      SIZE 10 BY 1.
+ 
+-DEFINE BUTTON b-doc-code
++DEFINE BUTTON b-doc-code 
+      IMAGE-UP FILE "cmp/btn-fnd.bmp":U
+      IMAGE-DOWN FILE "cmp/btn-fnd.bmp":U
+      IMAGE-INSENSITIVE FILE "cmp/btn-fnd.bmp":U NO-CONVERT-3D-COLORS
+@@ -203,6 +202,6 @@
+      IMAGE-UP FILE "cmp/btn-fnd.bmp":U
+      IMAGE-DOWN FILE "cmp/btn-fnd.bmp":U
+      IMAGE-INSENSITIVE FILE "cmp/btn-fnd.bmp":U NO-CONVERT-3D-COLORS
+-     LABEL "Документ"
++     LABEL "Документ" 
+      SIZE 3 BY 1 TOOLTIP "Документ, породивший партию".
+ 
+@@ -207,7 +206,7 @@
+      SIZE 3 BY 1 TOOLTIP "Документ, породивший партию".
+ 
+-DEFINE BUTTON b-exit AUTO-GO
+-     LABEL "&Ввод"
++DEFINE BUTTON b-exit AUTO-GO 
++     LABEL "&Ввод" 
+      SIZE 10 BY 1
+      BGCOLOR 8 .
+ 
+@@ -211,8 +210,8 @@
+      SIZE 10 BY 1
+      BGCOLOR 8 .
+ 
+-DEFINE BUTTON B-Help
+-     LABEL "Помо&щь"
++DEFINE BUTTON B-Help 
++     LABEL "Помо&щь" 
+      SIZE 4 BY 1
+      BGCOLOR 8 .
+ 
+@@ -216,7 +215,7 @@
+      SIZE 4 BY 1
+      BGCOLOR 8 .
+ 
+-DEFINE BUTTON B-hist
+-     LABEL "Ис&тория"
++DEFINE BUTTON B-hist 
++     LABEL "Ис&тория" 
+      SIZE 3.5 BY 1.
+ 
+@@ -221,7 +220,7 @@
+      SIZE 3.5 BY 1.
+ 
+-DEFINE BUTTON b-lkp
+-     LABEL "&Просмотр"
++DEFINE BUTTON b-lkp 
++     LABEL "&Просмотр" 
+      SIZE 10 BY 1
+      BGCOLOR 8 .
+ 
+@@ -225,7 +224,7 @@
+      SIZE 10 BY 1
+      BGCOLOR 8 .
+ 
+-DEFINE BUTTON B-mark
+-     LABEL "*"
++DEFINE BUTTON B-mark 
++     LABEL "*" 
+      SIZE 3 BY 1 TOOLTIP "Выделить".
+ 
+@@ -230,6 +229,6 @@
+      SIZE 3 BY 1 TOOLTIP "Выделить".
+ 
+-DEFINE BUTTON B-mark-all
+-     LABEL "+"
++DEFINE BUTTON B-mark-all 
++     LABEL "+" 
+      SIZE 3 BY 1 TOOLTIP "Выделить все партии".
+ 
+@@ -234,6 +233,6 @@
+      SIZE 3 BY 1 TOOLTIP "Выделить все партии".
+ 
+-DEFINE BUTTON B-print
+-     LABEL "Пе&чать"
++DEFINE BUTTON B-print 
++     LABEL "Пе&чать" 
+      SIZE 4 BY 1.
+ 
+@@ -238,7 +237,7 @@
+      SIZE 4 BY 1.
+ 
+-DEFINE BUTTON b-quit AUTO-END-KEY
+-     LABEL "&Отмена"
++DEFINE BUTTON b-quit AUTO-END-KEY 
++     LABEL "&Отмена" 
+      SIZE 10 BY 1
+      BGCOLOR 8 .
+ 
+@@ -242,7 +241,7 @@
+      SIZE 10 BY 1
+      BGCOLOR 8 .
+ 
+-DEFINE BUTTON B-sch
+-     LABEL "&Фильтр"
++DEFINE BUTTON B-sch 
++     LABEL "&Фильтр" 
+      SIZE 4.5 BY 1.
+ 
+@@ -247,6 +246,6 @@
+      SIZE 4.5 BY 1.
+ 
+-DEFINE BUTTON B-sel AUTO-GO
+-     LABEL "Вы&бор"
++DEFINE BUTTON B-sel AUTO-GO 
++     LABEL "Вы&бор" 
+      SIZE 10 BY 1.
+ 
+@@ -251,6 +250,6 @@
+      SIZE 10 BY 1.
+ 
+-DEFINE VARIABLE bar-str AS CHARACTER FORMAT "X(256)":U
+-     VIEW-AS FILL-IN
++DEFINE VARIABLE bar-str AS CHARACTER FORMAT "X(256)":U 
++     VIEW-AS FILL-IN 
+      SIZE 14 BY 1 NO-UNDO.
+ 
+@@ -255,8 +254,12 @@
+      SIZE 14 BY 1 NO-UNDO.
+ 
+-DEFINE VARIABLE fl-doc-code AS CHARACTER FORMAT "X(256)":U
+-     LABEL "Документ"
+-     VIEW-AS FILL-IN
++DEFINE VARIABLE code-str AS character FORMAT "X(256)":U 
++     VIEW-AS FILL-IN 
++     SIZE 14 BY 1 NO-UNDO.
++
++DEFINE VARIABLE fl-doc-code AS CHARACTER FORMAT "X(256)":U 
++     LABEL "Документ" 
++     VIEW-AS FILL-IN 
+      SIZE 10 BY 1
+      FGCOLOR 4  NO-UNDO.
+ 
+@@ -260,9 +263,9 @@
+      SIZE 10 BY 1
+      FGCOLOR 4  NO-UNDO.
+ 
+-DEFINE VARIABLE fl-doc-date AS DATE FORMAT "99/99/99":U
+-     LABEL "от"
+-     VIEW-AS FILL-IN
++DEFINE VARIABLE fl-doc-date AS DATE FORMAT "99/99/99":U 
++     LABEL "от" 
++     VIEW-AS FILL-IN 
+      SIZE 11.5 BY 1
+      FGCOLOR 4  NO-UNDO.
+ 
+@@ -266,7 +269,7 @@
+      SIZE 11.5 BY 1
+      FGCOLOR 4  NO-UNDO.
+ 
+-DEFINE VARIABLE fl-doc-ext-type AS CHARACTER FORMAT "X(256)":U
+-     VIEW-AS FILL-IN
++DEFINE VARIABLE fl-doc-ext-type AS CHARACTER FORMAT "X(256)":U 
++     VIEW-AS FILL-IN 
+      SIZE 44 BY 1 NO-UNDO.
+ 
+@@ -271,7 +274,7 @@
+      SIZE 44 BY 1 NO-UNDO.
+ 
+-DEFINE VARIABLE fl-gds AS CHARACTER FORMAT "X(256)":U
+-     LABEL "Товар"
+-     VIEW-AS FILL-IN
++DEFINE VARIABLE fl-gds AS CHARACTER FORMAT "X(256)":U 
++     LABEL "Товар" 
++     VIEW-AS FILL-IN 
+      SIZE 17.5 BY 1 NO-UNDO.
+ 
+@@ -276,8 +279,8 @@
+      SIZE 17.5 BY 1 NO-UNDO.
+ 
+-DEFINE VARIABLE fl-par-price AS CHARACTER FORMAT "X(256)":U
+-     LABEL "Цена"
+-     VIEW-AS FILL-IN
++DEFINE VARIABLE fl-par-price AS CHARACTER FORMAT "X(256)":U 
++     LABEL "Цена" 
++     VIEW-AS FILL-IN 
+      SIZE 8.5 BY 1
+      FGCOLOR 4  NO-UNDO.
+ 
+@@ -281,8 +284,8 @@
+      SIZE 8.5 BY 1
+      FGCOLOR 4  NO-UNDO.
+ 
+-DEFINE VARIABLE fl-par-val AS CHARACTER FORMAT "X(256)":U
+-     LABEL "Номинал"
+-     VIEW-AS FILL-IN
++DEFINE VARIABLE fl-par-val AS CHARACTER FORMAT "X(256)":U 
++     LABEL "Номинал" 
++     VIEW-AS FILL-IN 
+      SIZE 9 BY 1 NO-UNDO.
+ 
+@@ -287,7 +290,7 @@
+      SIZE 9 BY 1 NO-UNDO.
+ 
+-DEFINE VARIABLE fl-wth-name AS CHARACTER FORMAT "X(256)":U
+-     LABEL "МЦ"
+-     VIEW-AS FILL-IN
++DEFINE VARIABLE fl-wth-name AS CHARACTER FORMAT "X(256)":U 
++     LABEL "МЦ" 
++     VIEW-AS FILL-IN 
+      SIZE 26 BY 1 NO-UNDO.
+ 
+@@ -292,7 +295,7 @@
+      SIZE 26 BY 1 NO-UNDO.
+ 
+-DEFINE VARIABLE Fn-rs-obj AS CHARACTER FORMAT "X(256)":U
+-      VIEW-AS TEXT
++DEFINE VARIABLE Fn-rs-obj AS CHARACTER FORMAT "X(256)":U 
++      VIEW-AS TEXT 
+      SIZE 7.5 BY .67
+      FGCOLOR 4  NO-UNDO.
+ 
+@@ -296,8 +299,8 @@
+      SIZE 7.5 BY .67
+      FGCOLOR 4  NO-UNDO.
+ 
+-DEFINE VARIABLE text-sts AS CHARACTER FORMAT "X(256)":U INITIAL "Статус:"
+-      VIEW-AS TEXT
++DEFINE VARIABLE text-sts AS CHARACTER FORMAT "X(256)":U INITIAL "Статус:" 
++      VIEW-AS TEXT 
+      SIZE 7.5 BY .67
+      FGCOLOR 4  NO-UNDO.
+ 
+@@ -301,5 +304,5 @@
+      SIZE 7.5 BY .67
+      FGCOLOR 4  NO-UNDO.
+ 
+-DEFINE VARIABLE rsfl-ch AS INTEGER
++DEFINE VARIABLE rsfl-ch AS INTEGER 
+      VIEW-AS RADIO-SET HORIZONTAL
+@@ -305,5 +308,5 @@
+      VIEW-AS RADIO-SET HORIZONTAL
+-     RADIO-BUTTONS
++     RADIO-BUTTONS 
+           "Все", 0
+      SIZE 83.5 BY .75 NO-UNDO.
+ 
+@@ -307,5 +310,5 @@
+           "Все", 0
+      SIZE 83.5 BY .75 NO-UNDO.
+ 
+-DEFINE VARIABLE rsfl-obj AS INTEGER
++DEFINE VARIABLE rsfl-obj AS INTEGER 
+      VIEW-AS RADIO-SET HORIZONTAL
+@@ -311,7 +314,7 @@
+      VIEW-AS RADIO-SET HORIZONTAL
+-     RADIO-BUTTONS
++     RADIO-BUTTONS 
+           "Текущий объект", 1,
+ "Все объекты", 2
+      SIZE 47.5 BY 1 NO-UNDO.
+ 
+ DEFINE RECTANGLE RECT-1
+@@ -313,9 +316,9 @@
+           "Текущий объект", 1,
+ "Все объекты", 2
+      SIZE 47.5 BY 1 NO-UNDO.
+ 
+ DEFINE RECTANGLE RECT-1
+-     EDGE-PIXELS 2 GRAPHIC-EDGE  NO-FILL
++     EDGE-PIXELS 2 GRAPHIC-EDGE  NO-FILL   
+      SIZE 97 BY 1.5.
+ 
+ DEFINE RECTANGLE RECT-8
+@@ -319,8 +322,8 @@
+      SIZE 97 BY 1.5.
+ 
+ DEFINE RECTANGLE RECT-8
+-     EDGE-PIXELS 2 GRAPHIC-EDGE  NO-FILL
++     EDGE-PIXELS 2 GRAPHIC-EDGE  NO-FILL   
+      SIZE 97 BY 1.5.
+ 
+ /* Query definitions                                                    */
+ &ANALYZE-SUSPEND
+@@ -323,8 +326,8 @@
+      SIZE 97 BY 1.5.
+ 
+ /* Query definitions                                                    */
+ &ANALYZE-SUSPEND
+-DEFINE QUERY br-parts FOR
++DEFINE QUERY br-parts FOR 
+       X_wth-parts SCROLLING.
+ &ANALYZE-RESUME
+ 
+@@ -394,6 +397,7 @@
+      rsfl-obj AT ROW 3 COL 11 NO-LABEL WIDGET-ID 292
+      br-parts AT ROW 4 COL 1 WIDGET-ID 200
+      bar-str AT ROW 16.38 COL 16.5 COLON-ALIGNED NO-LABEL WIDGET-ID 320
++     code-str AT ROW 16.38 COL 72 COLON-ALIGNED NO-LABEL WIDGET-ID 330
+      fl-wth-name AT ROW 17.75 COL 4.5 COLON-ALIGNED WIDGET-ID 50
+      fl-par-val AT ROW 17.75 COL 40 COLON-ALIGNED WIDGET-ID 52
+      fl-gds AT ROW 17.75 COL 57 COLON-ALIGNED WIDGET-ID 58
+@@ -406,7 +410,10 @@
+      Fn-rs-obj AT ROW 3.17 COL 1 COLON-ALIGNED NO-LABEL WIDGET-ID 312
+      "Штрих-код:" VIEW-AS TEXT
+           SIZE 10.5 BY .67 AT ROW 16.58 COL 6.63 WIDGET-ID 328
+-          FGCOLOR 4
++          FGCOLOR 4 
++     "Код талона:" VIEW-AS TEXT
++          SIZE 10.5 BY .67 AT ROW 16.58 COL 61 WIDGET-ID 328
++          FGCOLOR 4 
+      RECT-1 AT ROW 17.5 COL 1 WIDGET-ID 300
+      RECT-8 AT ROW 19 COL 1 WIDGET-ID 310
+      SPACE(0.00) SKIP(0.07)
+@@ -410,8 +417,8 @@
+      RECT-1 AT ROW 17.5 COL 1 WIDGET-ID 300
+      RECT-8 AT ROW 19 COL 1 WIDGET-ID 310
+      SPACE(0.00) SKIP(0.07)
+-    WITH VIEW-AS DIALOG-BOX KEEP-TAB-ORDER
+-         SIDE-LABELS NO-UNDERLINE THREE-D  SCROLLABLE
++    WITH VIEW-AS DIALOG-BOX KEEP-TAB-ORDER 
++         SIDE-LABELS NO-UNDERLINE THREE-D  SCROLLABLE 
+          TITLE "Партии серийных МЦ" WIDGET-ID 100.
+ 
+ 
+@@ -432,9 +439,9 @@
+ /* SETTINGS FOR DIALOG-BOX Dialog-Frame
+    FRAME-NAME                                                           */
+ /* BROWSE-TAB br-parts rsfl-obj Dialog-Frame */
+-ASSIGN
++ASSIGN 
+        FRAME Dialog-Frame:SCROLLABLE       = FALSE
+        FRAME Dialog-Frame:HIDDEN           = TRUE.
+ 
+ /* SETTINGS FOR BUTTON b-doc-code IN FRAME Dialog-Frame
+    NO-ENABLE                                                            */
+@@ -436,8 +443,8 @@
+        FRAME Dialog-Frame:SCROLLABLE       = FALSE
+        FRAME Dialog-Frame:HIDDEN           = TRUE.
+ 
+ /* SETTINGS FOR BUTTON b-doc-code IN FRAME Dialog-Frame
+    NO-ENABLE                                                            */
+-ASSIGN
++ASSIGN 
+        b-doc-code:HIDDEN IN FRAME Dialog-Frame           = TRUE.
+ 
+@@ -442,5 +449,5 @@
+        b-doc-code:HIDDEN IN FRAME Dialog-Frame           = TRUE.
+ 
+-ASSIGN
++ASSIGN 
+        fl-doc-code:READ-ONLY IN FRAME Dialog-Frame        = TRUE.
+ 
+@@ -445,9 +452,9 @@
+        fl-doc-code:READ-ONLY IN FRAME Dialog-Frame        = TRUE.
+ 
+-ASSIGN
++ASSIGN 
+        fl-doc-ext-type:READ-ONLY IN FRAME Dialog-Frame        = TRUE.
+ 
+ /* SETTINGS FOR FILL-IN fl-gds IN FRAME Dialog-Frame
+    NO-ENABLE                                                            */
+ /* SETTINGS FOR RADIO-SET rsfl-ch IN FRAME Dialog-Frame
+    NO-ENABLE                                                            */
+@@ -448,10 +455,10 @@
+        fl-doc-ext-type:READ-ONLY IN FRAME Dialog-Frame        = TRUE.
+ 
+ /* SETTINGS FOR FILL-IN fl-gds IN FRAME Dialog-Frame
+    NO-ENABLE                                                            */
+ /* SETTINGS FOR RADIO-SET rsfl-ch IN FRAME Dialog-Frame
+    NO-ENABLE                                                            */
+-ASSIGN
++ASSIGN 
+        rsfl-ch:HIDDEN IN FRAME Dialog-Frame           = TRUE.
+ 
+ /* _RUN-TIME-ATTRIBUTES-END */
+@@ -470,7 +477,7 @@
+ */  /* BROWSE br-parts */
+ &ANALYZE-RESUME
+ 
+-
++ 
+ 
+ 
+ 
+@@ -600,7 +607,7 @@
+  define variable del-rec as recid no-undo.
+  define variable glog     as logical no-undo .
+  define variable rep-rec as recid no-undo .
+- define buffer buf_wth-ser for ub.wth-ser.
++ define buffer buf_wth-ser for wth-ser.
+  if not available X_wth-parts then do:
+    message "Неправильно выбрана строка.".
+    return no-apply.
+@@ -949,7 +956,6 @@
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+-
+ &Scoped-define SELF-NAME bar-str
+ &ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL bar-str Dialog-Frame
+ ON RETURN OF bar-str IN FRAME Dialog-Frame
+@@ -993,4 +999,5 @@
+ /*CASE p-coll-point:
+ when 'document' then do:  */
+ apply 'entry':U to br-parts.
++get last br-parts.
+ v-cur-recX =  recid(x_wth-parts).
+@@ -996,5 +1003,8 @@
+ v-cur-recX =  recid(x_wth-parts).
+-  get next br-parts .
++ 
++ 
++ 
++ reposition br-parts to row 1.
+   findBlock: do:
+     do while available x_wth-parts and v-cur-recX  <>  recid(x_wth-parts):
+ 
+@@ -998,14 +1008,45 @@
+   findBlock: do:
+     do while available x_wth-parts and v-cur-recX  <>  recid(x_wth-parts):
+ 
+-        if  x_wth-parts.ser-code =  v-ser-code
+-        and x_wth-parts.db-num   =  v-db-num
+-        and x_wth-parts.wth-code =  v-wth-code
+-        and x_wth-parts.gds-code =  v-gds-code
+-        and x_wth-parts.par-code =  v-par-code
+-  /*     and x_wth-parts.out-code = p-wth-doc   */
+-        and x_wth-parts.fact-RangeFrom <= v-rangeNum
+-        and x_wth-parts.fact-RangeTo >= v-rangeNum
+-        then do:
+-         if not available x_wth-parts then message '2' view-as alert-box.
++            if  x_wth-parts.ser-code =  v-ser-code
++                and x_wth-parts.db-num   =  v-db-num
++                and x_wth-parts.wth-code =  v-wth-code
++                and x_wth-parts.gds-code =  v-gds-code
++                and x_wth-parts.par-code =  v-par-code
++                /*     and x_wth-parts.out-code = p-wth-doc   */
++                and x_wth-parts.fact-RangeFrom <= v-rangeNum
++                and x_wth-parts.fact-RangeTo >= v-rangeNum
++                then 
++            do:
++               
++ 
++                    br-parts:SELECT-NEXT-ROW ().          
++                end.       
++            else 
++            do:               
++            br-parts:DELETE-SELECTED-ROWS().
++            br-parts:SELECT-PREV-ROW ().
++        end.
++        if not available x_wth-parts then leave findblock.
++    end.  
++    
++     if  x_wth-parts.ser-code =  v-ser-code
++                and x_wth-parts.db-num   =  v-db-num
++                and x_wth-parts.wth-code =  v-wth-code
++                and x_wth-parts.gds-code =  v-gds-code
++                and x_wth-parts.par-code =  v-par-code
++                /*     and x_wth-parts.out-code = p-wth-doc   */
++                and x_wth-parts.fact-RangeFrom <= v-rangeNum
++                and x_wth-parts.fact-RangeTo >= v-rangeNum
++             and v-cur-recX = recid(x_wth-parts)
++            then 
++        do:
++   
++            br-parts:SELECT-NEXT-ROW ().
++        end.
++        else 
++        do:
++               
++            br-parts:DELETE-SELECTED-ROWS().
++         
+ 
+@@ -1011,7 +1052,2 @@
+ 
+-            reposition br-parts to recid  recid(x_wth-parts).
+-           /* apply 'entry':U to br-parts.
+-            bar-str:screen-value = '':U.  */
+-          /*  br-parts:SELECT-FOCUSED-ROW( )  no-error.     */
+-            leave findBlock.
+         end.
+@@ -1017,7 +1053,11 @@
+         end.
+-       get next br-parts.
+-       if not available x_wth-parts then get first br-parts.
+-    end.
++               
++    
++    
++    
++    
++    
++    
+     if p-coll-point =   'document'  then
+     message substitute( "В данном списке нет талона с указанным штрих-кодом: &1", bar-str ) view-as alert-box warning.
+   /* end. */
+@@ -1035,17 +1075,6 @@
+ &Scoped-define BROWSE-NAME br-parts
+ &Scoped-define SELF-NAME br-parts
+ &ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL br-parts Dialog-Frame
+-ON MOUSE-SELECT-DBLCLICK, return OF br-parts IN FRAME Dialog-Frame
+-DO:
+-    IF b-chg:SENSITIVE THEN APPLY "choose":U TO b-chg.
+-  ELSE APPLY "choose":U TO b-lkp.
+-END.
+-
+-/* _UIB-CODE-BLOCK-END */
+-&ANALYZE-RESUME
+-
+-
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL br-parts Dialog-Frame
+ ON ROW-DISPLAY OF br-parts IN FRAME Dialog-Frame
+ DO:
+ def var v-font as integer no-undo init ?.
+@@ -1127,6 +1156,99 @@
+ &ANALYZE-RESUME
+ 
+ 
++&Scoped-define SELF-NAME code-str
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL code-str Dialog-Frame
++ON RETURN OF code-str IN FRAME Dialog-Frame
++DO:
++
++
++define variable v-cur-prt as recid no-undo.
++assign frame Dialog-Frame code-str .
++if not available x_wth-parts then return.
++
++    /*НЕ ЗАБЫТЬ ДОБАВИТЬ Когда code-str = ''     !!!!   */
++
++
++  
++    apply 'entry':U to br-parts.
++    get last br-parts.
++    v-cur-prt = recid(x_wth-parts).
++    
++
++    
++    
++    reposition br-parts to row 1.
++
++    findBlock: do:
++        if code-str = " " then do: 
++    message substitute("Не задан код талона!")
++    view-as alert-box error.
++ leave findblock.
++    end.
++    
++        
++        /*                          */
++        /*      run waitfram-show in this-procedure (  input "Ждите...").*/
++        do while  available x_wth-parts and v-cur-prt <>  recid(x_wth-parts):
++ 
++            if 
++                x_wth-parts.fact-RangeFrom <= integer(code-str)
++                and x_wth-parts.fact-RangeTo >= integer(code-str)
++                then 
++            do:
++ 
++                br-parts:SELECT-NEXT-ROW ().
++          
++            end. 
++      
++            else 
++            do:
++               
++                br-parts:DELETE-SELECTED-ROWS().
++                br-parts:SELECT-PREV-ROW ().
++
++            end.
++  
++            if not available x_wth-parts then leave findblock.
++        end.  
++   
++  
++        if  x_wth-parts.fact-RangeFrom <= integer(code-str)
++            and x_wth-parts.fact-RangeTo >= integer(code-str)
++            and v-cur-prt = recid(x_wth-parts)
++            then 
++        do:
++   
++            br-parts:SELECT-NEXT-ROW ().
++        end.
++        else 
++        do:
++               
++            br-parts:DELETE-SELECTED-ROWS().
++         
++
++        end.
++  
++   
++   
++   
++   
++   
++         
++/*    if p-coll-point =   'document'  then                                                                               */
++/*    message substitute( "В данном списке нет талона с указанным штрих-кодом: &1", code-str ) view-as alert-box warning.*/
++  /* end. */
++
++  end. /*FindBlock*/
++apply 'entry':U to br-parts.
++code-str:screen-value = '':U.
++return no-apply.
++END.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
+ &Scoped-define SELF-NAME rsfl-ch
+ &ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL rsfl-ch Dialog-Frame
+ ON VALUE-CHANGED OF rsfl-ch IN FRAME Dialog-Frame
+@@ -1168,7 +1290,7 @@
+ 
+ &UNDEFINE SELF-NAME
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CUSTOM _MAIN-BLOCK Dialog-Frame
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CUSTOM _MAIN-BLOCK Dialog-Frame 
+ 
+ 
+ /* ***************************  Main Block  *************************** */
+@@ -1178,7 +1300,11 @@
+     apply "entry" to bar-str in frame {&frame-name}.
+     apply "end" to bar-str in frame {&frame-name}.
+  end.
+-
++ on "ANY-PRINTABLE":U of br-parts anywhere  do:
++    code-str:screen-value = code-str:screen-value + last-event:label.
++    apply "entry" to code-str in frame {&frame-name}.
++    apply "end" to code-str in frame {&frame-name}.
++ end.
+ 
+ /* Parent the dialog-box to the ACTIVE-WINDOW, if there is no parent.   */
+ IF VALID-HANDLE(ACTIVE-WINDOW) AND FRAME {&FRAME-NAME}:PARENT eq ?
+@@ -1281,7 +1407,7 @@
+   Purpose:     DISABLE the User Interface
+   Parameters:  <none>
+   Notes:       Here we clean-up the user-interface by deleting
+-               dynamic widgets we have created and/or hide
++               dynamic widgets we have created and/or hide 
+                frames.  This procedure is usually called when
+                we are ready to "clean-up" after running.
+ ------------------------------------------------------------------------------*/
+@@ -1300,6 +1426,6 @@
+   Notes:       Here we display/view/enable the widgets in the
+                user-interface.  In addition, OPEN all queries
+                associated with each FRAME and BROWSE.
+-               These statements here are based on the "Other
++               These statements here are based on the "Other 
+                Settings" section of the widget Property Sheets.
+ ------------------------------------------------------------------------------*/
+@@ -1304,5 +1430,6 @@
+                Settings" section of the widget Property Sheets.
+ ------------------------------------------------------------------------------*/
+-  DISPLAY rsfl-ch rsfl-obj bar-str fl-wth-name fl-par-val fl-gds fl-par-price
+-          fl-doc-code fl-doc-date fl-doc-ext-type text-sts Fn-rs-obj
++  DISPLAY rsfl-ch rsfl-obj bar-str code-str fl-wth-name fl-par-val fl-gds 
++          fl-par-price fl-doc-code fl-doc-date fl-doc-ext-type text-sts 
++          Fn-rs-obj 
+       WITH FRAME Dialog-Frame.
+@@ -1308,8 +1435,8 @@
+       WITH FRAME Dialog-Frame.
+-  ENABLE b-exit b-quit B-mark B-mark-all B-cancel-mark B-sel b-lkp B-add B-chg
+-         B-del B-sch B-print B-hist B-Help RECT-1 RECT-8 rsfl-obj br-parts
+-         bar-str fl-wth-name fl-par-val fl-par-price fl-doc-code fl-doc-date
+-         fl-doc-ext-type text-sts Fn-rs-obj
++  ENABLE b-exit RECT-1 RECT-8 b-quit B-mark B-mark-all B-cancel-mark B-sel 
++         b-lkp B-add B-chg B-del B-sch B-print B-hist B-Help rsfl-obj br-parts 
++         bar-str code-str fl-wth-name fl-par-val fl-par-price fl-doc-code 
++         fl-doc-date fl-doc-ext-type text-sts Fn-rs-obj 
+       WITH FRAME Dialog-Frame.
+   VIEW FRAME Dialog-Frame.
+   {&OPEN-BROWSERS-IN-QUERY-Dialog-Frame}
+@@ -1318,7 +1445,7 @@
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE load-position Dialog-Frame
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE load-position Dialog-Frame 
+ PROCEDURE load-position :
+ /*------------------------------------------------------------------------------
+   Purpose:
+@@ -1345,7 +1472,7 @@
+         , output v-void-logical
+         , output v-void-logical
+     ) no-error.
+-    if not error-status :error  then rsfl-ch:screen-value =  v-current-zone-string.
++    rsfl-ch:screen-value =  v-current-zone-string.
+ /*    message  v-found  rsfl-ch:screen-value   {&current-position-zone} v-cntxt-userid.  */
+     run uf-get (
+           input {&current-position-obj}
+@@ -1357,7 +1484,7 @@
+         , output v-void-logical
+         , output v-void-logical
+     ) no-error.
+-    if not error-status :error  then rsfl-obj:screen-value =  v-current-obj-string.
++    rsfl-obj:screen-value =  v-current-obj-string.
+  end.
+ 
+ END PROCEDURE.
+@@ -1365,7 +1492,7 @@
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE main-block-procedure Dialog-Frame
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE main-block-procedure Dialog-Frame 
+ PROCEDURE main-block-procedure :
+ /*------------------------------------------------------------------------------
+   Purpose:
+@@ -1425,7 +1552,7 @@
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE MyEnable Dialog-Frame
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE MyEnable Dialog-Frame 
+ PROCEDURE MyEnable :
+ /*------------------------------------------------------------------------------
+   Purpose:
+@@ -1536,6 +1663,7 @@
+     b-print
+     b-help
+     bar-str
++    code-str
+     text-sts
+     b-mark when p-coll-point = 'document':U and p-edit-mode  <> {&lookup}
+     b-mark-all when p-coll-point = 'document':U and p-edit-mode  <> {&lookup}
+@@ -1573,7 +1701,7 @@
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE OpenBr Dialog-Frame
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE OpenBr Dialog-Frame 
+ PROCEDURE OpenBr :
+ /*------------------------------------------------------------------------------
+   Purpose:
+@@ -1859,7 +1987,7 @@
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE PrintProc Dialog-Frame
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE PrintProc Dialog-Frame 
+ PROCEDURE PrintProc :
+ /*------------------------------------------------------------------------------
+   Purpose:
+@@ -1994,7 +2122,7 @@
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE proc-add Dialog-Frame
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE proc-add Dialog-Frame 
+ PROCEDURE proc-add :
+ /*------------------------------------------------------------------------------
+   Purpose:
+@@ -2089,7 +2217,7 @@
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE proc-del Dialog-Frame
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE proc-del Dialog-Frame 
+ PROCEDURE proc-del :
+ /*------------------------------------------------------------------------------
+   Purpose:
+@@ -2217,7 +2345,7 @@
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE save-position Dialog-Frame
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE save-position Dialog-Frame 
+ PROCEDURE save-position :
+ /*------------------------------------------------------------------------------
+   Purpose:
+@@ -2258,7 +2386,7 @@
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE show-doc-code Dialog-Frame
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE show-doc-code Dialog-Frame 
+ PROCEDURE show-doc-code :
+ /*------------------------------------------------------------------------------
+   Purpose:
+@@ -2282,5 +2410,9 @@
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
++
++
++
++
+ /* ************************  Function Implementations ***************** */
+ 
+@@ -2285,6 +2417,6 @@
+ /* ************************  Function Implementations ***************** */
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION get-cli-name Dialog-Frame
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION get-cli-name Dialog-Frame 
+ FUNCTION get-cli-name RETURNS CHARACTER
+   ( f-cli-type AS CHAR, f-cli-code as int  ) :
+ /*------------------------------------------------------------------------------
+@@ -2303,7 +2435,7 @@
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION get-ser-name Dialog-Frame
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION get-ser-name Dialog-Frame 
+ FUNCTION get-ser-name RETURNS CHARACTER
+   ( pfser-code AS INT, pfser-db AS INT ) :
+ /*------------------------------------------------------------------------------
+@@ -2321,7 +2453,7 @@
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION get-w-p-name Dialog-Frame
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION get-w-p-name Dialog-Frame 
+ FUNCTION get-w-p-name RETURNS CHARACTER
+   ( vf-w-p-code AS int ,vf-obj-type as char, vf-obj-code as int ) :
+ /*------------------------------------------------------------------------------
+@@ -2340,7 +2472,7 @@
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION get-wthparts-out-code Dialog-Frame
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION get-wthparts-out-code Dialog-Frame 
+ FUNCTION get-wthparts-out-code RETURNS CHARACTER
+   ( vf-out-code AS CHAR ) :
+ /*------------------------------------------------------------------------------
+@@ -2359,4 +2491,5 @@
+ END FUNCTION.
+ 
+ /* _UIB-CODE-BLOCK-END */
+-&ANALYZE-RESUME
+\ No newline at end of file
++&ANALYZE-RESUME
++
+diff --git a/18022101.df b/18022101.df
+--- a/18022101.df
++++ b/18022101.df
+@@ -34,7 +34,6 @@
+   MANDATORY
+ 
+ ADD INDEX "auto-corr-user-db" ON "c-sr-izmerenia"
+-  AREA "History"
+   INDEX-FIELD "corr-user-db-num" ASCENDING
+ 
+ ADD INDEX "auto-corrr-user" ON "c-sr-izmerenia"
+@@ -38,7 +37,6 @@
+   INDEX-FIELD "corr-user-db-num" ASCENDING
+ 
+ ADD INDEX "auto-corrr-user" ON "c-sr-izmerenia"
+-  AREA "History"
+   INDEX-FIELD "corr-user-name" ASCENDING
+   INDEX-FIELD "corr-user-db-num" ASCENDING
+ 
+@@ -66,10 +64,9 @@
+ RENAME INDEX "artic" TO "temp-80833" ON "recipe"
+ 
+ ADD INDEX "artic" ON "recipe"
+-  AREA "Primary_data"
+   INDEX-FIELD "artic" ASCENDING
+   INDEX-FIELD "obj-type" ASCENDING
+   INDEX-FIELD "obj-code" ASCENDING
+   INDEX-FIELD "stts" ASCENDING
+ 
+ ADD INDEX "stts" ON "recipe"
+@@ -70,10 +67,9 @@
+   INDEX-FIELD "artic" ASCENDING
+   INDEX-FIELD "obj-type" ASCENDING
+   INDEX-FIELD "obj-code" ASCENDING
+   INDEX-FIELD "stts" ASCENDING
+ 
+ ADD INDEX "stts" ON "recipe"
+-  AREA "Primary_data"
+   INDEX-FIELD "stts" ASCENDING
+ 
+ DROP INDEX "temp-80833" ON "recipe"
+@@ -94,7 +90,6 @@
+   MAX-WIDTH 16
+ 
+ ADD INDEX "num" ON "shop"
+-  AREA "Primary_data"
+   INDEX-FIELD "obj-num" ASCENDING
+ 
+ ADD FIELD "obj-num" OF "store" AS character
+diff --git a/18022801.df b/18022801.df
+--- a/18022801.df
++++ b/18022801.df
+@@ -1,5 +1,4 @@
+ ADD TABLE "c-action-role"
+-  AREA "Primary_data"
+   DUMP-NAME "cactnrole"
+   TABLE-TRIGGER "DELETE" OVERRIDE PROCEDURE "trg/cactnrld.p" CRC "?" 
+   TABLE-TRIGGER "WRITE" OVERRIDE PROCEDURE "trg/cactnrlw.p" CRC "?" 
+@@ -145,7 +144,6 @@
+   ORDER 150
+ 
+ ADD INDEX "pi" ON "c-action-role" 
+-  AREA "History_Index"
+   UNIQUE
+   PRIMARY
+   INDEX-FIELD "db-num" ASCENDING 
+@@ -155,8 +153,7 @@
+   INDEX-FIELD "chip-num" ASCENDING 
+ 
+ ADD INDEX "auto_corr-user" ON "c-action-role" 
+-  AREA "Primary_data"
+   INDEX-FIELD "corr-user-name" ASCENDING 
+   INDEX-FIELD "corr-user-db-num" ASCENDING 
+ 
+ ADD INDEX "auto_corr-user-db" ON "c-action-role" 
+@@ -159,8 +156,7 @@
+   INDEX-FIELD "corr-user-name" ASCENDING 
+   INDEX-FIELD "corr-user-db-num" ASCENDING 
+ 
+ ADD INDEX "auto_corr-user-db" ON "c-action-role" 
+-  AREA "History_Index"
+   INDEX-FIELD "corr-user-db-num" ASCENDING 
+ 
+ ADD INDEX "is-del" ON "c-action-role" 
+@@ -164,8 +160,7 @@
+   INDEX-FIELD "corr-user-db-num" ASCENDING 
+ 
+ ADD INDEX "is-del" ON "c-action-role" 
+-  AREA "History_Index"
+   INDEX-FIELD "db-num" ASCENDING 
+   INDEX-FIELD "is-del" ASCENDING 
+ 
+ ADD INDEX "isubject" ON "c-action-role" 
+@@ -168,10 +163,9 @@
+   INDEX-FIELD "db-num" ASCENDING 
+   INDEX-FIELD "is-del" ASCENDING 
+ 
+ ADD INDEX "isubject" ON "c-action-role" 
+-  AREA "History_Index"
+   INDEX-FIELD "subject" ASCENDING 
+   INDEX-FIELD "corr-user-db-num" ASCENDING 
+   INDEX-FIELD "chip-num" ASCENDING 
+ 
+ ADD TABLE "c-action-role-item"
+@@ -173,9 +167,8 @@
+   INDEX-FIELD "subject" ASCENDING 
+   INDEX-FIELD "corr-user-db-num" ASCENDING 
+   INDEX-FIELD "chip-num" ASCENDING 
+ 
+ ADD TABLE "c-action-role-item"
+-  AREA "Primary_data"
+   DUMP-NAME "cactnroleit"
+   TABLE-TRIGGER "DELETE" OVERRIDE PROCEDURE "trg/cactnrtd.p" CRC "?" 
+   TABLE-TRIGGER "WRITE" OVERRIDE PROCEDURE "trg/cactnrtw.p" CRC "?" 
+@@ -322,7 +315,6 @@
+   ORDER 150
+ 
+ ADD INDEX "pi" ON "c-action-role-item" 
+-  AREA "History_Index"
+   UNIQUE
+   PRIMARY
+   INDEX-FIELD "db-num" ASCENDING 
+@@ -333,8 +325,7 @@
+   INDEX-FIELD "chip-num" ASCENDING 
+ 
+ ADD INDEX "auto_corr-user" ON "c-action-role-item" 
+-  AREA "History_Index"
+   INDEX-FIELD "corr-user-name" ASCENDING 
+   INDEX-FIELD "corr-user-db-num" ASCENDING 
+ 
+ ADD INDEX "auto_corr-user-db" ON "c-action-role-item" 
+@@ -337,8 +328,7 @@
+   INDEX-FIELD "corr-user-name" ASCENDING 
+   INDEX-FIELD "corr-user-db-num" ASCENDING 
+ 
+ ADD INDEX "auto_corr-user-db" ON "c-action-role-item" 
+-  AREA "History_Index"
+   INDEX-FIELD "corr-user-db-num" ASCENDING 
+ 
+ ADD INDEX "is-del" ON "c-action-role-item" 
+@@ -342,7 +332,6 @@
+   INDEX-FIELD "corr-user-db-num" ASCENDING 
+ 
+ ADD INDEX "is-del" ON "c-action-role-item" 
+-  AREA "History_Index"
+   INDEX-FIELD "db-num" ASCENDING 
+   INDEX-FIELD "is-del" ASCENDING 
+ 
+@@ -346,8 +335,7 @@
+   INDEX-FIELD "db-num" ASCENDING 
+   INDEX-FIELD "is-del" ASCENDING 
+ 
+-ADD INDEX "isubject" ON "c-action-role-item" 
+-  AREA "History_Index"
++ADD INDEX "isubject" ON "c-action-role-item"
+   INDEX-FIELD "subject" ASCENDING 
+   INDEX-FIELD "corr-user-db-num" ASCENDING 
+   INDEX-FIELD "chip-num" ASCENDING 

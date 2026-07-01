@@ -1,0 +1,1033 @@
+# HG changeset patch
+# User ARostovtsev
+# Parent  0ffb64f50be225592edb17f67a0ffd73faefc001
+refs #DEVBO-571 Ограничение передачи истории действия пользователя с УБД на ТБД #BTS-2020
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-571
+https://msk-exp-jira.expertek.local/browse/BTS-2020
+
+diff --git a/nws/call-nws.i b/nws/call-nws.i
+--- a/nws/call-nws.i
++++ b/nws/call-nws.i
+@@ -735,8 +735,10 @@ define variable v-custom-0-rdb-not-news 
+ 
+ /*-------------исключения из маршрутизации на параметре is-erpRN, таблицы не будут ходить ни при каких условиях (кроме таблиц которые ходят только из ГБД указанные v-custom-0-rdb_rbd-0-not-news)*/
+ define variable v-custom-except-list-erprn as character no-undo.
++/* 16.10.2025 BTS-2020 Отключена передача в ГБД истории изменений по таблицам */
+ v-custom-except-list-erprn =
+-"add-doc~
++"c-*
++,add-doc~
+ ,add-line~
+ ,add-trn~
+ ,add-trn-attr~
+@@ -753,184 +755,6 @@ v-custom-except-list-erprn =
+ ,bar-code~
+ ,bar-code-attr~
+ ,bar-code-obj-attr~
+-,c-add-doc~
+-,c-add-line~
+-,c-assortment-matrix~
+-,c-assortment-matrix-goods~
+-,c-auto-tank~
+-,c-auto-tank-attr~
+-,c-auto-section~
+-,c-auto-section-attr~
+-,c-auto-section-table~
+-,c-auto-tank-meas-attr~
+-,c-bar-code~
+-,c-bar-code-attr~
+-,c-bar-code-obj-attr~
+-,c-chk-discnt~
+-,c-chk-doc~
+-,c-chk-doc-attr~
+-,c-chk-gds~
+-,c-chk-pay~
+-,c-cash-pay~
+-,c-cash-pay-attr~
+-,c-cli-grp~
+-,c-cli-grp-attr~
+-,c-cli-hist~
+-,c-clients~
+-,c-clients-attr~
+-,c-contract~
+-,c-contract-line~
+-,c-contract-specif~
+-,c-country~
+-,c-country-attr~
+-,c-curr-accnt~
+-,c-curr-bank~
+-,c-currency~
+-,c-currency-attr~
+-,c-doc-attr~
+-,c-doc-fbr-gds~
+-,c-doc-line~
+-,c-doc-line-attr~
+-,c-doc-line-sum~
+-,c-doc-pl~
+-,c-doc-pl-pump~
+-,c-doc-prts~
+-,c-drt-prop~
+-,c-fbr-doc~
+-,c-fbr-gds-grp~
+-,c-fbr-gds-grp-attr~
+-,c-fbr-gds-grp-hist~
+-,c-fbr-gds-obj~
+-,c-fbr-gds-obj-attr~
+-,c-fbr-line~
+-,c-fbr-pln~
+-,c-fbr-pln-line~
+-,c-fbr-prn~
+-,c-fbr-prn-gds~
+-,c-fbr-prn-grp~
+-,c-fin-bank~
+-,c-fin-bank-attr~
+-,c-fin-code-an-uchet~
+-,c-fin-code-cel-nazn~
+-,c-fin-code-cor-acc~
+-,c-fin-connect~
+-,c-fin-doc~
+-,c-fin-doc-attr~
+-,c-fin-doc-tax~
+-,c-fin-gds-part~
+-,c-fin-ob~
+-,c-fin-ob-attr~
+-,c-fin-ob-tax~
+-,c-fin-schet~
+-,c-fin-schet-attr~
+-,c-fin-statement~
+-,c-fin-statement-attr~
+-,c-fin-statement-line~
+-,c-firm~
+-,c-gds-add-charges~
+-,c-gds-add-charges-attr~
+-,c-gds-dtl~
+-,c-gds-dtl-attr~
+-,c-gds-grp~
+-,c-gds-grp-attr~
+-,c-gds-grp-hist~
+-,c-gds-grp-obj~
+-,c-gds-hist~
+-,c-gds-host-attr~
+-,c-gds-obj~
+-,c-gds-obj-attr~
+-,c-gds-obj-prop~
+-,c-gds-obj-ref~
+-,c-gds-prt~
+-,c-gds-prt-attr~
+-,c-gds-season~
+-,c-goods~
+-,c-goods-attr~
+-,c-inkas~
+-,c-inkas-pay~
+-,c-inkas-pay-desk~
+-,c-inkas-pay-wth~
+-,c-inv-line~
+-,c-nozzle~
+-,c-nozzle-attr~
+-,c-nzl-hist~
+-,c-parts~
+-,c-parts-add~
+-,c-parts-attr~
+-,c-parts-obj-attr~
+-,c-parts-root~
+-,c-pay-type~
+-,c-pay-type-attr~
+-,c-payment-attr~
+-,c-person~
+-,c-pl-gds~
+-,c-pl-gds-attr~
+-,c-pl-gds-obj~
+-,c-pl-gds-pump~
+-,c-pl-gds-pump-attr~
+-,c-pl-level~
+-,c-pl-level-attr~
+-,c-pl-pump~
+-,c-pl-pump-attr~
+-,c-pl-pump-nozzle~
+-,c-pl-pump-nozzle-attr~
+-,c-place~
+-,c-place-attr~
+-,c-place-io~
+-,c-plc-hist~
+-,c-pmp-hist~
+-,c-price-doc~
+-,c-price-doc-forming~
+-,c-price-doc-forming-attr~
+-,c-price-doc-forming-gds~
+-,c-price-doc-forming-gds-qnty~
+-,c-price-doc-forming-gds-sum~
+-,c-price-doc-forming-gds-tnv~
+-,c-price-doc-forming-gdsattr~
+-,c-price-list~
+-,c-price-list-attr~
+-,c-price-list-type~
+-,c-price-list-type-attr~
+-,c-price-list-type-cash-pay~
+-,c-price-list-type-cassa~
+-,c-price-list-type-gds-grp~
+-,c-price-list-type-pay-type~
+-,c-prod-bc~
+-,c-prod-bc-attr~
+-,c-prod-bc-db-attr~
+-,c-profile-by-profile~
+-,c-prop-head~
+-,c-prop-ref~
+-,c-prop-ruleset~
+-,c-prop-script~
+-,c-pscript-ruleset~
+-,c-pump~
+-,c-pump-attr~
+-,c-pump-nozzle~
+-,c-pump-nozzle-attr~
+-,c-recipe~
+-,c-recipe-develop~
+-,c-recipe-gds~
+-,c-recipe-hist~
+-,c-regions~
+-,c-norm-loss~
+-,c-rvs-doc~
+-,c-rvs-line~
+-,c-rvs-line-pump~
+-,c-sale-doc~
+-,c-schet-fact-doc~
+-,c-schet-fact-line~
+-,c-shift-staff~
+-,c-shop~
+-,c-sht-hist~
+-,c-sr-izmerenia~
+-,c-staff~
+-,c-stop-list~
+-,c-stop-list-line~
+-,c-store~
+-,c-trn-doc~
+-,c-trn-doc-sum~
+-,c-units~
+ ,cash-pay~
+ ,cash-pay-attr~
+ ,chk-discnt~
+@@ -1180,27 +1004,6 @@ v-custom-except-list-erprn =
+ ,tax-rate-gds-attr~
+ ,tax-rate-gds-grp~
+ ,tax-rate-gds-grp-attr~
+-,c-dis-card~
+-,c-dis-card-long~
+-,c-dis-card-long-attr~
+-,c-dis-card-mask~
+-,c-dis-card-mask-attr~
+-,c-dis-card-property~
+-,c-dis-card-type~
+-,c-dis-card-type-attr~
+-,c-dis-cfg-rule~
+-,c-dis-cp-rule~
+-,c-dis-dc-rule~
+-,c-dis-dct-rule~
+-,c-dis-gds-rule~
+-,c-dis-grp-rule~
+-,c-dis-host~
+-,c-dis-obj~
+-,c-dis-rule~
+-,c-dis-rule-attr~
+-,c-dis-some-rule~
+-,c-dis-thbj-rule~
+-,c-dis-time-rule~
+ ,dis-card~
+ ,dis-card-long~
+ ,dis-card-long-attr~
+@@ -1247,15 +1050,6 @@ v-custom-except-list-erprn =
+ ,PromoAttr~
+ ,promo-schedule~
+ ,promo-schedule-week~
+-,c-utd~
+-,c-utd-attr~
+-,c-utd-err~
+-,c-utd-err-attr~
+-,c-utd-head~
+-,c-utd-lines~
+-,c-utd-lines-attr~
+-,c-utd-marking-lines~
+-,c-utd-marking-lines-attr~
+ ,marking~
+ ,marking-attr~
+ ,marking-chk~
+@@ -1275,11 +1069,6 @@ v-custom-except-list-erprn =
+ ,order-line~
+ ,order-doc-attr~
+ ,order-line-attr~
+-,c-order-head~
+-,c-order-doc~
+-,c-order-line~
+-,c-order-doc-attr~
+-,c-order-line-attr~
+ ":U.
+ 
+ /*-------------на параметре is-erpRN таблицы будут ходить только из ГБД*/
+diff --git a/nws/cr-route.i b/nws/cr-route.i
+--- a/nws/cr-route.i
++++ b/nws/cr-route.i
+@@ -19,6 +19,9 @@ Creation date: 03/23/99
+ &scoped-define vssseq {&sequence}
+ define variable vss-include-info{&vssseq} as character format "X(65)":U no-undo initial "@(#)$Workfile$ $Revision$".
+ 
++
++v-custom-except-list = v-custom-except-list-erprn.
++
+ PROCEDURE cre-dump-goods:
+   define input        parameter p-act-name   as character no-undo .
+   define input        parameter tbl-row      as   rowid                  no-undo.
+@@ -568,21 +571,33 @@ PROCEDURE cre-dump-wth-doc:
+     on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+       run cre-route-dump( p-act-name, {&table_wth-parts}, (buffer buf_wth-parts:handle), dmp-ord, input-output rc-ord ).
+     end.
+-    for each buf_c-wth-doc where buf_c-wth-doc.doc-code = buf_wth-doc.doc-code
+-    on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-      run cre-route-dump( p-act-name, {&table_c-wth-doc}, (buffer buf_c-wth-doc:handle), dmp-ord, input-output rc-ord ).
++    if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-wth-doc") then
++    do:
++      for each buf_c-wth-doc where buf_c-wth-doc.doc-code = buf_wth-doc.doc-code
++      on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++        run cre-route-dump( p-act-name, {&table_c-wth-doc}, (buffer buf_c-wth-doc:handle), dmp-ord, input-output rc-ord ).
++      end.
+     end.
+-    for each buf_c-wth-line where buf_c-wth-line.doc-code = buf_wth-doc.doc-code
+-    on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-      run cre-route-dump( p-act-name, {&table_c-wth-line}, (buffer buf_c-wth-line:handle), dmp-ord, input-output rc-ord ).
++    if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-wth-line") then
++    do:
++      for each buf_c-wth-line where buf_c-wth-line.doc-code = buf_wth-doc.doc-code
++      on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++        run cre-route-dump( p-act-name, {&table_c-wth-line}, (buffer buf_c-wth-line:handle), dmp-ord, input-output rc-ord ).
++      end.
+     end.
+-    for each buf_c-wth-dtl where buf_c-wth-dtl.doc-code = buf_wth-doc.doc-code
+-    on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-      run cre-route-dump( p-act-name, {&table_c-wth-dtl}, (buffer buf_c-wth-dtl:handle), dmp-ord, input-output rc-ord ).
++    if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-wth-dtl") then
++    do:
++      for each buf_c-wth-dtl where buf_c-wth-dtl.doc-code = buf_wth-doc.doc-code
++      on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++        run cre-route-dump( p-act-name, {&table_c-wth-dtl}, (buffer buf_c-wth-dtl:handle), dmp-ord, input-output rc-ord ).
++      end.
+     end.
+-    for each buf_c-wth-parts where buf_c-wth-parts.out-code = buf_wth-doc.doc-code
+-    on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-      run cre-route-dump( p-act-name, {&table_c-wth-parts}, (buffer buf_c-wth-parts:handle), dmp-ord, input-output rc-ord ).
++    if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-wth-parts") then
++    do:
++      for each buf_c-wth-parts where buf_c-wth-parts.out-code = buf_wth-doc.doc-code
++      on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++        run cre-route-dump( p-act-name, {&table_c-wth-parts}, (buffer buf_c-wth-parts:handle), dmp-ord, input-output rc-ord ).
++      end.
+     end.
+ 
+     if chk-go-news then do:
+@@ -592,13 +607,19 @@ PROCEDURE cre-dump-wth-doc:
+         on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+           run cre-route-dump( p-act-name, {&table_chk-pay}, (buffer buf_chk-pay:handle), dmp-ord, input-output rc-ord ).
+         end.
+-        for each buf_c-chk-doc where buf_c-chk-doc.doc-code = buf_chk-doc.doc-code
+-        on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-          run cre-route-dump( p-act-name, {&table_c-chk-doc}, (buffer buf_c-chk-doc:handle), dmp-ord, input-output rc-ord ).
++        if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-chk-doc") then
++        do:
++          for each buf_c-chk-doc where buf_c-chk-doc.doc-code = buf_chk-doc.doc-code
++          on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++            run cre-route-dump( p-act-name, {&table_c-chk-doc}, (buffer buf_c-chk-doc:handle), dmp-ord, input-output rc-ord ).
++          end.
+         end.
+-        for each buf_c-chk-pay where buf_c-chk-pay.doc-code = buf_chk-doc.doc-code
+-        on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-          run cre-route-dump( p-act-name, {&table_c-chk-pay}, (buffer buf_c-chk-pay:handle), dmp-ord, input-output rc-ord ).
++        if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-chk-pay") then
++        do:
++          for each buf_c-chk-pay where buf_c-chk-pay.doc-code = buf_chk-doc.doc-code
++          on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++            run cre-route-dump( p-act-name, {&table_c-chk-pay}, (buffer buf_c-chk-pay:handle), dmp-ord, input-output rc-ord ).
++          end.
+         end.
+         run cre-route-dump( p-act-name, {&table_chk-doc}, (buffer buf_chk-doc:handle), dmp-ord, input-output rc-ord ).
+       end.
+@@ -607,12 +628,14 @@ PROCEDURE cre-dump-wth-doc:
+     on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+       run cre-route-dump( p-act-name, {&table_inkas-pay-wth}, (buffer buf_inkas-pay-wth:handle), dmp-ord, input-output rc-ord ).
+     end.
+-    for each buf_c-inkas-pay-wth where buf_c-inkas-pay-wth.inkas-code = buf_wth-doc.doc-code
+-    on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-      run cre-route-dump( p-act-name, {&table_c-inkas-pay-wth}, (buffer buf_c-inkas-pay-wth:handle), dmp-ord, input-output rc-ord ).
++    if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-inkas-pay-wth") then
++    do:
++      for each buf_c-inkas-pay-wth where buf_c-inkas-pay-wth.inkas-code = buf_wth-doc.doc-code
++      on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++        run cre-route-dump( p-act-name, {&table_c-inkas-pay-wth}, (buffer buf_c-inkas-pay-wth:handle), dmp-ord, input-output rc-ord ).
++      end.
+     end.
+ 
+-
+   end.
+ END PROCEDURE.
+ 
+@@ -840,17 +863,26 @@ PROCEDURE cre-dump-trn-doc:
+         on error undo, return error return-value :
+           run cre-route-dump( p-act-name, {&table_chk-doc-attr}, (buffer buf_chk-doc-attr:handle), dmp-ord, input-output rc-ord ).
+         end.
+-        for each  buf_c-chk-doc-attr where buf_c-chk-doc-attr.doc-code = buf_chk-doc.doc-code
+-        on error undo, return error return-value :
+-          run cre-route-dump( p-act-name, {&table_c-chk-doc-attr}, (buffer buf_c-chk-doc-attr:handle), dmp-ord, input-output rc-ord ).
++        if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-chk-doc-attr") then
++        do:
++          for each  buf_c-chk-doc-attr where buf_c-chk-doc-attr.doc-code = buf_chk-doc.doc-code
++          on error undo, return error return-value :
++            run cre-route-dump( p-act-name, {&table_c-chk-doc-attr}, (buffer buf_c-chk-doc-attr:handle), dmp-ord, input-output rc-ord ).
++          end.
+         end.
+-        for each  buf_c-chk-doc where buf_c-chk-doc.doc-code = buf_chk-doc.doc-code
+-        on error undo, return error return-value :
+-          run cre-route-dump( p-act-name, {&table_c-chk-doc}, (buffer buf_c-chk-doc:handle), dmp-ord, input-output rc-ord ).
++        if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-chk-doc") then
++        do:
++          for each  buf_c-chk-doc where buf_c-chk-doc.doc-code = buf_chk-doc.doc-code
++          on error undo, return error return-value :
++            run cre-route-dump( p-act-name, {&table_c-chk-doc}, (buffer buf_c-chk-doc:handle), dmp-ord, input-output rc-ord ).
++          end.
+         end.
+-        for each  buf_c-chk-gds where buf_c-chk-gds.doc-code = buf_chk-doc.doc-code
+-        on error undo, return error return-value :
+-          run cre-route-dump( p-act-name, {&table_c-chk-gds}, (buffer buf_c-chk-gds:handle), dmp-ord, input-output rc-ord ).
++        if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-chk-gds") then
++        do:
++          for each  buf_c-chk-gds where buf_c-chk-gds.doc-code = buf_chk-doc.doc-code
++          on error undo, return error return-value :
++            run cre-route-dump( p-act-name, {&table_c-chk-gds}, (buffer buf_c-chk-gds:handle), dmp-ord, input-output rc-ord ).
++          end.
+         end.
+         /*  в куст входит но в чеке инвентаризации быть не может пропускаем--------------------------*/
+         /*------------------------------------------chk-pay------------------------------------------*/
+@@ -995,12 +1027,15 @@ PROCEDURE cre-dump-inkas:
+     for each  buf_sale-doc where buf_sale-doc.inkas-code = buf_inkas.inkas-code
+     on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+       run cre-route-dump( p-act-name, {&table_sale-doc}, (buffer buf_sale-doc:handle), dmp-ord, input-output rc-ord ).
+-      for each buf_c-sale-doc where
+-               buf_c-sale-doc.inkas-code = buf_sale-doc.inkas-code
+-           AND buf_c-sale-doc.doc-code   = buf_sale-doc.doc-code
+-       on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-         run cre-route-dump( p-act-name, {&table_c-sale-doc}, (buffer buf_c-sale-doc:handle), dmp-ord, input-output rc-ord ).
+-       end.
++      if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-sale-doc") then
++      do:
++        for each buf_c-sale-doc where
++                 buf_c-sale-doc.inkas-code = buf_sale-doc.inkas-code
++             AND buf_c-sale-doc.doc-code   = buf_sale-doc.doc-code
++        on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++          run cre-route-dump( p-act-name, {&table_c-sale-doc}, (buffer buf_c-sale-doc:handle), dmp-ord, input-output rc-ord ).
++        end.
++      end.
+     end.
+     for each  buf_chk-doc where buf_chk-doc.out-code = buf_inkas.inkas-code
+                           and ( chk-go-news = TRUE
+@@ -1041,25 +1076,40 @@ PROCEDURE cre-dump-inkas:
+       on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+         run cre-route-dump( p-act-name, {&table_chk-doc-attr}, (buffer buf_chk-doc-attr:handle), dmp-ord, input-output rc-ord ).
+       end.
+-      for each  buf_c-chk-doc where buf_c-chk-doc.doc-code = buf_chk-doc.doc-code
+-      on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-        run cre-route-dump( p-act-name, {&table_c-chk-doc}, (buffer buf_c-chk-doc:handle), dmp-ord, input-output rc-ord ).
++      if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-chk-doc") then
++      do:
++        for each  buf_c-chk-doc where buf_c-chk-doc.doc-code = buf_chk-doc.doc-code
++        on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++          run cre-route-dump( p-act-name, {&table_c-chk-doc}, (buffer buf_c-chk-doc:handle), dmp-ord, input-output rc-ord ).
++        end.
+       end.
+-      for each  buf_c-chk-gds where buf_c-chk-gds.doc-code = buf_chk-doc.doc-code
+-      on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-        run cre-route-dump( p-act-name, {&table_c-chk-gds}, (buffer buf_c-chk-gds:handle), dmp-ord, input-output rc-ord ).
++      if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-chk-gds") then
++      do:
++        for each  buf_c-chk-gds where buf_c-chk-gds.doc-code = buf_chk-doc.doc-code
++        on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++          run cre-route-dump( p-act-name, {&table_c-chk-gds}, (buffer buf_c-chk-gds:handle), dmp-ord, input-output rc-ord ).
++        end.
+       end.
+-      for each  buf_c-chk-pay where buf_c-chk-pay.doc-code = buf_chk-doc.doc-code
+-      on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-        run cre-route-dump( p-act-name, {&table_c-chk-pay}, (buffer buf_c-chk-pay:handle), dmp-ord, input-output rc-ord ).
++      if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-chk-pay") then
++      do:
++        for each  buf_c-chk-pay where buf_c-chk-pay.doc-code = buf_chk-doc.doc-code
++        on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++          run cre-route-dump( p-act-name, {&table_c-chk-pay}, (buffer buf_c-chk-pay:handle), dmp-ord, input-output rc-ord ).
++        end.
+       end.
+-      for each  buf_c-chk-discnt where buf_c-chk-discnt.doc-code = buf_chk-doc.doc-code
+-      on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-        run cre-route-dump( p-act-name, {&table_c-chk-discnt}, (buffer buf_c-chk-discnt:handle), dmp-ord, input-output rc-ord ).
++      if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-chk-discnt") then
++      do:
++        for each  buf_c-chk-discnt where buf_c-chk-discnt.doc-code = buf_chk-doc.doc-code
++        on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++          run cre-route-dump( p-act-name, {&table_c-chk-discnt}, (buffer buf_c-chk-discnt:handle), dmp-ord, input-output rc-ord ).
++        end.
+       end.
+-      for each  buf_c-chk-doc-attr where buf_c-chk-doc-attr.doc-code = buf_chk-doc.doc-code
+-      on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-        run cre-route-dump( p-act-name, {&table_c-chk-doc-attr}, (buffer buf_c-chk-doc-attr:handle), dmp-ord, input-output rc-ord ).
++      if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-chk-doc-attr") then
++      do:
++        for each  buf_c-chk-doc-attr where buf_c-chk-doc-attr.doc-code = buf_chk-doc.doc-code
++        on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++          run cre-route-dump( p-act-name, {&table_c-chk-doc-attr}, (buffer buf_c-chk-doc-attr:handle), dmp-ord, input-output rc-ord ).
++        end.
+       end.
+     end.
+     if chk-go-news = TRUE then do:
+@@ -1195,26 +1245,35 @@ PROCEDURE cre-dump-shift-obj:
+       on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+         run cre-route-dump( p-act-name, {&table_shift-cash}, (buffer buf_shift-cash:handle), dmp-ord, input-output rc-ord ).
+       end.
+-      for each buf_c-shift-staff where buf_c-shift-staff.obj-type   = buf_shift-obj.obj-type
+-                              and buf_c-shift-staff.obj-code   = buf_shift-obj.obj-code
+-                              and buf_c-shift-staff.shift-date = buf_shift-obj.shift-date
+-                              and buf_c-shift-staff.shift-num  = buf_shift-obj.shift-num
+-      on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-        run cre-route-dump( p-act-name, {&table_c-shift-staff}, (buffer buf_c-shift-staff:handle), dmp-ord, input-output rc-ord ).
++      if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-shift-staff") then
++      do:
++        for each buf_c-shift-staff where buf_c-shift-staff.obj-type   = buf_shift-obj.obj-type
++                                and buf_c-shift-staff.obj-code   = buf_shift-obj.obj-code
++                                and buf_c-shift-staff.shift-date = buf_shift-obj.shift-date
++                                and buf_c-shift-staff.shift-num  = buf_shift-obj.shift-num
++        on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++          run cre-route-dump( p-act-name, {&table_c-shift-staff}, (buffer buf_c-shift-staff:handle), dmp-ord, input-output rc-ord ).
++        end.
+       end.
+-      for each buf_c-sht-hist where buf_c-sht-hist.obj-type   = buf_shift-obj.obj-type
+-                              and buf_c-sht-hist.obj-code   = buf_shift-obj.obj-code
+-                              and buf_c-sht-hist.shift-date = buf_shift-obj.shift-date
+-                              and buf_c-sht-hist.shift-num  = buf_shift-obj.shift-num
+-      on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-        run cre-route-dump( p-act-name, {&table_c-sht-hist}, (buffer buf_c-sht-hist:handle), dmp-ord, input-output rc-ord ).
++      if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-sht-hist") then
++      do:
++        for each buf_c-sht-hist where buf_c-sht-hist.obj-type   = buf_shift-obj.obj-type
++                                and buf_c-sht-hist.obj-code   = buf_shift-obj.obj-code
++                                and buf_c-sht-hist.shift-date = buf_shift-obj.shift-date
++                                and buf_c-sht-hist.shift-num  = buf_shift-obj.shift-num
++        on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++          run cre-route-dump( p-act-name, {&table_c-sht-hist}, (buffer buf_c-sht-hist:handle), dmp-ord, input-output rc-ord ).
++        end.
+       end.
+-      for each buf_c-shift-obj where buf_c-shift-obj.obj-type   = buf_shift-obj.obj-type
+-                              and buf_c-shift-obj.obj-code   = buf_shift-obj.obj-code
+-                              and buf_c-shift-obj.shift-date = buf_shift-obj.shift-date
+-                              and buf_c-shift-obj.shift-num  = buf_shift-obj.shift-num
+-      on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-        run cre-route-dump( p-act-name, {&table_c-shift-obj}, (buffer buf_c-shift-obj:handle), dmp-ord, input-output rc-ord ).
++      if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-shift-obj") then
++      do:
++        for each buf_c-shift-obj where buf_c-shift-obj.obj-type   = buf_shift-obj.obj-type
++                                and buf_c-shift-obj.obj-code   = buf_shift-obj.obj-code
++                                and buf_c-shift-obj.shift-date = buf_shift-obj.shift-date
++                                and buf_c-shift-obj.shift-num  = buf_shift-obj.shift-num
++        on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++          run cre-route-dump( p-act-name, {&table_c-shift-obj}, (buffer buf_c-shift-obj:handle), dmp-ord, input-output rc-ord ).
++        end.
+       end.
+     end. /*если смена закрыта*/
+   end.
+@@ -2103,17 +2162,22 @@ PROCEDURE cre-dump-global-state  :
+       run cre-route-dump( p-act-name, {&table_global-state-attr}, (buffer buf_global-state-attr:handle), dmp-ord, input-output rc-ord ).
+     end.
+ 
+-    for each buf_c-global-state-attr where buf_c-global-state-attr.gls-id = buf_global-state.gls-id
+-    on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-      run cre-route-dump( p-act-name, {&table_c-global-state-attr}, (buffer buf_c-global-state-attr:handle), dmp-ord, input-output rc-ord ).
++    if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-global-state-attr") then
++    do:
++      for each buf_c-global-state-attr where buf_c-global-state-attr.gls-id = buf_global-state.gls-id
++      on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++        run cre-route-dump( p-act-name, {&table_c-global-state-attr}, (buffer buf_c-global-state-attr:handle), dmp-ord, input-output rc-ord ).
++      end.
+     end.
+ 
+-    for each buf_c-global-state where buf_c-global-state.gls-id = buf_global-state.gls-id
+-    on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-      run cre-route-dump( p-act-name, {&table_c-global-state}, (buffer buf_c-global-state:handle), dmp-ord, input-output rc-ord ).
++    if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-global-state") then
++    do:
++      for each buf_c-global-state where buf_c-global-state.gls-id = buf_global-state.gls-id
++      on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++        run cre-route-dump( p-act-name, {&table_c-global-state}, (buffer buf_c-global-state:handle), dmp-ord, input-output rc-ord ).
++      end.
+     end.
+ 
+-
+   end.
+ END PROCEDURE.
+ 
+@@ -2136,18 +2200,24 @@ PROCEDURE cre-dump-sum-group :
+ 
+     find buf_sum-group where rowid(buf_sum-group) = tbl-row.
+ 
+-    for each buf_c-sum-group where
+-             buf_c-sum-group.sgr-id     = buf_sum-group.sgr-id and
+-             buf_c-sum-group.sgr-db-num = buf_sum-group.sgr-db-num
+-    on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-      run cre-route-dump( p-act-name, {&table_c-sum-group}, (buffer buf_c-sum-group:handle), dmp-ord, input-output rc-ord ).
++    if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-sum-group") then
++    do:
++      for each buf_c-sum-group where
++               buf_c-sum-group.sgr-id     = buf_sum-group.sgr-id and
++               buf_c-sum-group.sgr-db-num = buf_sum-group.sgr-db-num
++      on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++        run cre-route-dump( p-act-name, {&table_c-sum-group}, (buffer buf_c-sum-group:handle), dmp-ord, input-output rc-ord ).
++      end.
+     end.
+ 
+-    for each buf_c-sum-in-sum-group where
+-             buf_c-sum-in-sum-group.sgr-id     = buf_sum-group.sgr-id and
+-             buf_c-sum-in-sum-group.sgr-db-num = buf_sum-group.sgr-db-num
+-    on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-      run cre-route-dump( p-act-name, {&table_c-sum-in-sum-group}, (buffer buf_c-sum-in-sum-group:handle), dmp-ord, input-output rc-ord ).
++    if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-sum-in-sum-group") then
++    do:
++      for each buf_c-sum-in-sum-group where
++               buf_c-sum-in-sum-group.sgr-id     = buf_sum-group.sgr-id and
++               buf_c-sum-in-sum-group.sgr-db-num = buf_sum-group.sgr-db-num
++      on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++        run cre-route-dump( p-act-name, {&table_c-sum-in-sum-group}, (buffer buf_c-sum-in-sum-group:handle), dmp-ord, input-output rc-ord ).
++      end.
+     end.
+ 
+     for each buf_sum-in-sum-group where
+@@ -2180,18 +2250,24 @@ PROCEDURE cre-dump-qnty-group :
+ 
+     find buf_qnty-group where rowid(buf_qnty-group) = tbl-row.
+ 
+-    for each buf_c-qnty-group where
+-             buf_c-qnty-group.qgr-id     = buf_qnty-group.qgr-id and
+-             buf_c-qnty-group.qgr-db-num = buf_qnty-group.qgr-db-num
+-    on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-      run cre-route-dump( p-act-name, {&table_c-qnty-group}, (buffer buf_c-qnty-group:handle), dmp-ord, input-output rc-ord ).
++    if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-qnty-group") then
++    do:
++      for each buf_c-qnty-group where
++               buf_c-qnty-group.qgr-id     = buf_qnty-group.qgr-id and
++               buf_c-qnty-group.qgr-db-num = buf_qnty-group.qgr-db-num
++      on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++        run cre-route-dump( p-act-name, {&table_c-qnty-group}, (buffer buf_c-qnty-group:handle), dmp-ord, input-output rc-ord ).
++      end.
+     end.
+ 
+-    for each buf_c-qnty-in-qnty-group where
+-             buf_c-qnty-in-qnty-group.qgr-id     = buf_qnty-group.qgr-id and
+-             buf_c-qnty-in-qnty-group.qgr-db-num = buf_qnty-group.qgr-db-num
+-    on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-      run cre-route-dump( p-act-name, {&table_c-qnty-in-qnty-group}, (buffer buf_c-qnty-in-qnty-group:handle), dmp-ord, input-output rc-ord ).
++    if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-qnty-in-qnty-group") then
++    do:
++      for each buf_c-qnty-in-qnty-group where
++               buf_c-qnty-in-qnty-group.qgr-id     = buf_qnty-group.qgr-id and
++               buf_c-qnty-in-qnty-group.qgr-db-num = buf_qnty-group.qgr-db-num
++      on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++        run cre-route-dump( p-act-name, {&table_c-qnty-in-qnty-group}, (buffer buf_c-qnty-in-qnty-group:handle), dmp-ord, input-output rc-ord ).
++      end.
+     end.
+ 
+     for each buf_qnty-in-qnty-group where
+@@ -2224,18 +2300,24 @@ PROCEDURE cre-dump-turnover-group :
+ 
+     find buf_turnover-group where rowid(buf_turnover-group) = tbl-row.
+ 
+-    for each buf_c-turnover-group where
+-             buf_c-turnover-group.tog-id     = buf_turnover-group.tog-id and
+-             buf_c-turnover-group.tog-db-num = buf_turnover-group.tog-db-num
+-    on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-      run cre-route-dump( p-act-name, {&table_c-turnover-group}, (buffer buf_c-turnover-group:handle), dmp-ord, input-output rc-ord ).
++    if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-turnover-group") then
++    do:
++      for each buf_c-turnover-group where
++               buf_c-turnover-group.tog-id     = buf_turnover-group.tog-id and
++               buf_c-turnover-group.tog-db-num = buf_turnover-group.tog-db-num
++      on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++        run cre-route-dump( p-act-name, {&table_c-turnover-group}, (buffer buf_c-turnover-group:handle), dmp-ord, input-output rc-ord ).
++      end.
+     end.
+ 
+-    for each buf_c-tnv-in-turnover-group where
+-             buf_c-tnv-in-turnover-group.tog-id     = buf_turnover-group.tog-id and
+-             buf_c-tnv-in-turnover-group.tog-db-num = buf_turnover-group.tog-db-num
+-    on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-      run cre-route-dump( p-act-name, {&table_c-tnv-in-turnover-group}, (buffer buf_c-tnv-in-turnover-group:handle), dmp-ord, input-output rc-ord ).
++    if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-tnv-in-turnover-group") then
++    do:
++      for each buf_c-tnv-in-turnover-group where
++               buf_c-tnv-in-turnover-group.tog-id     = buf_turnover-group.tog-id and
++               buf_c-tnv-in-turnover-group.tog-db-num = buf_turnover-group.tog-db-num
++      on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++        run cre-route-dump( p-act-name, {&table_c-tnv-in-turnover-group}, (buffer buf_c-tnv-in-turnover-group:handle), dmp-ord, input-output rc-ord ).
++      end.
+     end.
+ 
+     for each buf_tnv-in-turnover-group where
+@@ -2267,11 +2349,14 @@ PROCEDURE cre-dump-buyer-group    :
+ 
+     find buf_buyer-group where rowid(buf_buyer-group) = tbl-row.
+ 
+-    for each buf_c-buyer-group where
+-             buf_c-buyer-group.bgr-id     = buf_buyer-group.bgr-id and
+-             buf_c-buyer-group.bgr-db-num = buf_buyer-group.bgr-db-num
+-    on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-      run cre-route-dump( p-act-name, {&table_c-buyer-group}, (buffer buf_c-buyer-group:handle), dmp-ord, input-output rc-ord ).
++    if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-buyer-group") then
++    do:
++      for each buf_c-buyer-group where
++               buf_c-buyer-group.bgr-id     = buf_buyer-group.bgr-id and
++               buf_c-buyer-group.bgr-db-num = buf_buyer-group.bgr-db-num
++      on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++        run cre-route-dump( p-act-name, {&table_c-buyer-group}, (buffer buf_c-buyer-group:handle), dmp-ord, input-output rc-ord ).
++      end.
+     end.
+ 
+   end.
+@@ -2294,13 +2379,16 @@ PROCEDURE cre-dump-buyer-in-buyer-group 
+ 
+     find buf_buyer-in-buyer-group where rowid(buf_buyer-in-buyer-group) = tbl-row.
+ 
+-    for each buf_c-buyer-in-buyer-group where
+-             buf_c-buyer-in-buyer-group.bgr-id       = buf_buyer-in-buyer-group.bgr-id and
+-             buf_c-buyer-in-buyer-group.bgr-db-num   = buf_buyer-in-buyer-group.bgr-db-num and
+-             buf_c-buyer-in-buyer-group.bbg-obj-type = buf_buyer-in-buyer-group.bbg-obj-type and
+-             buf_c-buyer-in-buyer-group.bbg-obj-code = buf_buyer-in-buyer-group.bbg-obj-code
+-    on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-      run cre-route-dump( p-act-name, {&table_c-buyer-in-buyer-group}, (buffer buf_c-buyer-in-buyer-group:handle), dmp-ord, input-output rc-ord ).
++    if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-buyer-in-buyer-group") then
++    do:
++      for each buf_c-buyer-in-buyer-group where
++               buf_c-buyer-in-buyer-group.bgr-id       = buf_buyer-in-buyer-group.bgr-id and
++               buf_c-buyer-in-buyer-group.bgr-db-num   = buf_buyer-in-buyer-group.bgr-db-num and
++               buf_c-buyer-in-buyer-group.bbg-obj-type = buf_buyer-in-buyer-group.bbg-obj-type and
++               buf_c-buyer-in-buyer-group.bbg-obj-code = buf_buyer-in-buyer-group.bbg-obj-code
++      on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++        run cre-route-dump( p-act-name, {&table_c-buyer-in-buyer-group}, (buffer buf_c-buyer-in-buyer-group:handle), dmp-ord, input-output rc-ord ).
++      end.
+     end.
+ 
+   end.
+@@ -2687,17 +2775,23 @@ PROCEDURE cre-dump-stop-list:
+     on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+       run cre-route-dump( p-act-name, {&table_stop-list-line}, (buffer buf_stop-list-line:handle), dmp-ord, input-output rc-ord ).
+     end.
+-    for each  buf_c-stop-list-line where
+-             buf_c-stop-list-line.classif-type = buf_stop-list.classif-type
+-         and buf_c-stop-list-line.stop-list-code = buf_stop-list.stop-list-code
+-    on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-      run cre-route-dump( p-act-name, {&table_c-stop-list-line}, (buffer buf_c-stop-list-line:handle), dmp-ord, input-output rc-ord ).
++    if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-stop-list-line") then
++    do:
++      for each buf_c-stop-list-line where
++               buf_c-stop-list-line.classif-type = buf_stop-list.classif-type
++           and buf_c-stop-list-line.stop-list-code = buf_stop-list.stop-list-code
++      on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++        run cre-route-dump( p-act-name, {&table_c-stop-list-line}, (buffer buf_c-stop-list-line:handle), dmp-ord, input-output rc-ord ).
++      end.
+     end.
+-    for each  buf_c-stop-list where
+-             buf_c-stop-list.classif-type = buf_stop-list.classif-type
+-         and buf_c-stop-list.stop-list-code = buf_stop-list.stop-list-code
+-    on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
+-      run cre-route-dump( p-act-name, {&table_c-stop-list}, (buffer buf_c-stop-list:handle), dmp-ord, input-output rc-ord ).
++    if p-act-name <> {&send-tbl} or g#db-num = 0 or not can-do(v-custom-except-list,"c-stop-list") then
++    do:
++      for each  buf_c-stop-list where
++               buf_c-stop-list.classif-type = buf_stop-list.classif-type
++           and buf_c-stop-list.stop-list-code = buf_stop-list.stop-list-code
++      on error undo, return error substitute( "&1. &2&3&4", vss-include-info{&vssseq}, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) ) :
++        run cre-route-dump( p-act-name, {&table_c-stop-list}, (buffer buf_c-stop-list:handle), dmp-ord, input-output rc-ord ).
++      end.
+     end.
+ 
+ 
+diff --git a/nws/cr-route.p b/nws/cr-route.p
+--- a/nws/cr-route.p
++++ b/nws/cr-route.p
+@@ -29,6 +29,7 @@ define variable vss-description as character no-undo init "Создание записи маршрутизации (route)".
+ { cmp/vssrevis.i "substitute('&1|&2|&3|&4':u,p-act-name,p-tbl-name,p-tbl-handle,p-send-list)" }
+ { cmp/trg-def.i  }
+ { nws/lib-nws.i  }
++{ nws/call-nws.i }
+ { str/marks.i    }
+ { gbl/key-rec.i  }
+ { nws/cr-rtd.i   }
+diff --git a/str/callnews.p b/str/callnews.p
+--- a/str/callnews.p
++++ b/str/callnews.p
+@@ -460,7 +460,7 @@ on error  undo, return error substitute(
+ 
+   /********************************* "решатель" куда отправить ***************************************/
+   
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and lookup(v-tbl-name, v-0-rdb-and-from-news) > 0 then do:
+     /* отдельный блок т.к. только из ГБД но и во время работы новостей */
+     if g#db-num = 0 then do: /* Если БД центральная, то  разослать  во все удаленные базы  */
+@@ -469,7 +469,7 @@ on error  undo, return error substitute(
+     v-found = yes.
+   end. /*lookup(v-tbl-name, v-0-rdb-and-from-news) > 0*/
+   /* эти таблицы идут только из ГБД в УБД  и НЕ ходят транзитом  УБД1-ГБД-УБД2 */
+-  if v-found <> TRUE and (lookup(v-tbl-name, v-custom-0-rdb-not-news) > 0 or (lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and (lookup(v-tbl-name, v-custom-0-rdb-not-news) > 0 or (not can-do(v-custom-except-list, v-tbl-name)
+   and lookup(v-tbl-name, v-0-rdb-not-news) > 0))
+   then do:
+     if g#db-num = 0 and not g#news then do:
+@@ -477,7 +477,7 @@ on error  undo, return error substitute(
+     end.
+     v-found = yes.
+   end. /*if lookup(v-tbl-name, v-0-rdb-not-news) > 0 then do:*/
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0 
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name) 
+   and lookup(v-tbl-name, v-0-rdb_rbd-0-not-news) > 0 then do:
+     if g#db-num = 0 then do: /* Если БД центральная, то разослать во все удаленные базы */
+       assign list-db-for-send = list-remote-db-wsd .
+@@ -487,7 +487,7 @@ on error  undo, return error substitute(
+     end.
+     v-found = yes.
+   end. /*if lookup(v-tbl-name, v-0-rdb_rbd-0-not-news) > 0 then do:*/
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and lookup(v-tbl-name, v-0-remote-stock) > 0 then do:
+     /* отдельный блок т.к. рассылка в некоторые УБД чужих остаков */
+     if g#db-num = 0 then do:
+@@ -495,7 +495,7 @@ on error  undo, return error substitute(
+     end.
+     v-found = yes.
+   end. /*if lookup(v-tbl-name, v-0-remote-stock) > 0 then do:*/
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and lookup(v-tbl-name, v-rdb-0-not-news) > 0 then do:
+     if  g#db-num <> 0 and not g#news then do :
+       assign list-db-for-send = "0" .
+@@ -507,7 +507,7 @@ on error  undo, return error substitute(
+   Для того чтобы их корректно просматривать нам нужны справочники во всех базах данных.*/
+   /*из ГБД везде исключая БД источник*/
+   /*из УБД в ГБД*/
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and lookup(v-tbl-name, v-0-rdb-no-src_rdb-0-no-news) > 0 then do:
+     if g#db-num = 0 then do: /* Если БД центральная, то разослать во все удаленные базы кроме исх*/
+       assign list-db-for-send = list-remote-db .
+@@ -517,7 +517,7 @@ on error  undo, return error substitute(
+     end.
+     v-found = yes.
+   end. /*if lookup(v-tbl-name, v-0-rdb-no-src_rdb-0-no-news) > 0 then do:*/
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and lookup(v-tbl-name, v-route-c-glob-context) > 0 then do:
+     assign
+     v-obj-type = '':U
+@@ -527,7 +527,7 @@ on error  undo, return error substitute(
+     v-is-c-route = yes
+     .
+   end. /*if lookup(v-tbl-name, v-route-c-glob-context) > 0 then do:*/
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and lookup(v-tbl-name, v-route-c-shapka-context) > 0 then do:
+     assign
+     v-obj-type = v-tbl-handle:buffer-field("obj-type"):buffer-value
+@@ -543,7 +543,7 @@ on error  undo, return error substitute(
+       .
+     end.
+   end. /*if lookup(v-tbl-name, v-route-c-shapka-context) > 0 then do:*/
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and lookup(v-tbl-name, v-route-c-quest-context) > 0 then do:
+     assign
+     v-obj-type = v-tbl-handle:buffer-field("obj-type"):buffer-value
+@@ -553,7 +553,7 @@ on error  undo, return error substitute(
+     v-is-c-route = yes
+     .
+   end. /*if lookup(v-tbl-name, v-route-c-quest-context) > 0 then do:*/
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and lookup(v-tbl-name, v-c-quest-context-global-only-0) > 0 then do:
+     assign
+     v-obj-type = v-tbl-handle:buffer-field("obj-type"):buffer-value
+@@ -564,7 +564,7 @@ on error  undo, return error substitute(
+     v-global-only-0 = yes
+     .
+   end. /*if lookup(v-tbl-name, v-c-quest-context-global-only-0) > 0 then do:*/
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and v-is-c-route then do:
+     /*глобальный контекст истории*/
+     if (v-obj-type = '':U
+@@ -651,7 +651,7 @@ on error  undo, return error substitute(
+     end.
+     v-found = yes.
+   end.  /*маршрутизируем историю*/
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and lookup(v-tbl-name, v-route-c-only-0) > 0 then do:
+     if g#db-num = 0 then do:
+       assign list-db-for-send = list-remote-db-wsd .
+@@ -661,7 +661,7 @@ on error  undo, return error substitute(
+     end.
+     v-found = yes.
+   end.
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and lookup(v-tbl-name, v-reply-through-news) > 0 then do:
+     if g#news then do:
+       assign list-db-for-send = string(g#news-source-db).
+@@ -669,7 +669,7 @@ on error  undo, return error substitute(
+     v-found = yes.
+   end.
+    /*объектные таблицы - ходят только между двумя БД */
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and lookup(v-tbl-name, v-obj-tables) > 0 then do:
+     if g#db-num <> 0 then do:
+       assign list-db-for-send = "0" .
+@@ -689,7 +689,7 @@ on error  undo, return error substitute(
+     v-found = yes.
+   end. /*if lookup(v-tbl-name, v-obj-tables*/
+   /*история объектных таблиц - ходят только между двумя БД */
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and lookup(v-tbl-name, v-c-obj-tables) > 0 then do:
+     v-is-news = ( v-tbl-handle:buffer-field("corr-user-name"):buffer-value begins {&nts-user})
+     .
+@@ -712,7 +712,7 @@ on error  undo, return error substitute(
+     end.
+     v-found = yes.
+   end.
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and lookup(v-tbl-name, v-c-obj-tables-todo) > 0 then do:
+     v-is-news = ( v-tbl-handle:buffer-field("corr-user-name"):buffer-value begins {&nts-user})
+     .
+@@ -735,7 +735,7 @@ on error  undo, return error substitute(
+     v-found = yes.
+   end.
+   /*НЕИСТОРИЧЕСКИЕ таблицы с двойным вариантом контекста */
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and lookup(v-tbl-name, v-quest-context) > 0 then do:
+     assign
+     v-obj-code = v-tbl-handle:buffer-field("obj-code"):buffer-value
+@@ -766,7 +766,7 @@ on error  undo, return error substitute(
+     v-found = yes.
+   end.
+   /*таблицы с вдвойгым контекстом*/
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and lookup(v-tbl-name, v-quest-context-todo) > 0 then do:
+     assign
+     v-obj-code = v-tbl-handle:buffer-field("obj-code"):buffer-value
+@@ -797,7 +797,7 @@ on error  undo, return error substitute(
+     v-found = yes.
+   end.
+   /*таблицы с двойным контекстом - но глобальный вводится только в ГБД*/
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and lookup(v-tbl-name, v-quest-context-global-only-0) > 0 then do:
+     assign
+     v-obj-code = v-tbl-handle:buffer-field("obj-code"):buffer-value
+@@ -841,7 +841,7 @@ on error  undo, return error substitute(
+   end.
+   /*-----------маршрутизация таблиц имеющих глобальный и объектный контекст но глобальный вводится только в ГБД и не посслается*/
+  /*---------------объектный посылается только в БД объекта---------------------*/
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and lookup(v-tbl-name, v-quest-context-glob-nosend) > 0 then do:
+     assign
+     v-obj-code = v-tbl-handle:buffer-field("obj-code"):buffer-value
+@@ -870,7 +870,7 @@ on error  undo, return error substitute(
+     v-found = yes.
+   end.
+   /*-----------маршрутизация таблиц из главной БД фирмыи в ГБД*/
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and lookup(v-tbl-name,  v-main-firm-db-0-not-news) > 0 then do:
+     if not g#news then do:
+       if g#db-num = 0 then do:
+@@ -891,7 +891,7 @@ on error  undo, return error substitute(
+     end.
+     v-found = yes.
+   end.
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and lookup(v-tbl-name, v-0-rdb-not-news_rbd-0) > 0 then do:
+     /* Если БД центральная, то разослать во все удаленные базы */
+     if g#db-num = 0 and not g#news then do:
+@@ -903,7 +903,7 @@ on error  undo, return error substitute(
+     end.
+     v-found = yes.
+   end.
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and lookup(v-tbl-name, v-rbd-0) > 0 then do:
+     /*если удаленка, отсылать всегда*/
+     if g#db-num <> 0 then do:
+@@ -911,7 +911,7 @@ on error  undo, return error substitute(
+     end.
+     v-found = yes.
+   end.
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and lookup(v-tbl-name, v-db-num-tables) > 0 then do:
+     if g#db-num > 0
+       and g#news = false
+@@ -930,7 +930,7 @@ on error  undo, return error substitute(
+     end.
+     v-found = yes.
+   end.
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and lookup(v-tbl-name, v-c-db-num-tables) > 0 then do:
+     if g#db-num > 0
+       and g#news = false
+@@ -949,7 +949,7 @@ on error  undo, return error substitute(
+     end.
+     v-found = yes.
+   end.
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and lookup(v-tbl-name, v-shop-tables) > 0 then do:
+     if g#db-num <> 0 and not g#news then do:
+       assign list-db-for-send = "0" .
+@@ -967,7 +967,7 @@ on error  undo, return error substitute(
+     end.
+     v-found = yes.
+   end. /*if lookup(v-tbl-name, v-shop-tables) > 0 then do:*/
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and lookup(v-tbl-name, v-c-shop-tables) > 0 then do:
+     assign
+     v-is-news = (v-tbl-handle:buffer-field("corr-user-name"):buffer-value begins {&nts-user})
+@@ -992,7 +992,7 @@ on error  undo, return error substitute(
+     v-found = yes.
+   end. /*if lookup(v-tbl-name, v-shop-tables) > 0 then do:*/
+   /*сложные случаи*/
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+     and lookup(v-tbl-name, v-custom-list) > 0
+   then do:
+     CASE v-tbl-name:
+@@ -1726,7 +1726,7 @@ on error  undo, return error substitute(
+       end.
+     end case.
+   end. /*if lookup (v-tbl-name, v-custom-list) > 0 */
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and v-routing-type <> "LOB"
+   and not (v-has-subject
+           and v-tbl-name-prim <> '')
+@@ -1744,7 +1744,7 @@ on error  undo, return error substitute(
+       view-as alert-box error .
+     undo, return error .
+   end.
+-  if v-found <> TRUE and lookup(v-tbl-name, v-custom-except-list) = 0
++  if v-found <> TRUE and not can-do(v-custom-except-list, v-tbl-name)
+   and (v-has-subject
+      and v-tbl-name-prim <> '') then do:
+     return ''.

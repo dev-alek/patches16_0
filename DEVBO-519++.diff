@@ -1,0 +1,740 @@
+# HG changeset patch
+# User BelovaMM
+# Parent  9b62d1d19e334315be51109360f915a08ba07ca3
+refs #DEVBO-519 ТС ПИоТ ГИС МТ. Изменения в 303 ППРФ.
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-519
+
+diff --git a/gbl/gis.w b/gbl/gis.w
+--- a/gbl/gis.w
++++ b/gbl/gis.w
+@@ -235,7 +235,7 @@ DEFINE RECTANGLE RECT-1
+ 
+ DEFINE RECTANGLE RECT-2
+      EDGE-PIXELS 2 GRAPHIC-EDGE  NO-FILL   
+-     SIZE 98 BY 3.1.
++     SIZE 93 BY 3.1.
+ 
+ DEFINE RECTANGLE RECT-3
+      EDGE-PIXELS 2 GRAPHIC-EDGE  NO-FILL   
+@@ -594,13 +594,13 @@ PROCEDURE enable_UI :
+               cdnAdress registrationKey adressPort login password
+               dopParam waitTime Proxytext crashSituat
+               MACC_Timeout Resp_TH_required MACC_IP MACC_PORT LMCHzPort
+-              addTimeoutPIoT Copy-addTimeoutPIoT
++              addTimeoutPIoT 
+           WITH FRAME Dialog-Frame.
+       
+       ENABLE B-exit B-quit OflineAdress OflineLogin OflinePswd gisAdress cdnTurnOn
+               cdnAdress registrationKey adressPort login password
+               dopParam waitTime crashSituat MACC_Timeout Resp_TH_required
+-              MACC_IP MACC_PORT LMCHzPort addTimeoutPIoT Copy-addTimeoutPIoT
++              MACC_IP MACC_PORT LMCHzPort addTimeoutPIoT 
+           WITH FRAME Dialog-Frame.      
+       ASSIGN
+          maxTime:VISIBLE = false
+@@ -621,6 +621,7 @@ PROCEDURE enable_UI :
+          Copy-Timeout:VISIBLE = false 
+          Copy-THport:VISIBLE = false 
+          Copy-LMCHzPort:VISIBLE = false
++         Copy-addTimeoutPIoT:VISIBLE = false
+          TxtCopy:VISIBLE = false 
+          TxtCopy-2:VISIBLE = false
+          RECT-3:VISIBLE = false
+diff --git a/ibs/th/skt/Commands/markingcmd.cls b/ibs/th/skt/Commands/markingcmd.cls
+--- a/ibs/th/skt/Commands/markingcmd.cls
++++ b/ibs/th/skt/Commands/markingcmd.cls
+@@ -55,8 +55,15 @@ class ibs.th.skt.Commands.markingcmd inh
+   method public override void Execute_( input req as ibs.th.skt.Commands.IRequest, resp as class IResponse ):
+     def buffer buf_code for ub.code.
+     def var vNeedUpd as integer no-undo.
++    def var vMarkOnlineResult as char no-undo.
++    def var vMark as char no-undo.
++    def var vOnlineResult as int no-undo.
++    
++    def buffer buf_marking for ub.marking.
+     
+     empty temp-table tt-code.
++           
++    vMarkOnlineResult = "".
+     
+     do transaction:
+        hndlsocket = req:HndlSocket.
+@@ -75,7 +82,8 @@ class ibs.th.skt.Commands.markingcmd inh
+                   buf_code.parent = "CDN_GisMt":
+              create tt-code.
+              buffer-copy buf_code to tt-code.         
+-         end.                                    
++         end. 
++         vMarkOnlineResult = marking:GetMarkOnlineResult().                                   
+          undo.
+        end.                     
+     end.
+@@ -88,7 +96,23 @@ class ibs.th.skt.Commands.markingcmd inh
+            if avail buf_code then do:
+                buffer-copy tt-code to buf_code no-error.
+            end.    
+-        end.    
++        end. 
++        if vMarkOnlineResult <> ""
++           and num-entries(vMarkOnlineResult,chr(9)) = 2
++        then do:
++            assign
++               vMark = entry(1,vMarkOnlineResult,chr(9))
++               vOnlineResult = int(entry(2,vMarkOnlineResult,chr(9)))
++               no-error.
++            if vMark <> "" and vOnlineResult <> ? 
++            then do:   
++                find first buf_marking exclusive-lock where 
++                           buf_marking.mark begins vMark 
++                   no-wait no-error.
++                if avail buf_marking then
++                   buf_marking.online-result = vOnlineResult .
++            end.      
++        end.      
+     end.
+     /* обновляем, если надо, CDN площадки */
+     vNeedUpd = marking:CheckCdnNeedUpd().              
+diff --git a/ibs/th/skt/ControlledClients/marking.cls b/ibs/th/skt/ControlledClients/marking.cls
+--- a/ibs/th/skt/ControlledClients/marking.cls
++++ b/ibs/th/skt/ControlledClients/marking.cls
+@@ -56,11 +56,14 @@ CLASS ibs.th.skt.ControlledClients.marki
+   DEFINE PRIVATE VARIABLE mMarkOrig     AS CHARACTER NO-UNDO.
+   DEFINE PRIVATE VARIABLE mCheckSts     AS INTEGER   NO-UNDO.
+   DEFINE PRIVATE VARIABLE mCheckStsOff  AS INTEGER   NO-UNDO.
++  DEFINE PRIVATE VARIABLE mCheckStsSave AS INTEGER   NO-UNDO.
+   DEFINE PRIVATE VARIABLE mReqId        AS CHARACTER NO-UNDO. 
+   DEFINE PRIVATE VARIABLE mReqTimestamp AS CHARACTER NO-UNDO.
+   DEFINE PRIVATE VARIABLE mInst         AS CHARACTER NO-UNDO. 
+   DEFINE PRIVATE VARIABLE mVersion      AS CHARACTER NO-UNDO.
+-  DEFINE PRIVATE VARIABLE mCheckGisMT   AS INTEGER NO-UNDO. /* 0 - проверки не было, 1 - проверка была, 2 - аварийная ситуация */
++  DEFINE PRIVATE VARIABLE mCheckGisMT   AS INTEGER NO-UNDO. /* 0 - проверки не было, 1 - проверка была, 2 - аварийная ситуация */  
++  DEFINE PRIVATE VARIABLE mSaveOnlineResult AS LOGICAL NO-UNDO.
++  
+     
+   DEF STREAM out_s.
+   DEF STREAM out_data.
+@@ -201,6 +204,8 @@ CLASS ibs.th.skt.ControlledClients.marki
+       shift_tbeg = ?
+       shift_num  = 0 
+       gismt-WaitTimePlus = 0
++      statusPOS = ?
++      mSaveOnlineResult = no
+     .
+     
+     
+@@ -335,55 +340,109 @@ CLASS ibs.th.skt.ControlledClients.marki
+         FIND FIRST buf_marking EXCLUSIVE-LOCK WHERE buf_marking.mark BEGINS mark-short NO-WAIT NO-ERROR.
+         IF action = cashSts:SaleLock:NameProp THEN 
+         DO:
+-           mCheckGisMT    = 0. 
+-           vAccMarkCheck = ChekAccessMark({&shop},obj-code,mark,mark-short).           
+-           dbgPrint("marking.log", SUBSTITUTE("Проверка ГИС МТ: &1 Статус: &2 mReqId &3 mReqTimeStamp &4 mCheckGisMT &5", 
+-                                              vAccMarkCheck, 
+-                                              mCheckSts,
+-                                              mReqId,
+-                                              mReqTimeStamp,
+-                                              mCheckGisMT)).
+-           IF mCheckSts = 0 OR 
+-              mCheckSts = 3 /* faund = false */
+-           THEN DO:
+-              /* если марки нет в ГИС МТ или не прошла проверку в ГИС МТ, то ее создадим ниже, но продавать нельзя */
+-              vAccMarkCheck = vAccMarkCheck + "Снимите с продажи и передайте товар управляющему/старшему смены".
+-           END.
+-           /* Если прошло более 72ч с момента аварии ГИС МТ */
+-           IF mCheckSts = 4 THEN DO:
+-              vLC = getJson(0, vAccMarkCheck, mark).
+-              sendContent(vLC).
+-              RETURN.
+-           END.     
+-           /* если марку не удалось проверить онлайн */
+-           IF (mCheckSts = 2 AND mCheckGisMT <> 1) OR mCheckGisMT = 2 THEN DO:
+-              /* проверим значение online-result марки (? - если марки в ТН нет)*/
+-              dbgPrint("marking.log", SUBSTITUTE("Считываем online-result: &1.", 
+-                                                IF NOT AVAIL buf_marking THEN "marking не найдена"
+-                                                ELSE STRING(buf_marking.online-result))).
+-              IF AVAIL buf_marking AND buf_marking.online-result = 0 
+-              THEN DO:
+-                  vAccMarkCheck = "Выполнить текущую онлайн-проверку не удалось. Продажа заблокирована по результату ранее выполненной проверки. Снимите с продажи и передайте товар управляющему/старшему смены".
++           mCheckGisMT = 0.
++           ChekTypeMarkByDm(mark).
++           /* если на кассе уже была проверка онлайн/офлайн */ 
++           if statusPOS <> ? then do:
++               dbgPrint("marking.log", SUBSTITUTE("Проверка ГИС МТ была на кассе. Статус: &1 Проверка в ЛМЧЗ &2", 
++                                                  statusPOS, 
++                                                  isCheckedOffline
++                                                  )).
++               assign
++                  vCheckLocalMark = isCheckedOffline 
++                  mCheckSts = statusPOS
++                  .
++               /* была проверка онлайн */
++               if not isCheckedOffline
++               then do:                   
++                   mCheckGisMT = 1.
++                   /* проверка онлайн не пройдена */
++                   if mCheckSts = 0 then
++                      vAccMarkCheck = "Запрет онлайн".   
++                   mCheckStsSave = mCheckSts .                          
++               end.     
++               /* была проверка офлайн */
++               else do:               
++                   /* проверка офлайн не пройдена */
++                   if mCheckSts = 0 then do:
++                      /*vAccMarkCheck = vAccMarkCheck + "Снимите с продажи и передайте товар управляющему/старшему смены".*/
++                      vLC = getJson(0, vAccMarkCheck, mark).
++                      sendContent(vLC).
++                      RETURN.
++                   end.
++                   /* проверка офлайн на кассе пройдена */
++                   IF AVAIL buf_marking AND buf_marking.online-result = 0 
++                   THEN DO:
++                       vAccMarkCheck = "Выполнить текущую онлайн-проверку не удалось. Продажа заблокирована по результату ранее выполненной проверки. Снимите с продажи и передайте товар управляющему/старшему смены".
++                       vLC = getJson(0, vAccMarkCheck, mark).
++                       sendContent(vLC).
++                       RETURN.
++                   END.          
++               end.
++               /* проверяем срок годности */
++               if mCheckSts = 1 or mCheckSts = 2 
++               then do:
++                   /* Проверяем офлайн */
++                   vAccMarkCheckOff = ChekExpirationDate({&shop},obj-code,buffer buf_marking).                       
++                   vAccMarkCheck = vAccMarkCheckOff. 
++               end.
++               dbgPrint("marking.log", SUBSTITUTE("Результат после обработки статуса с кассы: Комментарий: &1 Статус: &2 Проверка в ЛМЧЗ &3 mCheckGisMT &4 ", 
++                                                  vAccMarkCheck, 
++                                                  mCheckSts,
++                                                  vCheckLocalMark,
++                                                  mCheckGisMT
++                                                  )).
++           end.    
++           else do:
++               vAccMarkCheck = ChekAccessMark({&shop},obj-code,mark,mark-short).           
++               dbgPrint("marking.log", SUBSTITUTE("Проверка ГИС МТ: &1 Статус: &2 mReqId &3 mReqTimeStamp &4 mCheckGisMT &5", 
++                                                  vAccMarkCheck, 
++                                                  mCheckSts,
++                                                  mReqId,
++                                                  mReqTimeStamp,
++                                                  mCheckGisMT)).
++                                              
++               IF mCheckSts = 0 OR 
++                  mCheckSts = 3 /* faund = false */
++               THEN DO:
++                  /* если марки нет в ГИС МТ или не прошла проверку в ГИС МТ, то ее создадим ниже, но продавать нельзя */
++                  vAccMarkCheck = vAccMarkCheck + "Снимите с продажи и передайте товар управляющему/старшему смены".
++               END.
++               /* Если прошло более 72ч с момента аварии ГИС МТ */
++               IF mCheckSts = 4 THEN DO:
+                   vLC = getJson(0, vAccMarkCheck, mark).
+                   sendContent(vLC).
+                   RETURN.
+-              END.
+-              ELSE DO:
+-                  /* Проверяем офлайн */
+-                  vAccMarkCheckOff = ChekLocalMark(mark-short).
+-                  vCheckLocalMark = TRUE.
+-                  /* Проверяем срок годности по дате из 1С */
+-                  if vAccMarkCheckOff = "" and 
+-                     mCheckSts = 2 and 
+-                     available buf_marking 
+-                  then 
+-                     vAccMarkCheckOff = ChekExpirationDate({&shop},obj-code,buffer buf_marking).
+-                     
+-                  if vAccMarkCheckOff <> "" and vAccMarkCheck begins "Сообщите" 
+-                  then vAccMarkCheck = vAccMarkCheckOff + " Также с" + substring(vAccMarkCheck,2). 
+-                  else vAccMarkCheck = vAccMarkCheckOff + vAccMarkCheck.                                    
+-              END.
+-              
++               END.     
++               /* если марку не удалось проверить онлайн */
++               IF (mCheckSts = 2 AND mCheckGisMT <> 1) OR mCheckGisMT = 2 THEN DO:
++                  /* проверим значение online-result марки (? - если марки в ТН нет)*/
++                  dbgPrint("marking.log", SUBSTITUTE("Считываем online-result: &1.", 
++                                                    IF NOT AVAIL buf_marking THEN "marking не найдена"
++                                                    ELSE STRING(buf_marking.online-result))).
++                  IF AVAIL buf_marking AND buf_marking.online-result = 0 
++                  THEN DO:
++                      vAccMarkCheck = "Выполнить текущую онлайн-проверку не удалось. Продажа заблокирована по результату ранее выполненной проверки. Снимите с продажи и передайте товар управляющему/старшему смены".
++                      vLC = getJson(0, vAccMarkCheck, mark).
++                      sendContent(vLC).
++                      RETURN.
++                  END.
++                  ELSE DO:
++                      /* Проверяем офлайн */
++                      vAccMarkCheckOff = ChekLocalMark(mark-short).
++                      vCheckLocalMark = TRUE.
++                      /* Проверяем срок годности по дате из 1С */
++                      if vAccMarkCheckOff = "" and 
++                         mCheckSts = 2 and 
++                         available buf_marking 
++                      then 
++                         vAccMarkCheckOff = ChekExpirationDate({&shop},obj-code,buffer buf_marking).
++                         
++                      if vAccMarkCheckOff <> "" and vAccMarkCheck begins "Сообщите" 
++                      then vAccMarkCheck = vAccMarkCheckOff + " Также с" + substring(vAccMarkCheck,2). 
++                      else vAccMarkCheck = vAccMarkCheckOff + vAccMarkCheck.                                    
++                  END.
++              END.   
+            END.                 
+         END.
+   
+@@ -399,6 +458,7 @@ CLASS ibs.th.skt.ControlledClients.marki
+             DO:
+               createMark(mark-short, buffer buf_marking).
+               IF NOT vCheckLocalMark 
++                 AND AVAILABLE buf_marking
+               THEN DO:   /* online-result устанавливаем, если offline-проверка не запускалась */
+                 setOnlineResult(BUFFER buf_marking).
+               END.
+@@ -2644,48 +2704,70 @@ CLASS ibs.th.skt.ControlledClients.marki
+       
+       DEFINE BUFFER buf_sys-ctrl     FOR ub.sys-ctrl.            
+             
+-      IF AVAILABLE buf_marking
+-         AND buf_marking.expDate <> ?           
+-      THEN DO: 
+-         vExpireDate = datetime-tz(ENTRY(1,buf_marking.expDate,"Z")) NO-ERROR.
+-         
+-         ChekTypeMarkByDm(buf_marking.mark).
++      /* тип маркировки вычисляется заранее */       
++      IF mTypeMark = "" THEN DO:
++         ASSIGN
++           vErrTxt = "Не опредлен тип маркировки товара. "
++           mCheckSts = 0
++           . 
++      END.             
++      ELSE
++         vCheckDate = GetMarkProp (p-obj-type,
++                                   p-obj-code,
++                                   {&attr-marking_checkDate},
++                                   mTypeMark).
++       dbgPrint("marking.log", SUBSTITUTE("Проверка срока годности для типа марки &1 vCheckDate &2",
++                                               mTypeMark,
++                                               vCheckDate)).                              
++      /* если по данному типу марки включена настройка проверять срок годности */                              
++      IF vCheckDate THEN DO:
++         /* могли еще не считывать настройки подключения к ГИС МТ (когда была проверка в ТС ПИоТ) */            
++         /*IF gismt-UpdateRequest AND StatusPOS = ? THEN DO:
++            FIND FIRST buf_sys-ctrl NO-LOCK NO-ERROR.
++            IF AVAILABLE buf_sys-ctrl AND buf_sys-ctrl.db-num <> 0 
++            THEN          
++                vRetProp = get-gismt-prop ({&db},
++                                           buf_sys-ctrl.db-num) NO-ERROR.                                          
++         END.*/                               
+          
+-         IF mTypeMark <> "" THEN
+-             vCheckDate = GetMarkProp (p-obj-type,
+-                                       p-obj-code,
+-                                       {&attr-marking_checkDate},
+-                                       mTypeMark).
+-         /* если по данному типу марки включена настройка проверять срок годности */                              
+-         IF vCheckDate THEN DO:
+-             /* могли еще не считывать настройки подключения к ГИС МТ (когда была проверка в ТС ПИоТ) */            
+-             IF gismt-UpdateRequest THEN DO:
+-                FIND FIRST buf_sys-ctrl NO-LOCK NO-ERROR.
+-                IF AVAILABLE buf_sys-ctrl AND buf_sys-ctrl.db-num <> 0 
+-                THEN          
+-                    vRetProp = get-gismt-prop ({&db},
+-                                               buf_sys-ctrl.db-num) NO-ERROR.                                          
+-             END.                               
+-             
+-             /* срок годности прошел */
+-             IF vExpireDate <> ? AND 
+-                vExpireDate < NOW + gismt-BanDate * 60 * 1000
+-             THEN DO:
+-                ASSIGN
+-                   vErrTxt   = substitute("Срок годности товара истек &1.", string(vExpireDate,"99/99/9999 HH:MM"))
+-                   mCheckSts = 0
+-                   .
+-                LogWrite:WriteFileToLog(SUBSTITUTE("Проверка срока годности не прошла: марка &1 срок годности &2",buf_marking.mark,string(vExpireDate,"99/99/9999 HH:MM"))).   
+-                dbgPrint("marking.log", SUBSTITUTE("Срок годности по данным из 1С: &1 . Товар просрочен, заблокирован к продаже.",
+-                                                   vExpireDate)). 
+-             END.
+-             ELSE DO:
+-                LogWrite:WriteFileToLog(SUBSTITUTE("Проверка срока годности прошла успешно: марка &1 срок годности &2",buf_marking.mark,string(vExpireDate,"99/99/9999 HH:MM"))). 
+-                dbgPrint("marking.log", SUBSTITUTE("Срок годности по данным из 1С: &1 . Проверка прошла успешно.",
+-                                                    vExpireDate)).
+-             END.                                   
+-         END.                                   
++         IF AVAILABLE buf_marking
++             AND buf_marking.expDate <> ?           
++         THEN vExpireDate = datetime-tz(ENTRY(1,buf_marking.expDate,".")) NO-ERROR.
++     
++         /* срок годности не задан на марке */
++         IF vExpireDate = ?
++         THEN DO:
++            /* если была проверка на кассе, то при отсутствии даты меняем статус на 2 */
++            IF (StatusPos = 1 OR StatusPos = 2)
++               AND mCheckSts = 1 
++            THEN mCheckSts = 2 .  
++            dbgPrint("marking.log", SUBSTITUTE("Срок годности для марки &1 по данным из 1С отсутствует. Дата &2. Проверить срок годности не удалось.",
++                                               (IF AVAILABLE buf_marking then buf_marking.mark ELSE "<не найдена>"),
++                                               (IF AVAILABLE buf_marking then buf_marking.expDate ELSE ""))). 
++         END.    
++         /* срок годности прошел */
++         ELSE IF vExpireDate < NOW + gismt-BanDate * 60 * 1000
++         THEN DO:
++            ASSIGN
++               vErrTxt   = substitute("Срок годности товара истек &1.", string(vExpireDate,"99/99/9999 HH:MM"))
++               mCheckSts = 0
++               .
++            LogWrite:WriteFileToLog(SUBSTITUTE("Проверка срока годности не прошла: марка &1 срок годности &2",buf_marking.mark,string(vExpireDate,"99/99/9999 HH:MM"))).   
++            dbgPrint("marking.log", SUBSTITUTE("Срок годности по данным из 1С: &1 . Товар просрочен, заблокирован к продаже.",
++                                               vExpireDate)). 
++         END.
++         ELSE DO:
++            /* если была проверка на кассе, то при успешной проверке даты меняем статус на 1 */
++            IF (StatusPos = 1 OR StatusPos = 2)
++               AND mCheckSts = 2 
++            THEN mCheckSts = 1 . 
++            LogWrite:WriteFileToLog(SUBSTITUTE("Проверка срока годности прошла успешно: марка &1 срок годности &2",buf_marking.mark,string(vExpireDate,"99/99/9999 HH:MM"))). 
++            dbgPrint("marking.log", SUBSTITUTE("Срок годности по данным из 1С: &1 . Проверка прошла успешно.",
++                                                vExpireDate)).
++         END.
++                                            
+       END.                                   
++                                         
+       RETURN vErrTxt.
+   END METHOD.
+    
+@@ -2694,19 +2776,41 @@ CLASS ibs.th.skt.ControlledClients.marki
+    Notes:  устанавливает online-result 
+   ------------------------------------------------------------------------------*/
+   METHOD PRIVATE VOID setOnlineResult(buffer buf_marking for ub.marking):
+-   
+-    IF (mCheckSts = 0 AND mCheckGisMT = 1) OR mCheckSts = 3    /* Оборот запрещен ошибки errorcode (1, …11) */
+-    THEN
+-      buf_marking.online-result = 0.  
+-    ELSE IF mCheckSts = 2 AND mCheckGisMT = 1  /* нет срока годности, а проверка его включена */
+-    THEN  
+-      buf_marking.online-result = 2.
+-    ELSE IF mCheckSts = 1 AND mCheckGisMT = 1  /* Оборот разрешен */
+-    THEN
+-      buf_marking.online-result = 1.
++      
++    /* если была онлайн проверка на кассе, то сохраняем результат проверки пришедший от кассы
++    ** (потом он меняется при проверке срока годности 1С */
++    IF statusPOS <> ? AND mCheckGisMT = 1
++    THEN ASSIGN
++            buf_marking.online-result = mCheckStsSave
++            mSaveOnlineResult = yes
++            .
++    /* иначе старый алгоритм */   
++    ELSE DO:   
++       IF (mCheckSts = 0 AND mCheckGisMT = 1) OR mCheckSts = 3    /* Оборот запрещен ошибки errorcode (1, …11) */
++       THEN
++         buf_marking.online-result = 0.  
++       ELSE IF mCheckSts = 2 AND mCheckGisMT = 1  /* нет срока годности, а проверка его включена */
++       THEN  
++         buf_marking.online-result = 2.
++       ELSE IF mCheckSts = 1 AND mCheckGisMT = 1  /* Оборот разрешен */
++       THEN
++         buf_marking.online-result = 1.
++    END.  
+     dbgprint("marking.log", SUBSTITUTE("Установка марке &1 результата проверки онлайн &2, mCheckSts &3 mCheckGisMT &4 ",
+                                        buf_marking.mark, buf_marking.online-result, mCheckSts, mCheckGisMT )). 
+   END METHOD.
++  
++  /* возвращает результат сохраненного ответа онлайн */
++  METHOD PUBLIC CHARACTER GetMarkOnlineResult():
++    define variable mark-short as character no-undo. 
++    
++    mark-short = GetCodeIdent(mark).   
++    IF mSaveOnlineResult = yes THEN             
++       RETURN substitute("&1&2&3",mark-short,chr(9),mCheckStsSave).
++    ELSE 
++       RETURN "".
++    
++  END METHOD.
+       
+ 	/*------------------------------------------------------------------------------
+ 	 Purpose:
+diff --git a/str/mark_hist.w b/str/mark_hist.w
+--- a/str/mark_hist.w
++++ b/str/mark_hist.w
+@@ -559,33 +559,35 @@ DO:
+   define buffer b_marking for ub.marking.
+   define buffer buf_marking-attr for ub.marking-attr.
+ 
+-  if available buf_marking and online-check:sensitive then
++  if available buf_marking then
+   do:
+-    assign online-check.
+-    find first buf_marking-attr where 
+-               buf_marking-attr.attr-code = "notOnlineCheck"
+-           and buf_marking-attr.mark begins buf_marking.mark
+-         exclusive-lock no-error.
+-    if (available buf_marking-attr and buf_marking-attr.attr-value <> string(online-check))
+-       or (not available buf_marking-attr and online-check) then
+-    do:
+-      if available buf_marking-attr and not online-check then 
+-      do:
+-        delete buf_marking-attr.
+-      end.
+-      else do:
+-        if not available buf_marking-attr then
++    if online-check:sensitive then
++    do:  
++        assign online-check.
++        find first buf_marking-attr where 
++                   buf_marking-attr.attr-code = "notOnlineCheck"
++               and buf_marking-attr.mark begins buf_marking.mark
++             exclusive-lock no-error.
++        if (available buf_marking-attr and buf_marking-attr.attr-value <> string(online-check))
++           or (not available buf_marking-attr and online-check) then
+         do:
+-          create buf_marking-attr.
+-          assign
+-            buf_marking-attr.mark = buf_marking.mark
+-            buf_marking-attr.attr-code = "notOnlineCheck"
+-          .
++          if available buf_marking-attr and not online-check then 
++          do:
++            delete buf_marking-attr.
++          end.
++          else do:
++            if not available buf_marking-attr then
++            do:
++              create buf_marking-attr.
++              assign
++                buf_marking-attr.mark = buf_marking.mark
++                buf_marking-attr.attr-code = "notOnlineCheck"
++              .
++            end.
++            buf_marking-attr.attr-value = string(online-check).
++          end.
+         end.
+-        buf_marking-attr.attr-value = string(online-check).
+-      end.
+     end.
+-
+     if buf_marking.sts <> f-status then do:
+       message "У марки был изменен статус.~nСохранить?" view-as alert-box question buttons yes-no 
+         update isSave as logical.
+diff --git a/str/send-all-work-gismt.p b/str/send-all-work-gismt.p
+--- a/str/send-all-work-gismt.p
++++ b/str/send-all-work-gismt.p
+@@ -148,7 +148,7 @@ procedure putc :
+            run put-xml-data(iSAXWriter,"Failure_time",string(buf_thbj-attr.property-value-integer),"Время с момента сбоя до начала уведомления персонала (часы)"). 
+         end.
+         when {&attr-gisMT_crashSituat} then do:           
+-           run put-xml-data(iSAXWriter,"emergencyMode",string(buf_thbj-attr.property-value-logical),"Признак аварийной ситуации в ГИС МТ").     
++           run put-xml-data(iSAXWriter,"emergencyMode",(if buf_thbj-attr.property-value-logical then "1" else "0"),"Признак аварийной ситуации в ГИС МТ").     
+         end.
+         when {&attr-gisMT_banDate} then do:           
+            run put-xml-data(iSAXWriter,"Before_Expiration",string(buf_thbj-attr.property-value-integer),"Опережение срабатывания запрета по сроку годности в минутах"). 
+@@ -163,7 +163,7 @@ procedure putc :
+             run put-xml-data(iSAXWriter,"Proxy_Pass",buf_thbj-attr.property-value-character,"Пароль для подключения к прокси-серверу"). 
+         end.                                 
+         when {&attr-gisMT_waitTime} then do:            
+-            run put-xml-data(iSAXWriter,"MACC_TimeoutPIoT",string(buf_thbj-attr.property-value-decimal),"Длительность ожидания ответа ТС ПИоТ"). 
++            run put-xml-data(iSAXWriter,"MACC_TimeoutGISMT",string(buf_thbj-attr.property-value-decimal),"Длительность ожидания ответа ТС ПИоТ"). 
+         end.
+         when {&attr-gisMT_MACC_Timeout} then do:                                     
+            if buf_thbj-attr.property-value-decimal <> 0 then 
+@@ -222,32 +222,50 @@ procedure putc :
+         vLmCHzPort = get-thbj-attr-prop({&db},mdb-num,{&attr-gisMT},{&attr-gisMT_LmCHzPort})        
+         vAddTimeoutPIoT = DEC(get-thbj-attr-prop({&db},mdb-num,{&attr-gisMT},{&attr-gisMT_AddTimeoutPIoT}))    
+         .  
+-      if vAddTimeoutPIoT = ? then vAddTimeoutPIoT = 0.      
++            
+       if vTH_IP <> "" and vTH_Port <> "" then vMACC_IP = substitute("&1:&2",vTH_IP,vTH_Port).
+-      
++      if vCheckBlock <> ? then
+       run put-xml-data(iSAXWriter,"checkBlock",vCheckBlock,"Типы маркированной продукции для проверки блокировок контролирующих органов").
++      if vCheckDate <> ? then
+       run put-xml-data(iSAXWriter,"checkDate",vCheckDate,"Типы маркированной продукции для проверки срока годности").
++      if vCheckMRC <> ? then
+       run put-xml-data(iSAXWriter,"checkMRC",vCheckMRC,"Типы маркированной продукции для проверки МРЦ").
++      if vCheckOwner <> ? then
+       run put-xml-data(iSAXWriter,"checkOwner",vCheckOwner,"Типы маркированной продукции для проверки владельца").
++      if vCheckStatusKM <> ? then
+       run put-xml-data(iSAXWriter,"checkStatusKM",vCheckStatusKM,"Типы маркированной продукции для проверки статуса КМ").
++      if vCheckTracking <> ? then 
+       run put-xml-data(iSAXWriter,"checkTracking",vCheckTracking,"Типы маркированной продукции для проверки флага прослеживаемости").
+-      if vMACC_IP <> "" then
++      if vMACC_IP <> "" and vMACC_IP <> ? then
+          run put-xml-data(iSAXWriter,"MACC_IP",vMACC_IP,"Адрес и порт для отправки запроса проверки марки в ТН").
+-      run put-xml-data(iSAXWriter,"LmCHzLogin",gismt-OflineLogin,"Логин для доступа ЛМ ЧЗ"). 
+-      run put-xml-data(iSAXWriter,"LmCHzPass",gismt-OflinePswd,"Пароль для доступа ЛМ ЧЗ"). 
++      if gismt-OflineLogin <> ? then   
++      run put-xml-data(iSAXWriter,"LmCHzLogin",gismt-OflineLogin,"Логин для доступа ЛМ ЧЗ").
++      if gismt-OflinePswd <> ? then 
++      run put-xml-data(iSAXWriter,"LmCHzPass",gismt-OflinePswd,"Пароль для доступа ЛМ ЧЗ").
++      if gismt-AdressPort <> ? then 
+       run put-xml-data(iSAXWriter,"Proxy_IP",gismt-AdressPort,"Адрес и порт прокси").
+-      run put-xml-data(iSAXWriter,"Proxy_Login",gismt-ProxyLogin,"Логин для подключения к прокси-серверу"). 
++      if gismt-ProxyLogin <> ? then
++      run put-xml-data(iSAXWriter,"Proxy_Login",gismt-ProxyLogin,"Логин для подключения к прокси-серверу").
++      if gismt-ProxyPswd <> ? then 
+       run put-xml-data(iSAXWriter,"Proxy_Pass",gismt-ProxyPswd,"Пароль для подключения к прокси-серверу").  
+-      if vMACC_IP <> "" and vLmCHzPort <> "" then
++      if vMACC_IP <> "" and vLmCHzPort <> "" 
++         and vMACC_IP <> ? and vLmCHzPort <> ? then
+          run put-xml-data(iSAXWriter,"LmCHzPort",vLmCHzPort,"Порт для отправки запроса проверки марки в ЛМ ЧЗ ").
+-      run put-xml-data(iSAXWriter,"MACC_TimeOutGisMT",string(gismt-WaitTime),"Длительность ожидания на стороне ТС ПИоТ ответа от ГИС МТ").
+-      run put-xml-data(iSAXWriter,"MACC_additionalTimeoutPIoT",string(vAddTimeoutPIoT),"Длительность обработки ответа ГИС МТ в ТС ПИоТ").      
+-      run put-xml-data(iSAXWriter,"Before_Expiration",string(gismt-BanDate),"Опережение срабатывания запрета по сроку годности в минутах"). 
+-      run put-xml-data(iSAXWriter,"Max_allowed_time",string(gismt-MaxTime),"Макс. допустимое время разрешения продажи при сбое онлайн проверки (часы)"). 
+-      run put-xml-data(iSAXWriter,"Failure_time",string(gismt-TimeFalStart),"Время с момента сбоя до начала уведомления персонала (часы)").       
+-      run put-xml-data(iSAXWriter,"emergencyMode",string(gismt-CrashSituat),"Признак аварийной ситуации в ГИС МТ").                    
+-      if vMACC_Timeout <> 0 then 
++      if gismt-WaitTime <> ? then  
++      run put-xml-data(iSAXWriter,"MACC_TimeoutGISMT",string(gismt-WaitTime),"Длительность ожидания на стороне ТС ПИоТ ответа от ГИС МТ").
++      if vAddTimeoutPIoT <> ? then
++      run put-xml-data(iSAXWriter,"MACC_additionalTimeoutPIoT",string(vAddTimeoutPIoT),"Длительность обработки ответа ГИС МТ в ТС ПИоТ").
++      if gismt-BanDate <> ? then      
++      run put-xml-data(iSAXWriter,"Before_Expiration",string(gismt-BanDate),"Опережение срабатывания запрета по сроку годности в минутах").
++      if gismt-MaxTime <> ? then  
++      run put-xml-data(iSAXWriter,"Max_allowed_time",string(gismt-MaxTime),"Макс. допустимое время разрешения продажи при сбое онлайн проверки (часы)").
++      if gismt-TimeFalStart <> ? then 
++      run put-xml-data(iSAXWriter,"Failure_time",string(gismt-TimeFalStart),"Время с момента сбоя до начала уведомления персонала (часы)").
++      if gismt-CrashSituat <> ? then       
++      run put-xml-data(iSAXWriter,"emergencyMode",(if gismt-CrashSituat then "1" else "0"),"Признак аварийной ситуации в ГИС МТ").                    
++      if vMACC_Timeout <> 0 and vMACC_Timeout <> ? then 
+          run put-xml-data(iSAXWriter,"MACC_Timeout",string(vMACC_Timeout),"Длительность ожидания ответа ТН").
++      if vResp_TH_requiredr <> ? then   
+       run put-xml-data(iSAXWriter,"Resp_TH_required",string(vResp_TH_requiredr),"Обязательность получения результатов проверки КМ в ТН").         
+    end.                                   
+    
+diff --git a/utl/thipimp.p b/utl/thipimp.p
+new file mode 100644
+--- /dev/null
++++ b/utl/thipimp.p
+@@ -0,0 +1,135 @@
++block-level on error undo, throw.
++/*
++$Revision:$
++$Author:$
++$Date:$
++$Workfile:$
++$Archive:$
++
++Автор: Белова Марина Михайловна 
++Дата создания: 27.01.2026
++Author:  Belova Marina
++Creation date: 27.01.2026
++
++*/
++using ibs.th.bge.execlimpexp.
++
++define variable vss-revision    as character no-undo init "$Revision:$":U .
++define variable vss-author      as character no-undo init "$Author:$":U .
++define variable vss-date        as character no-undo init "$Date:$":U .
++define variable vss-workfile    as character no-undo init "$Workfile:$":U .
++define variable vss-archive     as character no-undo init "$Archive:$":U .
++define variable vss-description as character no-undo init "".
++{ cmp/vssrevis.i }
++{ utl/runpro.i}
++
++define variable vfileLog as character no-undo init "Log_THIPImp.txt".
++define variable mFileName as character no-undo init "THIPImp.xslx".
++
++{ cmp/str-glbl.i }
++{ utl/search.i }
++{ cmp/trg-def.i }
++{ gbl/is-num.i }
++
++define temp-table tt-th_ip no-undo
++    field object-info as character label "Объект"  
++    field th_ip   as character   label "IP адрес"  
++    index object-info object-info.
++
++if g#db-num ne 0
++then do:
++   message "Импорт возможен только на ГБД" view-as alert-box.
++   return error.
++end.
++
++define variable varlog as logical no-undo.
++define variable mFileFullPath as character no-undo.
++system-dialog get-file mFileName title "Выберите файл для загрузки ip станций"
++    filters "MS Excel (*.xls,*.xlsx)" "*.xls,*.xlsx",
++            "Все файлы" "*.*"
++    initial-filter 1
++    must-exist             
++    update varlog.
++if not varlog then return error "Отказ от импорта" .
++
++assign
++   file-info:file-name = mFileName
++   mFileFullPath           = file-info:full-pathname
++.
++if length(mFileFullPath) > 0 then .
++else return error substitute("Не найден файл &1", mFileName).   
++
++define variable exlim as class ibs.th.bge.execlimpexp no-undo.
++
++do:
++   exlim = new ibs.th.bge.execlimpexp (this-procedure).
++   subscribe "WriteLogExel" anywhere run-procedure "WriteLog".
++   subscribe "WorkLineExel" anywhere.
++   exlim:impExcel(mFileFullPath, temp-table tt-th_ip:handle).
++   
++   delete object exlim.
++   unsubscribe "WorkLineExel".
++   unsubscribe "WriteLogExel".
++end.
++
++define variable mStrLoad as integer no-undo.
++define variable mStrAll  as integer no-undo.
++ 
++if searchfile(vfileLog) ne ?
++then
++   message "Сформирован лог " searchfile(vfileLog) skip
++           "Обработано строк: " mStrAll - 1 skip
++           "Изменено записей: " mStrLoad
++   view-as alert-box.
++else
++   message "Нет данных для обработки."
++   view-as alert-box.
++
++define stream Slog.
++define variable mfirst as logical no-undo init true.
++procedure WriteLog:
++   define input  parameter itext as character no-undo.
++   if mfirst
++   then do:
++      mFirst = false.
++      output stream Slog to value(vfileLog).
++   end.
++   else
++      output stream Slog to value(vfileLog) append.
++   put stream Slog unformatted itext skip.
++   output stream Slog close. 
++end.
++
++procedure WorkLineExel:
++   define input  parameter iBuffer as handle no-undo.
++   define output parameter oDelRec as logical no-undo.
++   
++   define variable vdb-num as integer   no-undo.
++   /* будем считать что запись нам больше не нужна */
++   oDelRec = yes.
++   mStrAll = mStrAll + 1.
++   /* Не красиво но*/
++   if not iBuffer:available then return.
++   /* Первую строку пропускаем - это заголовок */
++   if mStrAll = 1 then return .
++   vdb-num = int(iBuffer::object-info) no-error. 
++   /* ищем БД */
++   if vdb-num <> 0 then do: 
++       
++       find first thbj-attr where thbj-attr.upper-prop-code        eq {&attr-gisMT}
++                                     and thbj-attr.obj-type        eq {&db}
++                                     and thbj-attr.obj-code        eq vdb-num
++                                     and thbj-attr.prop-code       eq {&attr-gisMT_TH_IP}                     
++                exclusive-lock no-wait no-error.
++       if available thbj-attr then do:
++          thbj-attr.property-value-character =  iBuffer::th_ip.
++          mStrLoad = mStrLoad + 1.
++          run WriteLog(substitute ("БД &1 IP &2 - загружено успешно",vdb-num,iBuffer::th_ip) 
++                       ).  
++       end.            
++       else do:
++          run WriteLog(substitute ("БД &1 IP &2 - пропущено, отсутствует секция для данной БД",vdb-num,iBuffer::th_ip) 
++                       ).
++       end.      
++   end.                      
++end.

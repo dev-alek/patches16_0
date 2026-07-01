@@ -1,0 +1,7 @@
+# HG changeset patch
+# User EShklyar
+# Parent  4e4e5a9dac854dbffcaa1043385dbdc71193fa60
+refs #DEVBO-1741 Отключение запрета создания накладной по маркированному товару.
+
+http://exp-jira.expertek.local:8080/browse/DEVBO-1741
+

@@ -1,0 +1,409 @@
+# HG changeset patch
+# User SSlivenko
+# Parent  6abb76ffea0c271000718737ad2c8ca030a4f05e
+refs #DEVBO-2158 Сводный отчет по поставкам топлива
+Окрас ячеек
+http://exp-jira.expertek.local:8080/browse/DEVBO-2158
+
+diff -r 6abb76ffea0c rep/r-sum-fuel-supp.p
+--- a/rep/r-sum-fuel-supp.p	Чт мар 16 12:29:27 2023 +0300
++++ b/rep/r-sum-fuel-supp.p	Чт мар 16 12:32:03 2023 +0300
+@@ -1369,33 +1369,33 @@
+       put stream sOutStr-html unformatted
+         '<tbody>'
+         '<TR >'skip
+-        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; ">АЗК/АЗС</TH>'                                                   skip
+-        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; ">Дата и номер смены</TH>'                                        skip
+-        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; ">Внутренний номер документа приема</TH>'                         skip
+-        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; ">Номер документа поставщика</TH>'                                skip
+-        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; ">Дата начала приема НП</TH>'                                     skip
+-        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; ">Время приемки</TH>'                                             skip
+-        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; ">Поставщик</TH>'                                                 skip
+-        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; ">Перевозчик</TH>'                                                skip
+-        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; ">Нефтебаза</TH>'                                                 skip
+-        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; ">АЦ</TH>'                                                        skip
+-        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; ">Тип АЦ</TH>' 
+-        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; ">Приёмщик</TH>'                                                   skip
+-        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; ">№ секции</TH>'                                                  skip
+-        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; ">Марка НП</TH>'                                                  skip
+-        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; ">№ резервуара</TH>'                                              skip
+-        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; ">Способ разблокировки API-адаптера</TH>'                         skip
+-        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; ">Номер ключа/код доступа</TH>'                                   skip
+-        '<TH text_wrap="true" rowspan="4" colspan="4" style="text-align: center; font-weight:bold; ">Параметры топлива по ТТН</TH>'                                  skip
+-        '<TH text_wrap="true" rowspan="4" colspan="5" style="text-align: center; font-weight:bold; ">Параметры топлива по измерениям в АЦ</TH>'                      skip
+-        '<TH text_wrap="true" rowspan="4" colspan="4" style="text-align: center; font-weight:bold; ">Параметры топлива по измерениям в резервуаре до слива</TH>'     skip
+-        '<TH text_wrap="true" rowspan="4" colspan="4" style="text-align: center; font-weight:bold; ">Параметры топлива по измерениям в резервуаре после слива</TH>'  skip
+-        '<TH text_wrap="true" rowspan="4" colspan="2" style="text-align: center; font-weight:bold; ">Принято к учету</TH>'                                           skip
+-        '<TH text_wrap="true" rowspan="4" colspan="2" style="text-align: center; font-weight:bold; ">Отклонение АЦ к ТТН</TH>'                                       skip
+-        '<TH text_wrap="true" rowspan="4" colspan="2" style="text-align: center; font-weight:bold; ">Отклонение резервуара к АЦ</TH>'                                skip
+-        '<TH text_wrap="true" rowspan="4" colspan="2" style="text-align: center; font-weight:bold; ">Отклонение между резервуаром и  принятым к учету топливом</TH>' skip
+-        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; ">Сверхнормативные расхождения между резервуаром и АЦ, кг</TH>'   skip
+-        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; ">Сверхнормативные расхождения между резервуаром и принятым к учету топливом, кг</TH>' skip
++        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; background-color: orange; ">АЗК/АЗС</TH>'                                                   skip
++        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; background-color: orange; ">Дата и номер смены</TH>'                                        skip
++        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; background-color: orange; ">Внутренний номер документа приема</TH>'                         skip
++        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; background-color: orange; ">Номер документа поставщика</TH>'                                skip
++        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; background-color: orange; ">Дата начала приема НП</TH>'                                     skip
++        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; background-color: orange; ">Время приемки</TH>'                                             skip
++        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; background-color: orange; ">Поставщик</TH>'                                                 skip
++        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; background-color: orange; ">Перевозчик</TH>'                                                skip
++        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; background-color: orange; ">Нефтебаза</TH>'                                                 skip
++        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; background-color: orange; ">АЦ</TH>'                                                        skip
++        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; background-color: orange; ">Тип АЦ</TH>' 
++        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; background-color: orange; ">Приёмщик</TH>'                                                   skip
++        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; background-color: orange; ">№ секции</TH>'                                                  skip
++        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; background-color: orange; ">Марка НП</TH>'                                                  skip
++        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; background-color: orange; ">№ резервуара</TH>'                                              skip
++        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; background-color: orange; ">Способ разблокировки API-адаптера</TH>'                         skip
++        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; background-color: orange; ">Номер ключа/код доступа</TH>'                                   skip
++        '<TH text_wrap="true" rowspan="4" colspan="4" style="text-align: center; font-weight:bold; background-color: orange; ">Параметры топлива по ТТН</TH>'                                  skip
++        '<TH text_wrap="true" rowspan="4" colspan="5" style="text-align: center; font-weight:bold; background-color: orange; ">Параметры топлива по измерениям в АЦ</TH>'                      skip
++        '<TH text_wrap="true" rowspan="4" colspan="4" style="text-align: center; font-weight:bold; background-color: orange; ">Параметры топлива по измерениям в резервуаре до слива</TH>'     skip
++        '<TH text_wrap="true" rowspan="4" colspan="4" style="text-align: center; font-weight:bold; background-color: orange; ">Параметры топлива по измерениям в резервуаре после слива</TH>'  skip
++        '<TH text_wrap="true" rowspan="4" colspan="2" style="text-align: center; font-weight:bold; background-color: orange; ">Принято к учету</TH>'                                           skip
++        '<TH text_wrap="true" rowspan="4" colspan="2" style="text-align: center; font-weight:bold; background-color: orange; ">Отклонение АЦ к ТТН</TH>'                                       skip
++        '<TH text_wrap="true" rowspan="4" colspan="2" style="text-align: center; font-weight:bold; background-color: orange; ">Отклонение резервуара к АЦ</TH>'                                skip
++        '<TH text_wrap="true" rowspan="4" colspan="2" style="text-align: center; font-weight:bold; background-color: orange; ">Отклонение между резервуаром и  принятым к учету топливом</TH>' skip
++        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; background-color: orange; ">Сверхнормативные расхождения между резервуаром и АЦ, кг</TH>'   skip
++        '<TH text_wrap="true" rowspan="5" style="text-align: center; font-weight:bold; background-color: orange; ">Сверхнормативные расхождения между резервуаром и принятым к учету топливом, кг</TH>' skip
+         '</TR>'skip
+         
+         '<TR >'skip
+@@ -1408,78 +1408,78 @@
+         '</TR>'skip
+         
+         '<TR >'skip
+-        '<TH text_wrap="true" style="text-align: center; font-weight:bold; ">Объем, л</TH>'                        skip
+-        '<TH text_wrap="true" style="text-align: center; font-weight:bold; ">Масса, кг</TH>'                       skip
+-        '<TH text_wrap="true" style="text-align: center; font-weight:bold; ">Плотн., г/см3</TH>'                   skip
+-        '<TH text_wrap="true" style="text-align: center; font-weight:bold; ">Темп., °С</TH>'                       skip
+-        '<TH text_wrap="true" style="text-align: center; font-weight:bold; ">Объем, л</TH>'                        skip
+-        '<TH text_wrap="true" style="text-align: center; font-weight:bold; ">Масса, кг</TH>'                       skip
+-        '<TH text_wrap="true" style="text-align: center; font-weight:bold; ">Масса ЕУ, кг</TH>'                    skip
+-        '<TH text_wrap="true" style="text-align: center; font-weight:bold; ">Плотн., г/см3</TH>'                   skip
+-        '<TH text_wrap="true" style="text-align: center; font-weight:bold; ">Темп., °С</TH>'                       skip
+-        '<TH text_wrap="true" style="text-align: center; font-weight:bold; ">Объем, л</TH>'                        skip
+-        '<TH text_wrap="true" style="text-align: center; font-weight:bold; ">Масса, кг</TH>'                       skip
+-        '<TH text_wrap="true" style="text-align: center; font-weight:bold; ">Плотн., г/см3</TH>'                   skip
+-        '<TH text_wrap="true" style="text-align: center; font-weight:bold; ">Темп., °С</TH>'                       skip
+-        '<TH text_wrap="true" style="text-align: center; font-weight:bold; ">Объем, л</TH>'                        skip
+-        '<TH text_wrap="true" style="text-align: center; font-weight:bold; ">Масса, кг</TH>'                       skip
+-        '<TH text_wrap="true" style="text-align: center; font-weight:bold; ">Плотн., г/см3</TH>'                   skip
+-        '<TH text_wrap="true" style="text-align: center; font-weight:bold; ">Темп., °С</TH>'                       skip
+-        '<TH text_wrap="true" style="text-align: center; font-weight:bold; ">Объем, л</TH>'                        skip
+-        '<TH text_wrap="true" style="text-align: center; font-weight:bold; ">Масса, кг</TH>'                       skip
+-        '<TH text_wrap="true" style="text-align: center; font-weight:bold; ">Масса, кг</TH>'                       skip
+-        '<TH text_wrap="true" style="text-align: center; font-weight:bold; ">%</TH>'                               skip
+-        '<TH text_wrap="true" style="text-align: center; font-weight:bold; ">Масса, кг</TH>'                       skip
+-        '<TH text_wrap="true" style="text-align: center; font-weight:bold; ">%</TH>'                               skip
+-        '<TH text_wrap="true" style="text-align: center; font-weight:bold; ">Масса, кг</TH>'                       skip
+-        '<TH text_wrap="true" style="text-align: center; font-weight:bold; ">%</TH>'                               skip
++        '<TH text_wrap="true" style="text-align: center; font-weight:bold; background-color: orange; ">Объем, л</TH>'                        skip
++        '<TH text_wrap="true" style="text-align: center; font-weight:bold; background-color: orange; ">Масса, кг</TH>'                       skip
++        '<TH text_wrap="true" style="text-align: center; font-weight:bold; background-color: orange; ">Плотн., г/см3</TH>'                   skip
++        '<TH text_wrap="true" style="text-align: center; font-weight:bold; background-color: orange; ">Темп., °С</TH>'                       skip
++        '<TH text_wrap="true" style="text-align: center; font-weight:bold; background-color: orange; ">Объем, л</TH>'                        skip
++        '<TH text_wrap="true" style="text-align: center; font-weight:bold; background-color: orange; ">Масса, кг</TH>'                       skip
++        '<TH text_wrap="true" style="text-align: center; font-weight:bold; background-color: orange; ">Масса ЕУ, кг</TH>'                    skip
++        '<TH text_wrap="true" style="text-align: center; font-weight:bold; background-color: orange; ">Плотн., г/см3</TH>'                   skip
++        '<TH text_wrap="true" style="text-align: center; font-weight:bold; background-color: orange; ">Темп., °С</TH>'                       skip
++        '<TH text_wrap="true" style="text-align: center; font-weight:bold; background-color: orange; ">Объем, л</TH>'                        skip
++        '<TH text_wrap="true" style="text-align: center; font-weight:bold; background-color: orange; ">Масса, кг</TH>'                       skip
++        '<TH text_wrap="true" style="text-align: center; font-weight:bold; background-color: orange; ">Плотн., г/см3</TH>'                   skip
++        '<TH text_wrap="true" style="text-align: center; font-weight:bold; background-color: orange; ">Темп., °С</TH>'                       skip
++        '<TH text_wrap="true" style="text-align: center; font-weight:bold; background-color: orange; ">Объем, л</TH>'                        skip
++        '<TH text_wrap="true" style="text-align: center; font-weight:bold; background-color: orange; ">Масса, кг</TH>'                       skip
++        '<TH text_wrap="true" style="text-align: center; font-weight:bold; background-color: orange; ">Плотн., г/см3</TH>'                   skip
++        '<TH text_wrap="true" style="text-align: center; font-weight:bold; background-color: orange; ">Темп., °С</TH>'                       skip
++        '<TH text_wrap="true" style="text-align: center; font-weight:bold; background-color: orange; ">Объем, л</TH>'                        skip
++        '<TH text_wrap="true" style="text-align: center; font-weight:bold; background-color: orange; ">Масса, кг</TH>'                       skip
++        '<TH text_wrap="true" style="text-align: center; font-weight:bold; background-color: orange; ">Масса, кг</TH>'                       skip
++        '<TH text_wrap="true" style="text-align: center; font-weight:bold; background-color: orange; ">%</TH>'                               skip
++        '<TH text_wrap="true" style="text-align: center; font-weight:bold; background-color: orange; ">Масса, кг</TH>'                       skip
++        '<TH text_wrap="true" style="text-align: center; font-weight:bold; background-color: orange; ">%</TH>'                               skip
++        '<TH text_wrap="true" style="text-align: center; font-weight:bold; background-color: orange; ">Масса, кг</TH>'                       skip
++        '<TH text_wrap="true" style="text-align: center; font-weight:bold; background-color: orange; ">%</TH>'                               skip
+         '</TR>'skip
+         
+         '<TR >'skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.1</TH>'   skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.2</TH>'   skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.3</TH>'   skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.4</TH>'   skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.5</TH>'   skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.6</TH>'   skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.7</TH>'   skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.8</TH>'   skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.9</TH>'   skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.10</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.11</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.12</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.13</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.14</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.15</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.16</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.17</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.18</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.19</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.20</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.21</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.22</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.23</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.24</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.25</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.26</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.27</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.28</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.29</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.30</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.31</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.32</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.33</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.34</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.35</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.36</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.37</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.38</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.39</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.40</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.41</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.42</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.43</TH>'  skip
+-        '<TH style="text-align: center; font-weight:bold; ">1.44</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.1</TH>'   skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.2</TH>'   skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.3</TH>'   skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.4</TH>'   skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.5</TH>'   skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.6</TH>'   skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.7</TH>'   skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.8</TH>'   skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.9</TH>'   skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.10</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.11</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.12</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.13</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.14</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.15</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.16</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.17</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.18</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.19</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.20</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.21</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.22</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.23</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.24</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.25</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.26</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.27</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.28</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.29</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.30</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.31</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.32</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.33</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.34</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.35</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.36</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.37</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.38</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.39</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.40</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.41</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.42</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.43</TH>'  skip
++        '<TH style="text-align: center; font-weight:bold; background-color: orange; ">1.44</TH>'  skip
+         '</TR>'skip
+       .
+ 
+@@ -1551,50 +1551,50 @@
+           :
+             put stream sOutStr-html unformatted
+               '<TR >'skip
+-              '<TH style="text-align: center; font-weight:bold; ">Итого по:</TH>'  skip
+-              '<TH style="text-align: center; font-weight:bold; ">' fStrNvl(tt-itog.col1, "") '</TH>'   skip
+-              '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-              '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-              '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-              '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-              '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-              '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-              '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-              '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-              '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-              '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-              '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-              '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-              '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-              '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-              '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col18, "->>>>>>>>>>>9"  ) + '" style="text-align: center; font-weight:bold; ">' + fDec2Str(tt-itog.col18, "->>>>>>>>>>>9"  ) + '</TH>'  skip
+-              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col19, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; ">' + fDec2Str(tt-itog.col19, "->>>>>>>>>>>9.9") + '</TH>'  skip
+-              '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-              '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col22, "->>>>>>>>>>>9"  ) + '" style="text-align: center; font-weight:bold; ">' + fDec2Str(tt-itog.col22, "->>>>>>>>>>>9"  ) + '</TH>'  skip
+-              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col23, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; ">' + fDec2Str(tt-itog.col23, "->>>>>>>>>>>9.9") + '</TH>'  skip
+-              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col24, "->>>>>>>>>>9.99") + '" style="text-align: center; font-weight:bold; ">' + fDec2Str(tt-itog.col24, "->>>>>>>>>>9.99") + '</TH>'  skip
+-              '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-              '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col27, "->>>>>>>>>>>9"  ) + '" style="text-align: center; font-weight:bold; ">' + fDec2Str(tt-itog.col27, "->>>>>>>>>>>9"  ) + '</TH>'  skip
+-              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col28, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; ">' + fDec2Str(tt-itog.col28, "->>>>>>>>>>>9.9") + '</TH>'  skip
+-              '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-              '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col31, "->>>>>>>>>>>9"  ) + '" style="text-align: center; font-weight:bold; ">' + fDec2Str(tt-itog.col31, "->>>>>>>>>>>9"  ) + '</TH>'  skip
+-              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col32, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; ">' + fDec2Str(tt-itog.col32, "->>>>>>>>>>>9.9") + '</TH>'  skip
+-              '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-              '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col35, "->>>>>>>>>>>9"  ) + '" style="text-align: center; font-weight:bold; ">' + fDec2Str(tt-itog.col35, "->>>>>>>>>>>9"  ) + '</TH>'  skip
+-              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col36, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; ">' + fDec2Str(tt-itog.col36, "->>>>>>>>>>>9.9") + '</TH>'  skip
+-              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col37, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; color: ' + (if tt-itog.col38red then "red" else "black") + '; ">' + fDec2Str(tt-itog.col37, "->>>>>>>>>>>9.9") + '</TH>'  skip
+-              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col38, "->>>>>>>>>>9.99") + '" style="text-align: center; font-weight:bold; color: ' + (if tt-itog.col38red then "red" else "black") + '; ">' + fDec2Str(tt-itog.col38, "->>>>>>>>>>9.99") + '</TH>'  skip
+-              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col39, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; color: ' + (if tt-itog.col40red then "red" else "black") + '; ">' + fDec2Str(tt-itog.col39, "->>>>>>>>>>>9.9") + '</TH>'  skip
+-              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col40, "->>>>>>>>>>9.99") + '" style="text-align: center; font-weight:bold; color: ' + (if tt-itog.col40red then "red" else "black") + '; ">' + fDec2Str(tt-itog.col40, "->>>>>>>>>>9.99") + '</TH>'  skip
+-              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col41, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; color: ' + (if tt-itog.col42red then "red" else "black") + '; ">' + fDec2Str(tt-itog.col41, "->>>>>>>>>>>9.9") + '</TH>'  skip
+-              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col42, "->>>>>>>>>>9.99") + '" style="text-align: center; font-weight:bold; color: ' + (if tt-itog.col42red then "red" else "black") + '; ">' + fDec2Str(tt-itog.col42, "->>>>>>>>>>9.99") + '</TH>'  skip
+-              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col43, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; color: ' + (if tt-itog.col43 <> 0 then "red" else "black") + '; ">' + fDec2Str(tt-itog.col43, "->>>>>>>>>>>9.9") + '</TH>'  skip
+-              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col44, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; color: ' + (if tt-itog.col44 <> 0 then "red" else "black") + '; ">' + fDec2Str(tt-itog.col44, "->>>>>>>>>>>9.9") + '</TH>'  skip
++              '<TH style="text-align: center; font-weight:bold; background-color: yellow; ">Итого по:</TH>'  skip
++              '<TH style="text-align: center; font-weight:bold; background-color: yellow; ">' fStrNvl(tt-itog.col1, "") '</TH>'   skip
++              '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++              '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++              '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++              '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++              '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++              '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++              '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++              '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++              '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++              '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++              '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++              '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++              '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++              '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++              '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col18, "->>>>>>>>>>>9"  ) + '" style="text-align: center; font-weight:bold; background-color: yellow; ">' + fDec2Str(tt-itog.col18, "->>>>>>>>>>>9"  ) + '</TH>'  skip
++              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col19, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; background-color: yellow; ">' + fDec2Str(tt-itog.col19, "->>>>>>>>>>>9.9") + '</TH>'  skip
++              '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++              '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col22, "->>>>>>>>>>>9"  ) + '" style="text-align: center; font-weight:bold; background-color: yellow; ">' + fDec2Str(tt-itog.col22, "->>>>>>>>>>>9"  ) + '</TH>'  skip
++              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col23, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; background-color: yellow; ">' + fDec2Str(tt-itog.col23, "->>>>>>>>>>>9.9") + '</TH>'  skip
++              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col24, "->>>>>>>>>>9.99") + '" style="text-align: center; font-weight:bold; background-color: yellow; ">' + fDec2Str(tt-itog.col24, "->>>>>>>>>>9.99") + '</TH>'  skip
++              '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++              '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col27, "->>>>>>>>>>>9"  ) + '" style="text-align: center; font-weight:bold; background-color: yellow; ">' + fDec2Str(tt-itog.col27, "->>>>>>>>>>>9"  ) + '</TH>'  skip
++              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col28, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; background-color: yellow; ">' + fDec2Str(tt-itog.col28, "->>>>>>>>>>>9.9") + '</TH>'  skip
++              '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++              '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col31, "->>>>>>>>>>>9"  ) + '" style="text-align: center; font-weight:bold; background-color: yellow; ">' + fDec2Str(tt-itog.col31, "->>>>>>>>>>>9"  ) + '</TH>'  skip
++              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col32, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; background-color: yellow; ">' + fDec2Str(tt-itog.col32, "->>>>>>>>>>>9.9") + '</TH>'  skip
++              '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++              '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col35, "->>>>>>>>>>>9"  ) + '" style="text-align: center; font-weight:bold; background-color: yellow; ">' + fDec2Str(tt-itog.col35, "->>>>>>>>>>>9"  ) + '</TH>'  skip
++              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col36, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; background-color: yellow; ">' + fDec2Str(tt-itog.col36, "->>>>>>>>>>>9.9") + '</TH>'  skip
++              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col37, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; background-color: yellow; color: ' + (if tt-itog.col38red then "red" else "black") + '; ">' + fDec2Str(tt-itog.col37, "->>>>>>>>>>>9.9") + '</TH>'  skip
++              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col38, "->>>>>>>>>>9.99") + '" style="text-align: center; font-weight:bold; background-color: yellow; color: ' + (if tt-itog.col38red then "red" else "black") + '; ">' + fDec2Str(tt-itog.col38, "->>>>>>>>>>9.99") + '</TH>'  skip
++              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col39, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; background-color: yellow; color: ' + (if tt-itog.col40red then "red" else "black") + '; ">' + fDec2Str(tt-itog.col39, "->>>>>>>>>>>9.9") + '</TH>'  skip
++              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col40, "->>>>>>>>>>9.99") + '" style="text-align: center; font-weight:bold; background-color: yellow; color: ' + (if tt-itog.col40red then "red" else "black") + '; ">' + fDec2Str(tt-itog.col40, "->>>>>>>>>>9.99") + '</TH>'  skip
++              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col41, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; background-color: yellow; color: ' + (if tt-itog.col42red then "red" else "black") + '; ">' + fDec2Str(tt-itog.col41, "->>>>>>>>>>>9.9") + '</TH>'  skip
++              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col42, "->>>>>>>>>>9.99") + '" style="text-align: center; font-weight:bold; background-color: yellow; color: ' + (if tt-itog.col42red then "red" else "black") + '; ">' + fDec2Str(tt-itog.col42, "->>>>>>>>>>9.99") + '</TH>'  skip
++              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col43, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; background-color: yellow; color: ' + (if tt-itog.col43 <> 0 then "red" else "black") + '; ">' + fDec2Str(tt-itog.col43, "->>>>>>>>>>>9.9") + '</TH>'  skip
++              '<TH num="#,##0.00" val="' + fDec2Str(tt-itog.col44, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; background-color: yellow; color: ' + (if tt-itog.col44 <> 0 then "red" else "black") + '; ">' + fDec2Str(tt-itog.col44, "->>>>>>>>>>>9.9") + '</TH>'  skip
+               '</TR>'skip
+             .
+           end .
+@@ -1604,50 +1604,50 @@
+       for first tt-all-itog:
+         put stream sOutStr-html unformatted
+           '<TR >'skip
+-          '<TH style="text-align: center; font-weight:bold; ">Итого по:</TH>'  skip
+-          '<TH style="text-align: center; font-weight:bold; ">Всем выбранным объектам</TH>'   skip
+-          '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-          '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-          '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-          '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-          '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-          '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-          '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-          '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-          '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-          '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-          '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-          '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-          '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-          '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-          '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col18, "->>>>>>>>>>>9"  ) + '" style="text-align: center; font-weight:bold; ">' + fDec2Str(tt-all-itog.col18, "->>>>>>>>>>>9"  ) + '</TH>'  skip
+-          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col19, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; ">' + fDec2Str(tt-all-itog.col19, "->>>>>>>>>>>9.9") + '</TH>'  skip
+-          '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-          '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col22, "->>>>>>>>>>>9"  ) + '" style="text-align: center; font-weight:bold; ">' + fDec2Str(tt-all-itog.col22, "->>>>>>>>>>>9"  ) + '</TH>'  skip
+-          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col23, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; ">' + fDec2Str(tt-all-itog.col23, "->>>>>>>>>>>9.9") + '</TH>'  skip
+-          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col24, "->>>>>>>>>>9.99") + '" style="text-align: center; font-weight:bold; ">' + fDec2Str(tt-all-itog.col24, "->>>>>>>>>>9.99") + '</TH>'  skip
+-          '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-          '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col27, "->>>>>>>>>>>9"  ) + '" style="text-align: center; font-weight:bold; ">' + fDec2Str(tt-all-itog.col27, "->>>>>>>>>>>9"  ) + '</TH>'  skip
+-          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col28, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; ">' + fDec2Str(tt-all-itog.col28, "->>>>>>>>>>>9.9") + '</TH>'  skip
+-          '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-          '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col31, "->>>>>>>>>>>9"  ) + '" style="text-align: center; font-weight:bold; ">' + fDec2Str(tt-all-itog.col31, "->>>>>>>>>>>9"  ) + '</TH>'  skip
+-          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col32, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; ">' + fDec2Str(tt-all-itog.col32, "->>>>>>>>>>>9.9") + '</TH>'  skip
+-          '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-          '<TH style="text-align: center; font-weight:bold; "></TH>'  skip
+-          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col35, "->>>>>>>>>>>9"  ) + '" style="text-align: center; font-weight:bold; ">' + fDec2Str(tt-all-itog.col35, "->>>>>>>>>>>9"  ) + '</TH>'  skip
+-          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col36, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; ">' + fDec2Str(tt-all-itog.col36, "->>>>>>>>>>>9.9") + '</TH>'  skip
+-          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col37, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; color: ' + (if tt-all-itog.col38red then "red" else "black") + '; ">' + fDec2Str(tt-all-itog.col37, "->>>>>>>>>>>9.9") + '</TH>'  skip
+-          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col38, "->>>>>>>>>>9.99") + '" style="text-align: center; font-weight:bold; color: ' + (if tt-all-itog.col38red then "red" else "black") + '; ">' + fDec2Str(tt-all-itog.col38, "->>>>>>>>>>9.99") + '</TH>'  skip
+-          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col39, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; color: ' + (if tt-all-itog.col40red then "red" else "black") + '; ">' + fDec2Str(tt-all-itog.col39, "->>>>>>>>>>>9.9") + '</TH>'  skip
+-          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col40, "->>>>>>>>>>9.99") + '" style="text-align: center; font-weight:bold; color: ' + (if tt-all-itog.col40red then "red" else "black") + '; ">' + fDec2Str(tt-all-itog.col40, "->>>>>>>>>>9.99") + '</TH>'  skip
+-          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col41, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; color: ' + (if tt-all-itog.col42red then "red" else "black") + '; ">' + fDec2Str(tt-all-itog.col41, "->>>>>>>>>>>9.9") + '</TH>'  skip
+-          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col42, "->>>>>>>>>>9.99") + '" style="text-align: center; font-weight:bold; color: ' + (if tt-all-itog.col42red then "red" else "black") + '; ">' + fDec2Str(tt-all-itog.col42, "->>>>>>>>>>9.99") + '</TH>'  skip
+-          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col43, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; color: ' + (if tt-all-itog.col43 <> 0 then "red" else "black") + '; ">' + fDec2Str(tt-all-itog.col43, "->>>>>>>>>>>9.9") + '</TH>'  skip
+-          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col44, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; color: ' + (if tt-all-itog.col44 <> 0 then "red" else "black") + '; ">' + fDec2Str(tt-all-itog.col44, "->>>>>>>>>>>9.9") + '</TH>'  skip
++          '<TH style="text-align: center; font-weight:bold; background-color: yellow; ">Итого по:</TH>'  skip
++          '<TH style="text-align: center; font-weight:bold; background-color: yellow; ">Всем выбранным объектам</TH>'   skip
++          '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++          '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++          '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++          '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++          '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++          '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++          '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++          '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++          '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++          '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++          '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++          '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++          '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++          '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++          '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col18, "->>>>>>>>>>>9"  ) + '" style="text-align: center; font-weight:bold; background-color: yellow; ">' + fDec2Str(tt-all-itog.col18, "->>>>>>>>>>>9"  ) + '</TH>'  skip
++          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col19, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; background-color: yellow; ">' + fDec2Str(tt-all-itog.col19, "->>>>>>>>>>>9.9") + '</TH>'  skip
++          '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++          '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col22, "->>>>>>>>>>>9"  ) + '" style="text-align: center; font-weight:bold; background-color: yellow; ">' + fDec2Str(tt-all-itog.col22, "->>>>>>>>>>>9"  ) + '</TH>'  skip
++          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col23, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; background-color: yellow; ">' + fDec2Str(tt-all-itog.col23, "->>>>>>>>>>>9.9") + '</TH>'  skip
++          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col24, "->>>>>>>>>>9.99") + '" style="text-align: center; font-weight:bold; background-color: yellow; ">' + fDec2Str(tt-all-itog.col24, "->>>>>>>>>>9.99") + '</TH>'  skip
++          '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++          '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col27, "->>>>>>>>>>>9"  ) + '" style="text-align: center; font-weight:bold; background-color: yellow; ">' + fDec2Str(tt-all-itog.col27, "->>>>>>>>>>>9"  ) + '</TH>'  skip
++          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col28, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; background-color: yellow; ">' + fDec2Str(tt-all-itog.col28, "->>>>>>>>>>>9.9") + '</TH>'  skip
++          '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++          '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col31, "->>>>>>>>>>>9"  ) + '" style="text-align: center; font-weight:bold; background-color: yellow; ">' + fDec2Str(tt-all-itog.col31, "->>>>>>>>>>>9"  ) + '</TH>'  skip
++          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col32, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; background-color: yellow; ">' + fDec2Str(tt-all-itog.col32, "->>>>>>>>>>>9.9") + '</TH>'  skip
++          '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++          '<TH style="text-align: center; font-weight:bold; background-color: yellow; "></TH>'  skip
++          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col35, "->>>>>>>>>>>9"  ) + '" style="text-align: center; font-weight:bold; background-color: yellow; ">' + fDec2Str(tt-all-itog.col35, "->>>>>>>>>>>9"  ) + '</TH>'  skip
++          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col36, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; background-color: yellow; ">' + fDec2Str(tt-all-itog.col36, "->>>>>>>>>>>9.9") + '</TH>'  skip
++          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col37, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; background-color: yellow; color: ' + (if tt-all-itog.col38red then "red" else "black") + '; ">' + fDec2Str(tt-all-itog.col37, "->>>>>>>>>>>9.9") + '</TH>'  skip
++          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col38, "->>>>>>>>>>9.99") + '" style="text-align: center; font-weight:bold; background-color: yellow; color: ' + (if tt-all-itog.col38red then "red" else "black") + '; ">' + fDec2Str(tt-all-itog.col38, "->>>>>>>>>>9.99") + '</TH>'  skip
++          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col39, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; background-color: yellow; color: ' + (if tt-all-itog.col40red then "red" else "black") + '; ">' + fDec2Str(tt-all-itog.col39, "->>>>>>>>>>>9.9") + '</TH>'  skip
++          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col40, "->>>>>>>>>>9.99") + '" style="text-align: center; font-weight:bold; background-color: yellow; color: ' + (if tt-all-itog.col40red then "red" else "black") + '; ">' + fDec2Str(tt-all-itog.col40, "->>>>>>>>>>9.99") + '</TH>'  skip
++          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col41, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; background-color: yellow; color: ' + (if tt-all-itog.col42red then "red" else "black") + '; ">' + fDec2Str(tt-all-itog.col41, "->>>>>>>>>>>9.9") + '</TH>'  skip
++          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col42, "->>>>>>>>>>9.99") + '" style="text-align: center; font-weight:bold; background-color: yellow; color: ' + (if tt-all-itog.col42red then "red" else "black") + '; ">' + fDec2Str(tt-all-itog.col42, "->>>>>>>>>>9.99") + '</TH>'  skip
++          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col43, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; background-color: yellow; color: ' + (if tt-all-itog.col43 <> 0 then "red" else "black") + '; ">' + fDec2Str(tt-all-itog.col43, "->>>>>>>>>>>9.9") + '</TH>'  skip
++          '<TH num="#,##0.00" val="' + fDec2Str(tt-all-itog.col44, "->>>>>>>>>>>9.9") + '" style="text-align: center; font-weight:bold; background-color: yellow; color: ' + (if tt-all-itog.col44 <> 0 then "red" else "black") + '; ">' + fDec2Str(tt-all-itog.col44, "->>>>>>>>>>>9.9") + '</TH>'  skip
+           '</TR>'skip
+         .
+       end.

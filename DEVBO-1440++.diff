@@ -1,0 +1,54 @@
+# HG changeset patch
+# User EShklyar
+# Parent  2a941b8df9053f52a17703eb138033dcca495df6
+refs #DEVBO-1440 ЗИ 239: Передача учетной цены при перемещении СТ
+
+http://exp-jira.expertek.local:8080/browse/DEVBO-1440
+
+diff --git a/str/parts-l.w b/str/parts-l.w
+--- a/str/parts-l.w
++++ b/str/parts-l.w
+@@ -280,6 +280,7 @@ END FUNCTION.
+ 
+ /* требуется редактирование партий */
+ define variable v-edit-parts as logical   no-undo init false .
++define variable v-edit       as logical   no-undo init false .
+ /* можно создавать и удалять партии */
+ define variable v-add-parts as logical   no-undo init false .
+ /* условие того, что при редактировании партий */
+@@ -1386,6 +1387,10 @@ DO:
+         ,input        v-pl-code      /* p-pl-code        */
+         ,input-output v-prt-rec      /* p-parts-recid    */
+         ).
++
++  assign
++    v-edit = true
++  .
+     end.
+     else do:
+       message
+@@ -2518,6 +2523,7 @@ and (p-edit-mode = {&update}
+      or p-edit-mode = {&add-def}
+     )
+ then do:
++
+   assign
+     v-edit-parts = true
+   .
+@@ -4288,6 +4294,7 @@ PROCEDURE save-changes :
+     do transaction
+       on error undo, return error
+       :
++        
+       find first buf_trn-doc no-lock
+         where buf_trn-doc.doc-code = p-doc-code
+         no-error .
+@@ -4319,7 +4326,7 @@ PROCEDURE save-changes :
+           view-as alert-box error .
+         undo, return error .
+       end.      
+-
++      if buf_trn-doc.ext-doc-type = {&TDEDT_Ras_Perem} and not v-edit then leave .
+       /*Для внутреннего расхода*/
+       if buf_trn-doc.ext-doc-type = {&TDEDT_Ras_Perem} then
+       do:

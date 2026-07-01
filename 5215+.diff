@@ -1,0 +1,41 @@
+# HG changeset patch
+# User ASMorozov
+# Parent  d1dfd2d5ef98f6228c7f27fdad7f9deee58da038
+refs #5215 Закрытие накладной сформированной автоматически без некоторых проверок.
+
+http://exp-rm1.expertek.local/issues/5215
+Не правильно работала проверка атрибута.
+
+diff -r d1dfd2d5ef98 str/trn-stat.p
+--- a/str/trn-stat.p	Thu Oct 17 14:23:36 2019 +0300
++++ b/str/trn-stat.p	Thu Oct 17 14:24:15 2019 +0300
+@@ -216,6 +216,8 @@
+ define variable is-fuel          as   character            no-undo.
+ def var isFuel as logical no-undo init false.
+ define variable parisfueltype    as   character            no-undo.
++define variable v-valuetype    as   character            no-undo.
++define variable v-value        as   character            no-undo.
+ define variable v-show-str       as character no-undo .
+ define variable v-add-nat-gas    as logical no-undo .
+ define variable var-is-auto-trn  as logical no-undo .
+@@ -291,12 +293,16 @@
+   end.
+ end.
+ 
+-var-is-auto-trn = yes.
+-{ str/tdat-wrt.i                                    
++var-is-auto-trn = false.
++{ str/tdat-val.i                                    
+    bf_trn-doc.doc-code
+    {&trdcattr-is-auto-trn}
+-   "yes" 
+-no-error}
++   v-value 
++   v-valuetype no-error}
++
++assign
++  var-is-auto-trn = yes when v-value = "yes".
++
+ 
+ 
+ /* Получим из ТПЛ автопереоценок нужные переменные */

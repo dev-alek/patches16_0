@@ -1,0 +1,180 @@
+# HG changeset patch
+# User VSpiridonov
+# Parent  5e92efcaedd21a2d9b45b4df75a5b41f1f769421
+refs #DEVBO-667  !!! Отладка !!! Ограничение оплаты подарочного товара ЗИ7700299223
+
+diff --git a/cmp/str-glb4.p b/cmp/str-glb4.p
+--- a/cmp/str-glb4.p
++++ b/cmp/str-glb4.p
+@@ -473,6 +473,8 @@ run filwrlib_append-new-line in this-pro
+ /* Признак продажи is18+ */
+ { cmp/cr-prep.i 1 attr-IS18Plus           IS18Plus         " " IS18Plus    }
+ 
++/* Оплата баллами Семейная команда */
++{ cmp/cr-prep.i 1 attr-loyalty-gift           loyalty-gift         " " loyalty-gift    }
+ 
+ /* Признак предмета расчета */
+ { cmp/cr-prep.i 1 attr-item-matter-mark     item-matter-mark     " " item-matter-mark     }
+@@ -626,6 +628,7 @@ run filwrlib_append-new-line in this-pro
+ ,{&bef-attr-mark-type}~
+ ,{&bef-attr-emrc-type}~
+ ,{&bef-attr-IS18Plus}~
++,{&bef-attr-loyalty-gift}~
+ ,{&bef-attr-item-matter-mark}~
+ ,{&bef-attr-type-method-calc}~
+ ,{&bef-attr-group-np}~
+diff --git a/gbl/attr-lib.p b/gbl/attr-lib.p
+--- a/gbl/attr-lib.p
++++ b/gbl/attr-lib.p
+@@ -6765,8 +6765,18 @@ end procedure.
+ &scop manual-edit-attr-IS18Plus 4
+ &scop batch-edit-attr-IS18Plus  4
+ 
+-
+-
++/* Оплата баллами Семейная команда */
++&scop type-attr-loyalty-gift {&type-int}
++&scop format-attr-loyalty-gift  ">9"
++&scop label-attr-loyalty-gift   "Оплата баллами Семейная команда"
++&scop tooltip-attr-loyalty-gift "Оплата баллами Семейная команда"
++&glob user-can-edit-attr-loyalty-gift  false
++&glob output-display-attr-loyalty-gift  true
++&glob other-attr-loyalty-gift  ""
++&glob news-attr-loyalty-gift true
++&glob copy-attr-loyalty-gift  true
++&scop manual-edit-attr-loyalty-gift 4
++&scop batch-edit-attr-loyalty-gift  4
+ 
+ /* сюда добавлять новые параметры атрибутов товаров */
+ 
+@@ -6927,6 +6937,8 @@ procedure gds-attr-name :
+       {&attr-temp-full-code}
+       &scop attr-code attr-IS18Plus
+       {&attr-temp-full-code}
++      &scop attr-code attr-loyalty-gift
++      {&attr-temp-full-code}
+       /* сюда добавлять новые параметры атрибутов товаров */
+       otherwise do:
+         undo, return error substitute("неизвестный глобальный атрибут товара &1", p-code ).
+@@ -7045,6 +7057,8 @@ do
+       {&attr-temp-code}
+       &scop attr-code attr-IS18Plus
+       {&attr-temp-code}
++      &scop attr-code attr-loyalty-gift
++      {&attr-temp-code}
+ 
+       /* сюда добавлять новые параметры атрибутов товаров */
+       otherwise do:
+@@ -7413,6 +7427,8 @@ procedure gds-attr-news :
+       {&attr-news-code}
+       &scop attr-code attr-IS18Plus
+       {&attr-news-code}
++     &scop attr-code attr-loyalty-gift      
++      {&attr-news-code}
+       
+       /* сюда добавлять новые параметры атрибутов товаров */
+       otherwise do:
+@@ -7525,6 +7541,8 @@ procedure gds-attr-copy :
+       {&attr-copy-code}
+       &scop attr-code attr-IS18Plus      
+       {&attr-copy-code}
++      &scop attr-code attr-loyalty-gift
++      {&attr-copy-code}
+ 
+       /* сюда добавлять новые параметры атрибутов товаров */
+       otherwise do:
+@@ -8293,6 +8311,8 @@ do
+       {&attr-manual-edit-code}
+       &scop attr-code attr-IS18Plus          
+       {&attr-manual-edit-code}
++      &scop attr-code attr-loyalty-gift
++      {&attr-manual-edit-code}
+ 
+       /* сюда добавлять новые параметры атрибутов товаров */
+       otherwise do:
+diff --git a/ibs/th/bge/1crn/subjects/goods.cls b/ibs/th/bge/1crn/subjects/goods.cls
+--- a/ibs/th/bge/1crn/subjects/goods.cls
++++ b/ibs/th/bge/1crn/subjects/goods.cls
+@@ -63,6 +63,7 @@ class ibs.th.bge.1crn.subjects.goods inh
+   define property vad-gds       as integer      no-undo get. private set.
+   define property pay-flag      as integer      no-undo get. private set.
+   define property is18plus      as integer      no-undo get. private set.
++  define property loyalty-gift  as integer  no-undo get. private set.
+   define property method-flag   as character    no-undo get. private set.
+   define property code-AIS      as character    no-undo get. private set.
+   define property production-use as integer      no-undo get. private set.
+@@ -127,6 +128,7 @@ class ibs.th.bge.1crn.subjects.goods inh
+       when "vad-gds"       then vad-gds       = {&attr-integer} .
+       when "pay-flag"      then pay-flag      = {&attr-integer} .
+       when "is18plus"      then is18plus      = {&attr-integer} .
++      when "loyalty-gift" then loyalty-gift  = {&attr-integer} .
+       when "method-flag"   then method-flag   = {&attr-str} .
+       when "production-use" then production-use = {&attr-integer} .
+       when "weighed-product" then weighed-product = {&attr-integer} .
+@@ -229,6 +231,7 @@ class ibs.th.bge.1crn.subjects.goods inh
+         vad-gds       = ?
+         pay-flag      = ?
+         is18plus      = ?
++        loyalty-gift = ?
+         method-flag   = ?
+         code-AIS      = ?
+         production-use = ?
+diff --git a/ref/imp-goods-1C-RN.p b/ref/imp-goods-1C-RN.p
+--- a/ref/imp-goods-1C-RN.p
++++ b/ref/imp-goods-1C-RN.p
+@@ -503,12 +503,24 @@ end.
+   then do:
+     RUN gds-attr-write (v-nbc, {&attr-IS18Plus}, p-GdsObj:IS18Plus).
+   end.  
+-
+   if p-GdsObj:IS18Plus = 0 or p-GdsObj:IS18Plus = ? 
+   then do:
+      RUN gds-attr-delete (v-nbc, {&attr-IS18Plus}, output v-attr-del).
+   end.  
+ 
++
++  if p-GdsObj:loyalty-gift = 1
++   then do:
++     RUN gds-attr-write (v-nbc, {&attr-loyalty-gift}, p-GdsObj:loyalty-gift).
++     run fill-g-list in mImp2CdH ( input v-nbc, input ?, input ?).
++  end.  
++
++  else do:
++    RUN gds-attr-delete (v-nbc, {&attr-loyalty-gift}, output v-attr-del).
++    run fill-g-list in mImp2CdH ( input v-nbc, input ?, input ?).
++  end.  
++
++
+  
+   if p-GdsObj:oil-grp <> ?
+   then do:
+@@ -530,7 +542,7 @@ end.
+                                         and fbr-gds-obj.obj-code = buf-clients.obj-code 
+                                         no-lock no-error. 
+            par-recid-fbr    =  if available fbr-gds-obj then recid(fbr-gds-obj) else ?.   
+-              
++
+            run ref/fgdsobj1.p (
+                             input-output par-recid-fbr
+                         , input (if available fbr-gds-obj
+diff --git a/str/xml-gds.i b/str/xml-gds.i
+--- a/str/xml-gds.i
++++ b/str/xml-gds.i
+@@ -275,6 +275,17 @@ end.
+       run bgelib-tag-put in this-procedure ( input 4, input "IS18Plus", input 0, input 1 ). 
+   end. */
+ 
++
++/* Оплата баллами Семейная команда */ 
++  find first buf_goods-attr where buf_goods-attr.gds-code = cash-gds.gds-code 
++         and buf_goods-attr.attr-code = "loyalty-gift" 
++         and buf_goods-attr.attr-value = "1"
++         no-lock no-error. 
++  if available buf_goods-attr then do:   
++      run bgelib-tag-put in this-procedure ( input 4, input "ItemLoyaltyGift", input 1, input 1 ). 
++  end.
++
++
+ /*Алкоголь*/
+ 
+   find first buf_goods-attr where buf_goods-attr.gds-code = cash-gds.gds-code and buf_goods-attr.attr-code = "alcohol-prod" no-lock no-error. 

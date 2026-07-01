@@ -1,0 +1,233 @@
+# HG changeset patch
+# User ASMorozov
+# Parent  fb56fc71d52079fedf9b09b14464394980c6735a
+refs #4324 Исходящие сообщения из ERP-СИСТЕМЫ в GC Документы
+
+http://exp-rm/redmine/issues/4324
+
+diff -r fb56fc71d520 ibs/th/bge/1crn/import/imptrn-gd-doc.cls
+--- a/ibs/th/bge/1crn/import/imptrn-gd-doc.cls	Tue Dec 18 17:00:17 2018 +0300
++++ b/ibs/th/bge/1crn/import/imptrn-gd-doc.cls	Tue Dec 18 22:17:06 2018 +0300
+@@ -48,6 +48,7 @@
+     define variable mode      as character no-undo.
+     define variable ii        as integer   no-undo.
+     define variable jj        as integer   no-undo.
++    define variable v-vat-pc  as decimal   no-undo.
+     define variable objTrnDoc  as class     trn-gd-doc-in   no-undo.
+     define variable objGd      as class     trn-gd          no-undo.
+     define variable objPrt     as class     trn-prt         no-undo.
+@@ -100,6 +101,9 @@
+         objPrt =  cast (objPrts:SubjectObjCurr, trn-prt).
+         if objPrt:gd-line-num = objGd:line-num
+         then do:
++          v-vat-pc = (objPrt:sum-nds / (objPrt:sum - objPrt:sum-nds)) * 100.
++          if v-vat-pc = ? 
++            then v-vat-pc = 0.
+           create TempDocLine.
+           assign
+             TempDocLine.gds-code = objGd:gd-code
+@@ -107,8 +111,8 @@
+             TempDocLine.doc-qnty = objPrt:qnty
+             TempDocLine.vsd-uuid = objPrt:vad-guid
+             TempDocLine.part-id = objPrt:prt-id
+-            TempDocLine.price-rubl = round (objGd:sum / objGd:qnty-fact, 2)
+-            TempDocLine.vat-pc = (objGd:sum-nds / (objGd:sum - objGd:sum-nds)) * 100. 
++            TempDocLine.price-rubl = 0 /* round (objGd:sum / objGd:qnty-fact, 2)*/
++            TempDocLine.vat-pc = v-vat-pc
+           .
+         end.
+       end.
+diff -r fb56fc71d520 ibs/th/bge/1crn/subjects/trn-gd-doc.cls
+--- a/ibs/th/bge/1crn/subjects/trn-gd-doc.cls	Tue Dec 18 17:00:17 2018 +0300
++++ b/ibs/th/bge/1crn/subjects/trn-gd-doc.cls	Tue Dec 18 22:17:06 2018 +0300
+@@ -545,9 +545,12 @@
+         write-data-element ("koef", string (1)).
+         write-data-element ("qnty-ttn", string-mth (buf_gds-dtl.doc-qnty)).
+         write-data-element ("qnty-fact", string-mth (buf_gds-dtl.fact-qnty)).
+-        write-data-element ("sum", string-mth (round (buf_gds-dtl.price-rubl * buf_gds-dtl.fact-qnty, 2))).
+-        write-data-element ("sum-nds", string-mth ( round ((buf_gds-dtl.price-rubl * buf_gds-dtl.fact-qnty * buf_doc-line.VAT-pc) / (100 + buf_doc-line.VAT-pc) , 2))).
+-        write-data-element ("nds-code", string-mth ( round (buf_doc-line.VAT-pc , 2))).
++        if not v-doc-type-ERPRN = "3"
++        then do:
++          write-data-element ("sum", string-mth (round (buf_gds-dtl.price-rubl * buf_gds-dtl.fact-qnty, 2))).
++          write-data-element ("sum-nds", string-mth ( round ((buf_gds-dtl.price-rubl * buf_gds-dtl.fact-qnty * buf_doc-line.VAT-pc) / (100 + buf_doc-line.VAT-pc) , 2))).
++          write-data-element ("nds-code", string-mth ( round (buf_doc-line.VAT-pc , 0))).
++        end.
+       sw:end-element ("gd").
+     end.
+     sw:end-element ("gds").
+@@ -854,16 +857,6 @@
+         and buf_gds.prod-code = buf_doc-line.prod-code
+         and buf_gds.prod-type = buf_doc-line.prod-type.
+ 
+-      { gbl/gdscdat.i
+-        buf_gds.gds-code
+-        "'mercur_FGIS=request':u"
+-        v-mercury-prod
+-        no-error
+-      }
+-      
+-      if not v-mercury-prod 
+-        then next.
+-      
+       if not tagPrts 
+       then do: 
+         sw:start-element ("prts").
+@@ -874,27 +867,47 @@
+           and buf_parts.artic = buf_doc-line.artic
+           and buf_parts.prod-type = buf_doc-line.prod-type
+           and buf_parts.prod-code = buf_doc-line.prod-code:
+-        vsds = new vsdsubs ().
+-        vsds = vsdstr:getVSDsubs(buffer buf_parts).
+-        sw:start-element ("prt").      
+-          write-data-element ("gd-line-num", string-mth (buf_doc-line.line-num)).
+-          write-data-element ("prt-id", buf_parts.part-code).
+-          if vsds:iCounter > 0
+-          then do:
+-            do ii = 1 to vsds:GetItem(ii):
+-              if vsds:VsdObjCurr:VSDType = vsdsts:VSDTrans or vsds:VsdObjCurr:VSDType = vsdsts:VSDIn 
+-              then do:
+-                write-data-element ("vad-guid", vsds:VsdObjCurr:UUID).
+-                leave.
++
++        sw:start-element ("prt").
++        write-data-element ("gd-line-num", string-mth (buf_doc-line.line-num)).
++        write-data-element ("prt-id", buf_parts.part-code).
++        
++        { gbl/gdscdat.i
++          buf_gds.gds-code
++          "'mercur_FGIS=request':u"
++          v-mercury-prod
++          no-error
++        }
++        
++        if v-mercury-prod 
++        then do:
++          vsds = new vsdsubs ().
++          vsds = vsdstr:getVSDsubs(buffer buf_parts).
++            if vsds:iCounter > 0
++            then do:
++              do ii = 1 to vsds:GetItem(ii):
++                if vsds:VsdObjCurr:VSDType = vsdsts:VSDTrans or vsds:VsdObjCurr:VSDType = vsdsts:VSDIn 
++                then do:
++                  write-data-element ("vad-guid", vsds:VsdObjCurr:UUID).
++                  leave.
++                end.
+               end.
+             end.
+-          end.
+-          else do:
+-            write-data-element ("vad-guid", "").
+-          end.
+-          write-data-element ("qnty", string-mth (buf_parts.fact-qnty)).
++            else do:
++              write-data-element ("vad-guid", "").
++            end.
++
++        end.
++        
++        write-data-element ("qnty", string-mth (buf_parts.fact-qnty)).
++        write-data-element ("sum", string-mth ( round ((buf_parts.price-rubl * buf_parts.fact-qnty) , 2))).                
++        write-data-element ("sum-nds", string-mth ( round ((buf_parts.price-rubl * buf_parts.fact-qnty * buf_parts.VAT-pc) / (100 + buf_parts.VAT-pc) , 2))).
++        write-data-element ("nds-code", string-mth ( round (buf_parts.VAT-pc , 2))).
++
++          
+         sw:end-element ("prt").
+         
++        
+         delete object vsds no-error.        
+       
+       end.      
+diff -r fb56fc71d520 ibs/th/bge/1crn/subjects/trn-prt.cls
+--- a/ibs/th/bge/1crn/subjects/trn-prt.cls	Tue Dec 18 17:00:17 2018 +0300
++++ b/ibs/th/bge/1crn/subjects/trn-prt.cls	Tue Dec 18 22:17:06 2018 +0300
+@@ -32,6 +32,16 @@
+   define property qnty as decimal no-undo 
+     get. 
+     private set.
++  define property sum as decimal no-undo 
++    get. 
++    private set.
++    
++  define property nds-code as decimal no-undo 
++    get. 
++    private set.
++  define property sum-nds as decimal no-undo 
++    get. 
++    private set.
+     
+   define override property InitTag as character no-undo init "prt"
+     get. 
+@@ -50,6 +60,15 @@
+       when "qnty" then do:
+         assign qnty = decimal (inValue) .
+       end.
++      when "nds-code" then do:
++        assign nds-code = decimal (inValue) .
++      end.
++      when "sum-nds" then do:
++        assign sum-nds = decimal (inValue) .
++      end.
++      when "sum" then do:
++        assign sum = decimal (inValue) .
++      end.
+     end case.
+   end.
+ 
+@@ -61,6 +80,9 @@
+       v-str = "gd-line-num" when gd-line-num = ?
+       v-str = v-str + ",prt-id" when prt-id = ?
+       v-str = v-str + ",qnty" when qnty = ?
++      v-str = v-str + ",nds-code" when nds-code = ?
++      v-str = v-str + ",sum-nds" when sum-nds = ?
++      v-str = v-str + ",sum" when sum = ?
+     .
+     v-str = trim (v-str, ",").
+     if v-str > ''
+diff -r fb56fc71d520 utl/ora-i516-1c.p
+--- a/utl/ora-i516-1c.p	Tue Dec 18 17:00:17 2018 +0300
++++ b/utl/ora-i516-1c.p	Tue Dec 18 22:17:06 2018 +0300
+@@ -895,7 +895,7 @@
+           tt-parts.obj-code       = new_trn-doc.obj-code
+           tt-parts.fact-date      = new_trn-doc.fact-date
+           tt-parts.fact-num       = new_trn-doc.fact-num
+-          tt-parts.VAT-pc         = tt2-doc-line.vat-pc
++          tt-parts.VAT-pc         = temp_doc-line.vat-pc
+           tt-parts.part-code      = if is-egais then temp_doc-line.line-num-str else string (jj)
+           tt-parts.PS             = ""
+           tt-parts.pay-code       = new_trn-doc.pay-code
+@@ -1246,7 +1246,7 @@
+                   end.
+                 end.
+ 
+-   run clos-trn2 in this-procedure (new_trn-doc.doc-code) no-error .
++        run clos-trn2 in this-procedure (new_trn-doc.doc-code) no-error .
+         if error-status:error then do :
+            v-end-message = substitute(" Ошибка &1 &2" , error-status :get-message(1)  , return-value) .
+            run pcall-log-file in p-log-handle ( input v-end-message ) .
+@@ -1258,7 +1258,24 @@
+             new_trn-doc.PS  = trim(new_trn-doc.PS) + " " + v-str-txt .
+       end.
+    end case.
+-
++  for each  ub.doc-line where ub.doc-line.doc-code = new_trn-doc.doc-code:
++    find first buf_goods where ub.doc-line.artic = buf_goods.artic and
++      ub.doc-line.prod-type = buf_goods.prod-type  and
++      ub.doc-line.prod-code = buf_goods.prod-code
++      no-lock no-error .
++    release temp_doc-line.
++    for each ub.parts exclusive-lock
++      where ub.parts.in-code   = new_trn-doc.doc-code
++        and ub.parts.artic     = ub.doc-line.artic
++        and ub.parts.prod-type = ub.doc-line.prod-type
++        and ub.parts.prod-code = ub.doc-line.prod-code 
++        :
++  
++      find first temp_doc-line where temp_doc-line.part-id = ub.parts.part-code.
++      ub.parts.VAT-pc = temp_doc-line.vat-pc.
++  
++    end.
++  end.
+ 
+   if new_trn-doc.vat-type = "" or new_trn-doc.vat-type = ? or
+      new_trn-doc.slt-type = "" or new_trn-doc.slt-type = ? then do:

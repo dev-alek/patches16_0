@@ -1,0 +1,16 @@
+# HG changeset patch
+# Parent  bcbf2f12edc259271be72cc4d593bf2dcd6a4e19
+Compil
+
+diff --git a/utl/proc-async.i b/utl/proc-async.i
+--- a/utl/proc-async.i
++++ b/utl/proc-async.i
+@@ -1,4 +1,8 @@
++&if "{1}" eq "beg_proc" &then
+ { cmp/str-glbl.i }
++&else
++&global-define CommentStartNoClass /~* 
++&endif
+ &if "{1}" eq "beg_proc" or "{1}" eq "proc_def"
+ &then
+ define variable mAsyncProc as class ibs.th.file.AsyncProc. 

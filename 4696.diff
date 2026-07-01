@@ -1,0 +1,34 @@
+# HG changeset patch
+# User SSlivenko
+# Parent  9c9477706080a69fe3c26654d22434e6720660cc
+refs #4696 Учет топлива по ЛНД. Сверки
+
+http://exp-rm1/issues/4696
+http://exp-jira.expertek.local:8080/browse/EXPSD-635
+
+diff -r 9c9477706080 str/rvs-lin.w
+--- a/str/rvs-lin.w	Fri Jul 12 16:13:43 2019 +0300
++++ b/str/rvs-lin.w	Fri Jul 12 16:29:19 2019 +0300
+@@ -2368,7 +2368,7 @@
+   .
+   
+   abs-delta-mass-add-qnty = tt-rvs-line.fact-calc-add-mass * pl-error-mass / 100 .
+-  abs-delta-mass-qnty = tt-rvs-line.state-measure-cli-qnty * input frame {&frame-name} delta-mass-qnty / 100 .
++  abs-delta-mass-qnty = tt-rvs-line.state-measure-cli-qnty * delta-mass-qnty / 100 .
+   
+   display
+     tt-rvs-line.calc-add-mass
+@@ -2414,6 +2414,13 @@
+     else do :
+       disable tt-rvs-line.izmer-density with frame {&frame-name}.
+     end.
++    if pl-rvd-dens or tt-rvs-line.density = ?
++    then do :
++      enable tt-rvs-line.state-density with frame {&frame-name}.
++    end.
++    else do :
++      disable tt-rvs-line.state-density with frame {&frame-name}.
++    end.
+     if pl-rvd-lvl or tt-rvs-line.density = ?
+     then do :
+       enable tt-rvs-line.state-level-total tt-rvs-line.state-level-water with frame {&frame-name}.

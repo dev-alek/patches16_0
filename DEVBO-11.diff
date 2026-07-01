@@ -1,0 +1,33 @@
+# HG changeset patch
+# User PGridchina
+# Parent  67fc333e70592823a80dc7bdd55469f9f1e0852f
+refs # При выгрузке УБД из ТБД 16.0 не выгружается атрибут маски дисконтной карты и диапазоны точек привязки (EXPSD-1321, 1327)
+
+http://exp-jira.expertek.local:8080/browse/DEVBO-11
+
+diff -r 67fc333e7059 adm/rest-rdb.p
+--- a/adm/rest-rdb.p	Fri Nov 01 12:20:56 2019 +0300
++++ b/adm/rest-rdb.p	Fri Nov 01 15:22:45 2019 +0300
+@@ -679,6 +679,11 @@
+                 create dst.code-range.
+                 buffer-copy src.code-range to dst.code-range .
+         end.    
++        for each src.code-range where src.code-range.db-num = p-db-num and          
++            src.code-range.range-type =  {&gbl-ca-code} :           
++                create dst.code-range.
++                buffer-copy src.code-range to dst.code-range .
++        end. 
+      end. 
+   end.
+ 
+diff -r 67fc333e7059 cmp/rest-rdb.i
+--- a/cmp/rest-rdb.i	Fri Nov 01 12:20:56 2019 +0300
++++ b/cmp/rest-rdb.i	Fri Nov 01 15:22:45 2019 +0300
+@@ -159,6 +159,7 @@
+ ,delivery-type-subject~
+ ,c-delivery-type-subject~
+ ,dis-card-mask~
++,dis-card-mask-attr~
+ ,dis-card-type~
+ ,dis-card-type-attr~
+ ,dis-dct-rule~

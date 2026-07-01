@@ -1,0 +1,117 @@
+# HG changeset patch
+# User DRuban
+# Parent  2944598c2c1325b932b65b763a6d6b7ecfe352e7
+refs #DISP-718 Создание скрипта для автоматического закрытия смен ТН на несколькихААЗС
+Проверка статуса трк.
+http://exp-jira.expertek.local:8080/browse/DISP-718
+
+diff --git a/ibs/th/str/CloseAndOpenShift.cls b/ibs/th/str/CloseAndOpenShift.cls
+--- a/ibs/th/str/CloseAndOpenShift.cls
++++ b/ibs/th/str/CloseAndOpenShift.cls
+@@ -342,7 +342,7 @@ class ibs.th.str.CloseAndOpenShift:
+       return cycleOperTso(iCycle,"stopShift",vList).
+    end.
+ 
+-   method public logical cycleOneInState(iCycle as integer, iStList as character ):
++   method public logical canCloseShift(iCycle as integer, iStList as character ):
+       define variable vi as integer no-undo.
+       do vi = 1 to iCycle:
+          if vi ne 1
+@@ -350,7 +350,7 @@ class ibs.th.str.CloseAndOpenShift:
+             myPause ({&TimeOutRvs}).
+          mTso:tso-send-Stat().
+          mTso:waitReadSts().
+-         if mTso:oneTsoInSts(iStList)
++         if mTso:AllTsoInSts(iStList)
+          then
+             return yes.
+          
+@@ -363,7 +363,7 @@ class ibs.th.str.CloseAndOpenShift:
+       vList = substitute ("&1,&2,&3",mShiftState:Stopped:NameProp,
+                                      mShiftState:DontWork:NameProp,
+                                      mShiftState:Closed:NameProp).
+-      return cycleOneInState(iCycle,vList).
++      return canCloseShift(iCycle,vList).
+    end.
+    
+    method public logical CloseShift():
+diff --git a/ibs/th/str/cash/ShiftState.cls b/ibs/th/str/cash/ShiftState.cls
+--- a/ibs/th/str/cash/ShiftState.cls
++++ b/ibs/th/str/cash/ShiftState.cls
+@@ -26,6 +26,7 @@ define override public property vss-revi
+    define public property Running          as class propmap no-undo get. protected set.
+    define public property Closed           as class propmap no-undo get. protected set.
+    define public property Stopped          as class propmap no-undo get. protected set.
++   define public property StopWorkProc     as class propmap no-undo get. protected set.
+    define public property DontWork         as class propmap no-undo get. protected set.
+    define public property OK               as class propmap no-undo get. protected set.
+    
+@@ -34,7 +35,8 @@ define override public property vss-revi
+       Running       = crProp(1,  "Running",               "Запущена и открыта").
+       Closed        = crProp(2,  "Closed",                "Закрыта").
+       Stopped       = crProp(3,  "Stopped",               "Остановлена и открыта").
+-      DontWork      = crProp(4,  "DontWork",              "Не опрашивается").
+-      ok            = crProp(5,  "OK",                    "OK").
++      StopWorkProc  = crProp(4,  "StopWorkProc",               "Остановлена и открыта").
++      DontWork      = crProp(5,  "DontWork",              "Не опрашивается").
++      ok            = crProp(6,  "OK",                    "OK").
+    end.
+ end class.
+\ No newline at end of file
+diff --git a/ibs/th/str/tso_trg.cls b/ibs/th/str/tso_trg.cls
+--- a/ibs/th/str/tso_trg.cls
++++ b/ibs/th/str/tso_trg.cls
+@@ -18,6 +18,8 @@ class ibs.th.str.tso_trg:
+     Purpose:
+     Notes:
+    ------------------------------------------------------------------------------*/
++/*статусы в которых трк заняты*/
++   &scop StatTrkIswork "A,I,T"
+    define variable parparentproc as handle no-undo.
+    define variable SilentMode    as logical no-undo.
+    
+@@ -476,6 +478,7 @@ class ibs.th.str.tso_trg:
+                                       and tt-tso.tso-num  eq tt-tso-socet.tso-num
+                   no-lock.
+                   tt-tso.FiscalStatus = "НЕ ОТВЕЧАЕТ" .
++                  tt-tso.TRkBusy      = false.
+                   run getResponceMemptr in tt-tso-socet.tso-socet (output vResult).
+                   if     vResult ne ?
+                   then do:
+@@ -486,6 +489,12 @@ class ibs.th.str.tso_trg:
+                      if error-status:error
+                      then
+                         tt-tso.FiscalStatus = "Плохой ответ" .
++                     else
++                        if     tt-tso.ShiftState eq mShiftState:stopped:nameprop
++                           and tt-tso.TRkBusy
++                        then
++                           tt-tso.ShiftState = mShiftState:StopWorkProc:nameprop.
++            
+                      putLog(substitute ("Статус ТСО/заправщике &4 &1: &2 &3 &5",tt-tso.tso-addr,tt-tso.FiscalStatus,tt-tso.PosStatus,tt-tso.tso-num, tt-tso.ShiftState)).
+                   end.
+                   else do:
+@@ -615,6 +624,12 @@ class ibs.th.str.tso_trg:
+                  and available tt-pump
+          then
+             tt-pump.numTr = integer(hText:node-value) no-error .
++         else if     hNoderef:name = "shift_busy"
++                 and can-do({&StatTrkIswork},hText:node-value)
++         then do:
++            tt-tso.TRkBusy = yes.
++         end.
++          
+          GetChildren(hNoderef, (level + 1)).
+       end.
+       delete object hNoderef.
+diff --git a/ref/tso-tt.i b/ref/tso-tt.i
+--- a/ref/tso-tt.i
++++ b/ref/tso-tt.i
+@@ -14,6 +14,7 @@
+       field tso-host      as character
+       field tso-port      as integer
+       field Tso-protocol  as character
++      field TRkBusy       as logical
+       
+    index pi as primary unique
+       tso-num obj-code

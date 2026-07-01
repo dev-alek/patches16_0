@@ -1,0 +1,3441 @@
+# HG changeset patch
+# User ARostovtsev
+# Parent  f9660b8ce7fcb226f3c98750701e2306f0aea0c5
+refs #DEVBO-717 Разаработка интерфейса просмотр истории изменени по любой таблице
+Просмотр истории доступен в меню Администратор/Утилиты/Просмотр истории
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-717
+
+diff --git a/cmp/history.txt b/cmp/history.txt
+new file mode 100644
+--- /dev/null
++++ b/cmp/history.txt
+@@ -0,0 +1,10 @@
++// Файл настройки просмотра истории изменений по объектам учета
++// Формат строки: 
++// "<Имя таблицы>" "<Наименование объекта>" "<Процедура просмотра истории по объекту>"
++"utd" "УПД" "ref/cutdhist.w"
++"marking" "Марки" "ref/cmarking.w"
++"order-doc" "Заказы" "ref/cordhist.w"
++"cashbook" "Кассовая книга" "ref/ccbhist.w"
++"code" "Справочники" "ref/ccode.w"
++"goods" "Товары" "ref/cgdshist_.p"
++"trn-doc" "Документы" "str/calldocs_.p"
+diff --git a/cmp/menu.txt b/cmp/menu.txt
+--- a/cmp/menu.txt
++++ b/cmp/menu.txt
+@@ -1,4 +1,4 @@
+-"659"
++"660"
+ "menu-group"
+ "all" "Полное меню"            "Показать полное меню"                           ""            "cmp/btn-all.bmp"                "chk-usr-numa-no"     "int,m__menu-all-exe"
+ "menu-group"
+@@ -605,6 +605,7 @@ m-i "Распределённая проверка остатков по товарам"            "int,m_chk-senreq-exe"                                         "m_chk-senreq"             "m_util-chk"               "chk-db-num-0,chk-user-adm"                                       "global"  ""                                                                               "all,adm"                                  ""  ""
+ m-i "Коррекция при смене версии"                             "int,m_util-version-exe"                                       "m_util-version"           "m_util"                   "chk-user-adm"                                                    "global"  ""                                                                               "all,adm"                                  ""  ""
+ m-i "Функции администратора"                                 "int,m_util-function-exe"                                      "m_util-function"          "m_util"                   "chk-user-adm"                                                    "global"  ""                                                                               "all,adm"                                  ""  ""
+ m-i "Проверки"                                               "int,m_util-check-exe"                                         "m_util-check"             "m_util"                   "chk-user-adm"                                                    "global"  ""                                                                               "all,adm"                                  ""  ""
++m-i "Просмотр истории"                                       "int,m_view-history-exe"                                       "m_util-history"           "m_util"                   "chk-user-adm"                                                    "global"  ""                                                                               "all,adm"                                  ""  ""
+ m-i "Работа с архивами"                                      "int,m_util-archive-exe"                                       "m_util-archive"           "m_util"                   "chk-user-adm"                                                    "global"  ""                                                                               "all,adm"                                  ""  ""
+ m-i "Импорт/Экспорт"                                         "int,m_util-impexp-exe"                                        "m_util-impexp"            "m_util"                   "chk-user-adm"                                                    "global"  ""                                                                               "all,adm"                                  ""  ""
+ s-m "Технологические утилиты"                                "?"                                                            "m_util-techno"            "m_util"                   "chk-user-adm"                                                    "global"  ""                                                                               "all,adm"                                  ""  ""
+diff --git a/gbl/dm-menu.p b/gbl/dm-menu.p
+--- a/gbl/dm-menu.p
++++ b/gbl/dm-menu.p
+@@ -3475,6 +3475,16 @@ procedure m_util-check-exe :
+ 
+ end procedure. /* m_util-check-exe */
+ 
++procedure m_view-history-exe :
++
++  do
++  on error undo, return error return-value
++  :
++    run str/history.w (parparentproc) .
++  end.
++
++end procedure. /* m_util-check-exe */
++
+ procedure m_util-archive-exe :
+ 
+   do
+diff --git a/ref/brwhist.i b/ref/brwhist.i
+--- a/ref/brwhist.i
++++ b/ref/brwhist.i
+@@ -264,10 +264,10 @@ DEFINE VARIABLE mark-num AS CHARACTER FO
+      SIZE 6 BY 1
+      FGCOLOR 4  NO-UNDO.
+ 
+-DEFINE VARIABLE sch-obj-code AS INTEGER FORMAT ">>>>>>9":U INITIAL 0 
++DEFINE VARIABLE sch-obj-code AS CHARACTER FORMAT "X(50)":U 
+      LABEL "коду" 
+      VIEW-AS FILL-IN 
+-     SIZE 8 BY 1 TOOLTIP "Поиск первой записи - <ВВОД>; поиск следующей - <CTRL-J>" NO-UNDO.
++     SIZE 10 BY 1 TOOLTIP "Поиск первой записи - <ВВОД>; поиск следующей - <CTRL-J>" NO-UNDO.
+ 
+ DEFINE VARIABLE sch-corr-date AS DATE FORMAT "99/99/9999":U 
+      LABEL "Дате изменения" 
+@@ -314,6 +314,7 @@ DEFINE BROWSE br-obj-hist
+ &ANALYZE-SUSPEND _UIB-CODE-BLOCK _DISPLAY-FIELDS br-obj-hist Dialog-Frame _FREEFORM
+   QUERY br-obj-hist NO-LOCK DISPLAY
+       mark-string(recid(X_c-obj-hist), v-rid-list) COLUMN-LABEL "*" FORMAT "X(1)":U
++      {&browse-fields}      
+       X_c-obj-hist.corr-date FORMAT "99/99/9999":U COLUMN-LABEL "Дата изм."
+       string(X_c-obj-hist.corr-time, "HH:MM:SS":U) COLUMN-LABEL "Время изм." FORMAT "X(8)":U
+       usrfulnf(X_c-obj-hist.corr-user-name) COLUMn-LABEL {&label-user} FORMAT "X(255)":U width 18
+@@ -322,8 +323,8 @@ DEFINE BROWSE br-obj-hist
+       &if defined (objhead) ne 0 &then
+       X_c-obj-hist.is-news FORMAT "+/":U COLUMN-LABEL "Прием.!нов."
+       
+-      get-source-type(X_c-obj-hist.source-type) COLUMN-LABEL "Источн.!измен."
+-      X_c-obj-hist.source-ref FORMAT "X(20)":U COLUMN-LABEL "Ссылка на!источник." WIDTH 10
++      get-source-type(X_c-obj-hist.source-type) COLUMN-LABEL "Источн.!измен." WIDTH 7
++      X_c-obj-hist.source-ref FORMAT "X(20)":U COLUMN-LABEL "Ссылка на!источник." WIDTH 9
+        get-subject(X_c-obj-hist.subject) COLUMN-LABEL {&label-subject} FORMAT "X(35)":U WIDTH 15
+       &endif
+   ENABLE
+@@ -348,7 +349,7 @@ DEFINE FRAME Dialog-Frame
+      br-obj-hist AT ROW 2 COL 1
+      sch-db-num AT ROW 13.63 COL 60.13 COLON-ALIGNED
+      sch-corr-date AT ROW 13.63 COL 85.75 COLON-ALIGNED
+-     sch-obj-code AT ROW 13.67 COL 48.13 COLON-ALIGNED
++     sch-obj-code AT ROW 13.67 COL 45.13 COLON-ALIGNED
+      sch-corr-user-name AT ROW 13.71 COL 22.5 COLON-ALIGNED
+      BR-changes AT ROW 14.79 COL 1
+      mark-num AT ROW 1 COL 12.5 COLON-ALIGNED NO-LABEL
+@@ -481,8 +482,13 @@ END.
+ &ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL b-nextlavel Dialog-Frame
+ ON CHOOSE OF b-nextlevel IN FRAME Dialog-Frame /* * */
+ DO:
++   define variable vRun as character no-undo.
++   vRun = this-procedure:file-name.
++   &if defined(proc_nextlevel) &then
++   vRun = "{&proc_nextlevel}".    
++   &endif
+    
+-   run value(this-procedure:file-name)
++   run value(vRun)
+       (
+        &if defined(param_1) &then {&param_1}, &endif
+        &if defined(param_2) &then {&param_2}, &endif
+@@ -500,7 +506,7 @@ DO:
+        p-curr-obj-code,
+        bttns,
+       /*кнопки для нажатия*/
+-       p-mode,
++       "one",
+        p-corr-user-db-num,
+        p-corr-user-name,
+        p-subject,
+@@ -1066,15 +1072,31 @@ end case.
+ &glob flt-open-waitfram yes
+ 
+ define variable l-open-query as logical   no-undo .
+-if not local-open-br( p-open-query      ,
+-                      p-find-next         ,
+-                      p-find-condition )
+-then do:
+-    { gbl/fltopend.i
+-          &where-cond = " TRUE "
++
++/*run gbl/inidebug.p.*/
++if p-mode = {&all} then
++do:
++      assign
++      filter-point = filter-point0 + p-mode
++      filter-label = substitute("&1", filter-label0)
++      .
++  { gbl/fltopend.i
++       &where-cond = " TRUE "
++       &by         = " BY X_c-obj-hist.corr-date DESC BY X_c-obj-hist.corr-time DESC {&by-sort} "
++       &use-ind    = " BY X_c-obj-hist.corr-date DESC BY X_c-obj-hist.corr-time DESC {&by-sort} " 
++  }
++end.
++else do:
++  if not local-open-br( p-open-query      ,
++                        p-find-next         ,
++                       p-find-condition )
++  then do:
++      { gbl/fltopend.i
++            &where-cond = " TRUE "
++            
++            &by         = "  " }
+           
+-          &by         = "  " }
+-          
++  end.
+ end.
+ /*
+ CASE p-db-num:
+diff --git a/ref/ccbhist.w b/ref/ccbhist.w
+--- a/ref/ccbhist.w
++++ b/ref/ccbhist.w
+@@ -1,8 +1,13 @@
+ define input  parameter pid as int64 no-undo.
+ define variable vlable as character no-undo.
+ {ref/brwhist.i &Paramonly = yes &buf_obj-hist = c-cashbook-head}
+-vlable = if p-mode eq "one"  then "История по кассовой книге " + string(pid) else "История по кассовых книг". 
+-{ref/brwhist.i &buf_obj-hist = c-cashbook-head &objhead = yes &lable = vlable}
++vlable = if p-mode eq "one"  then "История по кассовой книге " + string(pid) else "История по кассовым книгам". 
++{ref/brwhist.i 
++  &buf_obj-hist = c-cashbook-head 
++  &objhead = yes 
++  &lable = vlable
++  &browse-fields="X_c-obj-hist.id COLUMN-LABEL 'Код!КК' FORMAT '>>9':U"
++}
+ 
+ function get-subject returns character
+   ( p-subject as character ) :
+diff --git a/ref/cgdshist.w b/ref/cgdshist.w
+--- a/ref/cgdshist.w
++++ b/ref/cgdshist.w
+@@ -259,17 +259,17 @@ DEFINE VARIABLE sch-corr-date AS DATE FO
+ DEFINE VARIABLE sch-corr-user-name AS CHARACTER FORMAT "X(9)":U 
+      LABEL "пользователю" 
+      VIEW-AS FILL-IN 
+-     SIZE 12 BY 1 TOOLTIP "Поиск первой записи - <ВВОД>; поиск следующей - <CTRL-J>" NO-UNDO.
++     SIZE 9 BY 1 TOOLTIP "Поиск первой записи - <ВВОД>; поиск следующей - <CTRL-J>" NO-UNDO.
+ 
+ DEFINE VARIABLE sch-db-num AS INTEGER FORMAT ">>>>>>9":U INITIAL 0 
+      LABEL "БД" 
+      VIEW-AS FILL-IN 
+      SIZE 8 BY 1 TOOLTIP "Поиск первой записи - <ВВОД>; поиск следующей - <CTRL-J>" NO-UNDO.
+ 
+-DEFINE VARIABLE sch-gds-code AS INTEGER FORMAT ">>>>>>9":U INITIAL 0 
++DEFINE VARIABLE sch-gds-code AS INTEGER FORMAT ">>>>>>>>>9":U INITIAL 0 
+      LABEL "коду товара" 
+      VIEW-AS FILL-IN 
+-     SIZE 8 BY 1 TOOLTIP "Поиск первой записи - <ВВОД>; поиск следующей - <CTRL-J>" NO-UNDO.
++     SIZE 11 BY 1 TOOLTIP "Поиск первой записи - <ВВОД>; поиск следующей - <CTRL-J>" NO-UNDO.
+ 
+ DEFINE VARIABLE v-corr-user-db-num AS INTEGER FORMAT ">>>>9":U INITIAL 0 
+      LABEL "по БД" 
+@@ -300,7 +300,7 @@ DEFINE BROWSE BR-gds-hist
+ &ANALYZE-SUSPEND _UIB-CODE-BLOCK _DISPLAY-FIELDS BR-gds-hist Dialog-Frame _FREEFORM
+   QUERY BR-gds-hist NO-LOCK DISPLAY
+       mark-string(recid(X_c-gds-hist), v-rid-list) COLUMN-LABEL "*" FORMAT "X(1)":U
+-  X_c-gds-hist.gds-code FORMAT "999999999":U
++  X_c-gds-hist.gds-code FORMAT "9999999999":U
+   X_c-gds-hist.corr-date FORMAT "99/99/9999":U
+   string(X_c-gds-hist.corr-time, "HH:MM:SS":U) COLUMN-LABEL "Время изм." FORMAT "X(8)":U
+   {&sort-clmn_2} column-label {&label-clmn_2} FORMAT "X(8)":U
+@@ -337,7 +337,7 @@ DEFINE FRAME Dialog-Frame
+      BR-gds-hist AT ROW 2 COL 1
+      sch-db-num AT ROW 13.63 COL 60.13 COLON-ALIGNED
+      sch-corr-date AT ROW 13.63 COL 85.75 COLON-ALIGNED
+-     sch-gds-code AT ROW 13.67 COL 48.13 COLON-ALIGNED
++     sch-gds-code AT ROW 13.67 COL 44.75 COLON-ALIGNED
+      sch-corr-user-name AT ROW 13.71 COL 22.5 COLON-ALIGNED
+      BR-changes AT ROW 14.79 COL 1
+      mark-num AT ROW 1 COL 12.5 COLON-ALIGNED NO-LABEL
+@@ -442,17 +442,20 @@ END.
+ ON CHOOSE OF B-gds-obj IN FRAME Dialog-Frame /* Остатки */
+ DO:
+ 
++  if avail X_c-gds-hist or p-gds-code <> ? then
++  do:
+   run ref/cgdsobj.w
+     (
+      input parparentproc
+     ,input p-curr-obj-type
+     ,input p-curr-obj-code
+-    ,input p-gds-code
++    ,input if p-gds-code <> ? then p-gds-code else X_c-gds-hist.gds-code 
+     ) no-error.
+   if error-status :error
+   then do:
+     return no-apply.
+   end.
++  end.
+ 
+ END.
+ 
+@@ -831,9 +834,10 @@ end.
+   if p-mode <> {&all} then do:
+     assign
+     v-find = yes.
+-    end.
+-    else do:
++  end.
++  else do:
+     assign
++    v-find = yes
+     v-gds-name = get-good(p-gds-code, output v-artic, output v-prod-type, output v-prod-code)
+     .
+   end.
+@@ -1043,7 +1047,7 @@ CASE p-db-num :
+       { gbl/fltopend.i
+           &where-cond = " TRUE "
+           &use-ind    = " use-index idate  "
+-          &by         = "  " }
++          &by         = " BY X_c-gds-hist.corr-date DESC BY X_c-gds-hist.corr-time DESC " }
+       END.
+       WHEN {&company} THEN DO:
+ 
+@@ -1139,7 +1143,7 @@ CASE p-db-num :
+       { gbl/fltopend.i
+           &where-cond = " TRUE "
+           &use-ind    = "  use-index ishow "
+-          &by         = "  " }
++          &by         = " BY X_c-gds-hist.corr-date DESC BY X_c-gds-hist.corr-time DESC " }
+       END.
+       WHEN {&company} THEN DO:
+         assign
+diff --git a/ref/cgdshist_.p b/ref/cgdshist_.p
+new file mode 100644
+--- /dev/null
++++ b/ref/cgdshist_.p
+@@ -0,0 +1,25 @@
++&glob param_1 iGdsCode
++define input  parameter {&Param_1} like ub.goods.gds-code no-undo.
++
++{ gbl/objsrv.i }
++
++&glob buf_obj-hist c-gds-hist
++&Glob VisibleKeyField yes
++{ref/brwhist.i &Paramonly = yes}
++
++run ref/cgdshist.w (
++      input parParentProc
++    , input p-curr-host-code
++    , input p-curr-obj-type
++    , input p-curr-obj-code
++    , input bttns
++    , input p-mode
++    , input iGdsCode
++    , input ?
++    , input ?
++    , input ?
++    , input p-corr-user-db-num
++    , input p-corr-user-name
++    , input p-subject
++    , input p-db-num
++    , input-output p-rid-list  ) no-error .
+\ No newline at end of file
+diff --git a/ref/cmarking.i b/ref/cmarking.i
+new file mode 100644
+--- /dev/null
++++ b/ref/cmarking.i
+@@ -0,0 +1,156 @@
++function getStsName returns character (iSts as int ):
++  define variable thMarkSts  as class ibs.th.str.marking.sts.mark no-undo.
++  thMarkSts = ObjSrv:Env:Marking:Sts:Mark.
++
++  return thMarkSts:GetLabel(iSts).
++end.
++
++function getOnlineResultName returns character (iOnlineResult as int ):
++  define variable vNames as character no-undo
++    init "Запрет продажи,Продажа разрешена,Необходимо проверить сроки годности".   
++  return if iOnlineResult = ? then "null" else entry(iOnlineResult + 1, vNames).
++end.
++
++function formatLogicalValue returns character (iValue as character ):
++  return if iValue = "" then ? else string(logical(iValue),"Да/Нет").
++end.
++
++function formatValue returns character (iValue as character ):
++  define variable vLog as logical no-undo. 
++  define variable vDec as decimal no-undo.
++  define variable vChr as character no-undo.
++  
++  vChr = iValue.
++  
++  if iValue <> "" then do:
++      vLog = logical(iValue) no-error.
++      if vLog <> ? then vChr = string(vLog,"Да/Нет").
++      else do:
++         vDec = decimal(iValue) no-error.
++         if vDec <> ? then vChr = string(vDec).          
++      end.   
++  end.    
++  return vChr.
++end.
++
++function getAttributeName returns character (iCode as character ):
++  return 
++    if iCode = "notOnlineCheck" 
++      then "Игнорировать результат online-проверки"
++      else if iCode = "weight" then "Вес"
++      else "Значение атрибута " + iCode. 
++end.
++
++&glob tt_name temp-changes
++procedure ParentPars:
++   define input  parameter iOldBuf as handle no-undo.
++   define input  parameter iCurBuf as handle no-undo.
++end.
++
++function get-subject returns character
++  ( p-subject as character ) :
++  
++  return if p-subject = "marking" then "Марка" else "Атрибут марки".
++
++end function.
++ 
++procedure local-view-cange:
++  define output parameter odescription as character no-undo.
++  
++  define buffer current_c-marking for ub.c-marking  .
++  define variable v-mess as character no-undo.
++
++  &if defined(head) &then
++   if X_c-obj-hist.subject <> "marking"
++   then
++      run getMarkingAttr (output odescription).
++   else
++  &endif
++      run getMarking (output odescription).
++end procedure.
++
++procedure getMarking:
++  define output parameter p-description as character no-undo .
++
++  define buffer current_c-marking for ub.c-marking.
++  define variable v-mess as character no-undo.
++  
++  do
++  on error undo, return error return-value
++  :
++    find first current_c-marking no-lock where
++               current_c-marking.mark = X_c-obj-hist.mark
++           and current_c-marking.chip-num = X_c-obj-hist.chip-num
++           and current_c-marking.corr-user-db-num = X_c-obj-hist.corr-user-db-num no-error .
++    if not avail current_c-marking then do:
++        v-mess = "Неверная ссылка на марку в таблице c-marking".
++        return error  v-mess .
++    end.
++    &scop fields-name-list "sts,last-change,online-result"
++    define variable v-label-param as character no-undo .
++    v-label-param =
++          "sts"   + {&delim-par} + "Статус" + {&delim-par} + "getStsName" + {&delim-flf}
++        + "last-change" + {&delim-par} + "Изменен" + {&delim-par} + "" + {&delim-flf}
++        + "online-result" + {&delim-par} + "Результат ГИС МТ" + {&delim-par} + "getOnlineResultName".
++    run proc-full-temp-changes in this-procedure (
++                                                 input current_c-marking.action = integer({&hn-create})
++                                                ,input current_c-marking.action = integer({&hn-delete})
++                                                ,input  buffer current_c-marking:handle
++                                                ,input  "marking"
++                                                ,input  {&fields-name-list}
++                                                ,input  v-label-param).
++  end.
++end procedure. /* getMarking */
++
++procedure getMarkingAttr:
++  define output parameter p-description as character no-undo .
++
++  define buffer current_c-marking for ub.c-marking-attr.
++  define variable v-mess as character no-undo.
++  
++  do
++  on error undo, return error return-value
++  :
++    find first current_c-marking no-lock where
++               current_c-marking.mark = X_c-obj-hist.mark
++           and current_c-marking.chip-num = X_c-obj-hist.chip-num
++           and current_c-marking.corr-user-db-num = X_c-obj-hist.corr-user-db-num no-error .
++    if not avail current_c-marking then do:
++        v-mess = "Неверная ссылка на марку в таблице c-marking".
++        return error  v-mess .
++    end.
++    &scop fields-name-list "attr-value"
++    define variable v-label-param as character no-undo .
++    v-label-param =
++          "attr-value"   + {&delim-par} + getAttributeName(current_c-marking.attr-code) + {&delim-par} 
++          + (if current_c-marking.attr-code = "notOnlineCheck" then "formatLogicalValue" else "formatValue").
++    run proc-full-temp-changes in this-procedure (
++                                                 input current_c-marking.action = integer({&hn-create})
++                                                ,input current_c-marking.action = integer({&hn-delete})
++                                                ,input  buffer current_c-marking:handle
++                                                ,input  "marking-attr"
++                                                ,input  {&fields-name-list}
++                                                ,input  v-label-param).
++  end.
++end procedure. /* getMarkingAttr */
++
++PROCEDURE proc-find-obj-code :
++/*------------------------------------------------------------------------------
++  Purpose:
++  Parameters:  <none>
++  Notes:
++------------------------------------------------------------------------------*/
++define input parameter p-next as logical no-undo.
++define input parameter p-obj-code as character no-undo.
++
++if p-obj-code = "" then return .
++
++run OpenBr in this-procedure
++    (input false /* p-open-query */
++    ,input true  /* p-find-next  */
++    ,input substitute("and X_c-obj-hist.mark begins '&1' "
++      , p-obj-code)
++    ,input v-corr-user-db-num
++    ).
++apply "entry":u to sch-obj-code in frame Dialog-Frame.
++END PROCEDURE.
+diff --git a/ref/cmarking.w b/ref/cmarking.w
+--- a/ref/cmarking.w
++++ b/ref/cmarking.w
+@@ -3,194 +3,46 @@ define input  parameter {&Param_1} as ch
+ 
+ { gbl/objsrv.i }
+ 
+-define temp-table c-marking-hist no-undo like c-marking-attr
+-  field subject as character
+-  field is-news as logical
+-  field source-type as character
+-  field source-ref as character
+-.
++define variable vLabel as character no-undo.
+ 
+-function fLabel returns character forward.
+-
+-&glob buf_obj-hist c-marking-hist
++&glob buf_obj-hist c-marking
+ &Glob VisibleKeyField yes
+ &glob myChangeAdd ParentPars
+-{ref/brwhist.i &lable = fLabel() &objtt=yes &objhead = yes}
+-
+-function getStsName returns character (iSts as int ):
+-  define variable thMarkSts  as class ibs.th.str.marking.sts.mark no-undo.
+-  thMarkSts = ObjSrv:Env:Marking:Sts:Mark.
+-
+-  return thMarkSts:GetLabel(iSts).
+-end.
+-
+-function getOnlineResultName returns character (iOnlineResult as int ):
+-  define variable vNames as character no-undo
+-    init "Запрет продажи,Продажа разрешена,Необходимо проверить сроки годности".   
+-  return if iOnlineResult = ? then "null" else entry(iOnlineResult + 1, vNames).
+-end.
+-
+-function formatLogicalValue returns character (iValue as character ):
+-  return if iValue = "" then ? else string(logical(iValue),"Да/Нет").
++{ref/brwhist.i &Paramonly = yes}
++if p-mode <> "one" then
++do:
++  vLabel = "История по Маркам".
++  {ref/brwhist.i 
++    &lable        = vLabel
++    &by-sort      = "BY X_c-obj-hist.mark"
++    &browse-fields= "X_c-obj-hist.mark COLUMN-LABEL 'Марка' FORMAT 'X(50)':U WIDTH 35 
++                     X_c-obj-hist.gds-code COLUMN-LABEL 'Код товара' FORMAT '>>>>>>>>9':U"  }
+ end.
+-
+-function formatValue returns character (iValue as character ):
+-  define variable vLog as logical no-undo. 
+-  define variable vDec as decimal no-undo.
+-  define variable vChr as character no-undo.
+-  
+-  vChr = iValue.
+-  
+-  if iValue <> "" then do:
+-      vLog = logical(iValue) no-error.
+-      if vLog <> ? then vChr = string(vLog,"Да/Нет").
+-      else do:
+-         vDec = decimal(iValue) no-error.
+-         if vDec <> ? then vChr = string(vDec).          
+-      end.   
+-  end.    
+-  return vChr.
+-end.
+-
+-function getAttributeName returns character (iCode as character ):
+-  return 
+-    if iCode = "notOnlineCheck" 
+-      then "Игнорировать результат online-проверки"
+-      else if iCode = "weight" then "Вес"
+-      else "Значение атрибута " + iCode. 
+-end.
+-
+-&glob tt_name temp-changes
+-procedure ParentPars:
+-   define input  parameter iOldBuf as handle no-undo.
+-   define input  parameter iCurBuf as handle no-undo.
+-end.
+-function fLabel returns character :
+-   return "История изменений по марке " + iMark.
++else do:
++  run ref/cmarkingone.w(
++    {&param_1},
++    parParentProc,
++    p-curr-host-code,
++    p-curr-obj-type,
++    p-curr-obj-code,
++    bttns,
++    p-mode,
++    p-corr-user-db-num,
++    p-corr-user-name,
++    p-subject,
++    p-db-num,
++    p-chip-num,
++    input-output p-rid-list
++  ).
+ end.
+ 
+-function get-subject returns character
+-  ( p-subject as character ) :
+-  
+-  return if p-subject = "marking" then "Марка" else "Атрибут марки".
+-
+-end function.
+- 
+-procedure local-view-cange:
+-  define output parameter odescription as character no-undo.
+-  
+-  define buffer current_c-marking for ub.c-marking  .
+-  define variable v-mess as character no-undo.
+-
+-   if X_c-obj-hist.subject eq "marking"
+-   then
+-      run getMarking (output odescription).
+-   else
+-      run getMarkingAttr (output odescription).
+-end procedure.
+-
+-procedure getMarking:
+-  define output parameter p-description as character no-undo .
+-
+-  define buffer current_c-marking for ub.c-marking.
+-  define variable v-mess as character no-undo.
+-  
+-  do
+-  on error undo, return error return-value
+-  :
+-    find first current_c-marking no-lock where
+-               current_c-marking.mark = X_c-obj-hist.mark
+-           and current_c-marking.chip-num = X_c-obj-hist.chip-num
+-           and current_c-marking.corr-user-db-num = X_c-obj-hist.corr-user-db-num no-error .
+-    if not avail current_c-marking then do:
+-        v-mess = "Неверная ссылка на марку в таблице c-marking".
+-        return error  v-mess .
+-    end.
+-    &scop fields-name-list "sts,last-change,online-result"
+-    define variable v-label-param as character no-undo .
+-    v-label-param =
+-          "sts"   + {&delim-par} + "Статус" + {&delim-par} + "getStsName" + {&delim-flf}
+-        + "last-change" + {&delim-par} + "Изменен" + {&delim-par} + "" + {&delim-flf}
+-        + "online-result" + {&delim-par} + "Результат ГИС МТ" + {&delim-par} + "getOnlineResultName".
+-    run proc-full-temp-changes in this-procedure (
+-                                                 input current_c-marking.action = integer({&hn-create})
+-                                                ,input current_c-marking.action = integer({&hn-delete})
+-                                                ,input  buffer current_c-marking:handle
+-                                                ,input  "marking"
+-                                                ,input  {&fields-name-list}
+-                                                ,input  v-label-param).
+-  end.
+-end procedure. /* getMarking */
+-
+-procedure getMarkingAttr:
+-  define output parameter p-description as character no-undo .
+-
+-  define buffer current_c-marking for ub.c-marking-attr.
+-  define variable v-mess as character no-undo.
+-  
+-  do
+-  on error undo, return error return-value
+-  :
+-    find first current_c-marking no-lock where
+-               current_c-marking.mark = X_c-obj-hist.mark
+-           and current_c-marking.chip-num = X_c-obj-hist.chip-num
+-           and current_c-marking.corr-user-db-num = X_c-obj-hist.corr-user-db-num no-error .
+-    if not avail current_c-marking then do:
+-        v-mess = "Неверная ссылка на марку в таблице c-marking".
+-        return error  v-mess .
+-    end.
+-    &scop fields-name-list "attr-value"
+-    define variable v-label-param as character no-undo .
+-    v-label-param =
+-          "attr-value"   + {&delim-par} + getAttributeName(current_c-marking.attr-code) + {&delim-par} 
+-          + (if current_c-marking.attr-code = "notOnlineCheck" then "formatLogicalValue" else "formatValue").
+-    run proc-full-temp-changes in this-procedure (
+-                                                 input current_c-marking.action = integer({&hn-create})
+-                                                ,input current_c-marking.action = integer({&hn-delete})
+-                                                ,input  buffer current_c-marking:handle
+-                                                ,input  "marking-attr"
+-                                                ,input  {&fields-name-list}
+-                                                ,input  v-label-param).
+-  end.
+-end procedure. /* getMarkingAttr */
++{ref/cmarking.i}
+ 
+ function local-open-br returns logical ( 
+   p-open-query     as logical    ,
+-  p-find-next       as logical    ,
++  p-find-next      as logical    ,
+   p-find-condition as character 
+ ):
+-  define variable sort-column-phrase as character no-undo .
+-  define variable l-query-was-opened as logical no-undo .
+-  
+-  for each X_c-obj-hist :
+-    delete X_c-obj-hist.
+-  end.
+-  if p-mode eq "one"
+-  then do:
+-    &glob addTable marking
+-    for each c-{&addTable} where c-{&addTable}.mark               eq iMark
+-    no-lock:
+-       create X_c-obj-hist.
+-       buffer-copy c-{&addTable} to X_c-obj-hist
+-       assign 
+-          X_c-obj-hist.subject = "{&addTable}"
+-       .
+-    end.
+-    &glob addTable marking-attr
+-    for each c-{&addTable} where c-{&addTable}.mark               eq iMark
+-    no-lock:
+-       create X_c-obj-hist.
+-       buffer-copy c-{&addTable} to X_c-obj-hist
+-       assign 
+-          X_c-obj-hist.subject = "{&addTable}"
+-       .
+-    end.
+-  end.
+-  {gbl/fltopend.i
+-    &where-cond = " TRUE "
+-    &by         = " by X_c-obj-hist.corr-date desc by X_c-obj-hist.corr-time desc  " 
+-  }
+   return true.
+ end.
+ 
+-
+diff --git a/ref/cmarkingone.w b/ref/cmarkingone.w
+new file mode 100644
+--- /dev/null
++++ b/ref/cmarkingone.w
+@@ -0,0 +1,60 @@
++&glob param_1 iMark
++define input  parameter {&Param_1} as character no-undo.
++
++{ gbl/objsrv.i }
++
++define temp-table c-marking-hist no-undo like c-marking-attr
++  field subject as character
++  field is-news as logical
++  field source-type as character
++  field source-ref as character
++.
++
++define variable vLabel as character no-undo.
++
++&glob buf_obj-hist c-marking-hist
++&Glob VisibleKeyField yes
++&glob myChangeAdd ParentPars
++vLabel = "История изменений по марке " + iMark.
++{ref/brwhist.i &lable = vLabel &objtt=yes &objhead = yes}
++
++{ref/cmarking.i &head=yes}
++
++function local-open-br returns logical ( 
++  p-open-query     as logical    ,
++  p-find-next       as logical    ,
++  p-find-condition as character 
++):
++  define variable sort-column-phrase as character no-undo .
++  define variable l-query-was-opened as logical no-undo .
++  
++  for each X_c-obj-hist :
++    delete X_c-obj-hist.
++  end.
++  if p-mode eq "one"
++  then do:
++    &glob addTable marking
++    for each c-{&addTable} where c-{&addTable}.mark               eq iMark
++    no-lock:
++       create X_c-obj-hist.
++       buffer-copy c-{&addTable} to X_c-obj-hist
++       assign 
++          X_c-obj-hist.subject = "{&addTable}"
++       .
++    end.
++    &glob addTable marking-attr
++    for each c-{&addTable} where c-{&addTable}.mark               eq iMark
++    no-lock:
++       create X_c-obj-hist.
++       buffer-copy c-{&addTable} to X_c-obj-hist
++       assign 
++          X_c-obj-hist.subject = "{&addTable}"
++       .
++    end.
++  end.
++  {gbl/fltopend.i
++    &where-cond = " TRUE "
++    &by         = " by X_c-obj-hist.corr-date desc by X_c-obj-hist.corr-time desc  " 
++  }
++  return true.
++end.
+diff --git a/ref/cord_table-proc.i b/ref/cord_table-proc.i
+--- a/ref/cord_table-proc.i
++++ b/ref/cord_table-proc.i
+@@ -39,10 +39,7 @@ Creation date: 16/04/2025
+   on error undo, return error return-value
+   :
+     find first buf_c-{&table} no-lock where
+-               buf_c-{&table}.db-num           = X_c-obj-hist.db-num
+-           and buf_c-{&table}.doc-code         = X_c-obj-hist.doc-code
+-           {&and}
+-           and buf_c-{&table}.corr-user-db-num = X_c-obj-hist.corr-user-db-num
++               buf_c-{&table}.corr-user-db-num = X_c-obj-hist.corr-user-db-num
+            and buf_c-{&table}.chip-num         = X_c-obj-hist.chip-num no-error.
+     if not avail buf_c-{&table} then 
+     do:
+diff --git a/ref/cordhist.i b/ref/cordhist.i
+new file mode 100644
+--- /dev/null
++++ b/ref/cordhist.i
+@@ -0,0 +1,163 @@
++function fLabel returns character :
++   return if p-mode eq "one"  then "История по Заказу " + string({&Param_2}) + " по ДБ " + string({&Param_1}) else "История по Заказам".
++end.
++
++{str/utd-err.i}
++function get-subject returns character
++  ( p-subject as character ) :
++/*------------------------------------------------------------------------------
++  Purpose:
++    Notes:
++------------------------------------------------------------------------------*/
++&scop hn-obj-hist-code p-subject
++  return p-subject.   /* Function return value. */
++
++end function.
++ 
++procedure local-view-cange:
++   define output parameter oDescription as character no-undo.
++   if X_c-obj-hist.subject eq "order-doc"
++   then
++      run order-doc-proc in this-procedure no-error.
++   else if X_c-obj-hist.subject eq "order-doc-attr"
++   then
++      run order-doc-attr-proc in this-procedure no-error.
++   else if X_c-obj-hist.subject eq "order-line"
++   then
++      run order-line-proc in this-procedure no-error.
++   else if X_c-obj-hist.subject eq "order-line-attr"
++   then
++      run order-line-attr-proc in this-procedure no-error.
++   if error-status:error then
++     message return-value view-as alert-box.
++   
++end procedure.
++  
++function local-open-br returns logical 
++(  p-open-query     as logical    ,
++  p-find-next       as logical    ,
++  p-find-condition as character ):
++     define variable sort-column-phrase as character no-undo .
++     define variable l-query-was-opened as logical no-undo .
++     
++   for each X_c-obj-hist :
++      delete X_c-obj-hist.
++   end.
++   if p-mode eq "one"
++   then do:
++      if p-chip-num eq ?
++      then do:
++         for each {&buf_obj-hist} where {&buf_obj-hist}.db-num   = {&Param_1}  
++                                    and {&buf_obj-hist}.doc-code = {&Param_2}
++                                    and {&buf_obj-hist}.corr-user-db-num = v-corr-user-db-num
++         no-lock:
++            create X_c-obj-hist.
++            buffer-copy {&buf_obj-hist} to X_c-obj-hist.
++            if {&buf_obj-hist}.subject <> "order-doc" and 
++               {&buf_obj-hist}.subject <> "*" then
++            do:
++              run getRecordsByChipNum in this-procedure ((buffer X_c-obj-hist:handle), {&buf_obj-hist}.subject).
++            end.
++         end.
++      end.
++      else do:
++         for each {&buf_obj-hist} where 
++                  {&buf_obj-hist}.db-num           = {&Param_1}  
++              and {&buf_obj-hist}.doc-code         = {&Param_2}
++              and {&buf_obj-hist}.corr-user-db-num = v-corr-user-db-num
++              and {&buf_obj-hist}.chip-num         = p-chip-num  
++             no-lock:
++           run getRecordsByChipNum in this-procedure (?, "order-doc").
++           run getRecordsByChipNum in this-procedure (?, "order-doc-attr").
++           run getRecordsByChipNum in this-procedure (?, "order-line").
++           run getRecordsByChipNum in this-procedure (?, "order-line-attr").
++         end.
++      end.
++   end.
++   
++     
++{ gbl/fltopend.i
++          &where-cond = " TRUE "
++          &by         = " by X_c-obj-hist.chip-num  " }
++  
++  return true.
++end.
++
++procedure getRecordsByChipNum:
++  define input parameter iXObjHist as handle no-undo. /* X_c-obj-hist */
++  define input parameter iTable as character no-undo.
++  
++  define variable vXObjHist   as handle    no-undo.  
++  define variable vHistTable  as character no-undo.  
++  define variable vQuery      as handle    no-undo.
++  define variable vEachWhere  as character no-undo .
++  define variable vBufSubj    as handle    no-undo.
++    
++  vHistTable = substitute("c-&1",iTable).
++  CREATE BUFFER vBufSubj FOR TABLE vHistTable.
++  vEachWhere  = substitute(
++    "for each &1 where &1.db-num = &2 and &1.doc-code = &3 and &1.corr-user-db-num = &4 and &1.chip-num = &5"
++    ,vHistTable
++    ,{&buf_obj-hist}.db-num
++    ,{&buf_obj-hist}.doc-code
++    ,{&buf_obj-hist}.corr-user-db-num
++    ,{&buf_obj-hist}.chip-num)
++  .
++/*run gbl/inidebug.p.*/
++  create query vQuery.
++  vQuery:set-buffers(vBufSubj).
++  vQuery:query-prepare(vEachWhere).
++  vQuery:query-open.
++
++  vQuery:get-first(no-lock).
++  do while not vQuery:query-off-end:
++    if iXObjHist = ? then do:
++      create buffer vXObjHist for table "X_c-obj-hist".  
++      vXObjHist:buffer-copy(buffer {&buf_obj-hist}:handle).
++    end.
++    else vXObjHist = iXObjHist.
++    vXObjHist:buffer-copy(vQuery:get-buffer-handle()).
++    vXObjHist:buffer-field("subject"):buffer-value = iTable.
++    vQuery:get-next(no-lock).
++  end.
++  vQuery:QUERY-CLOSE(). 
++  DELETE OBJECT vQuery.
++end procedure.
++
++procedure order-doc-proc :
++  &glob table order-doc
++  { ref/cord_table-proc.i &exclude="" &method="sts,getStsOrder" &label=""}
++end procedure.
++
++procedure order-doc-attr-proc :
++  &glob table order-doc-attr
++  {ref/cord_table-proc.i
++    &exclude="db-num,doc-code"
++    &label=""
++    &method=""
++  }
++end.
++
++procedure order-line-proc :
++  &glob table order-line
++  {ref/cord_table-proc.i
++    &exclude="db-num,doc-code"
++    &label=""
++    &method=""
++  }
++end procedure.
++
++procedure order-line-attr-proc :
++  &glob table order-line-attr
++  {ref/cord_table-proc.i
++    &exclude="db-num,doc-code"
++    &label=""
++    &method=""
++  }
++end.
++
++function  getStsOrder returns character (iSts as int ):
++   
++   return orderStatus:GetLabel(iSts).
++   
++end.
+diff --git a/ref/cordhist.w b/ref/cordhist.w
+--- a/ref/cordhist.w
++++ b/ref/cordhist.w
+@@ -12,6 +12,7 @@
+ Дата создания: 16/04/2025
+ Author: Rostovtsev Aleksandr
+ Creation date: 16/04/2025
++Изменен: 06/05/2026 доработана возможность просмотра истории по всем заказам и по 1-му
+ 
+ */
+ 
+@@ -24,191 +25,42 @@ define variable orderStatus  as class ib
+ orderStatus =  new ibs.th.str.order.sts.order().
+  
+ { gbl/objsrv.i }
+-function fLabel returns character forward.
+ 
++define variable vLabel as character no-undo.
++
++&glob proc_nextlevel ref/cordhistone.w 
+ &glob buf_obj-hist c-order-head
+ &Glob VisibleKeyField yes
+-{ref/brwhist.i 
+-  &buf_obj-hist = c-order-head 
+-  &objhead = yes 
+-  &lable = fLabel() 
+-  &objtt = yes
+-  &addFields = "use-index chip-num use-index corr-user-db-num use-index user-name use-index sub
+-                field line-num like ub.order-line.line-num
+-                field attr-code like ub.order-doc-attr.attr-code
+-                index pi-2 is primary unique
+-                  db-num asc
+-                  doc-code asc 
+-                  line-num asc
+-                  attr-code asc
+-                  corr-user-db-num asc 
+-                  chip-num asc
+-                  subject asc"
+-}
+-
+-function fLabel returns character :
+-   return if p-mode eq "one"  then "История по Заказу " + string({&Param_2}) + " по ДБ " + string({&Param_1}) else "История по УПД".
++{ref/brwhist.i &Paramonly = yes &objhead = yes}
++if p-mode <> "one" then
++do:
++  vLabel = "История по Заказам".
++  {ref/brwhist.i 
++    &objhead = yes 
++    &lable = vLabel
++    &browse-fields="X_c-obj-hist.db-num   COLUMN-LABEL 'БД' WIDTH 4
++                    X_c-obj-hist.doc-code COLUMN-LABEL 'Код заказа'"
++  }
++end.
++else do:
++  run ref/cordhistone.w(
++    {&param_1},
++    {&param_2},
++    parParentProc,
++    p-curr-host-code,
++    p-curr-obj-type,
++    p-curr-obj-code,
++    bttns,
++    p-mode,
++    p-corr-user-db-num,
++    p-corr-user-name,
++    p-subject,
++    p-db-num,
++    p-chip-num,
++    input-output p-rid-list
++  ).
+ end.
+ 
+-{str/utd-err.i}
+-function get-subject returns character
+-  ( p-subject as character ) :
+-/*------------------------------------------------------------------------------
+-  Purpose:
+-    Notes:
+-------------------------------------------------------------------------------*/
+-&scop hn-obj-hist-code p-subject
+-  return p-subject.   /* Function return value. */
+-
+-end function.
+- 
+-procedure local-view-cange:
+-   define output parameter oDescription as character no-undo.
+-   if X_c-obj-hist.subject eq "order-doc"
+-   then
+-      run order-doc-proc in this-procedure no-error.
+-   else if X_c-obj-hist.subject eq "order-doc-attr"
+-   then
+-      run order-doc-attr-proc in this-procedure no-error.
+-   else if X_c-obj-hist.subject eq "order-line"
+-   then
+-      run order-line-proc in this-procedure no-error.
+-   else if X_c-obj-hist.subject eq "order-line-arre"
+-   then
+-      run order-line-attr-proc in this-procedure no-error.
+-   if error-status:error then
+-     message return-value view-as alert-box.
+-   
+-end procedure.
+-  
+-function local-open-br returns logical 
+-(  p-open-query     as logical    ,
+-  p-find-next       as logical    ,
+-  p-find-condition as character ):
+-     define variable sort-column-phrase as character no-undo .
+-     define variable l-query-was-opened as logical no-undo .
+-     
+-   for each X_c-obj-hist :
+-      delete X_c-obj-hist.
+-   end.
+-   if p-mode eq "one"
+-   then do:
+-      if p-chip-num eq ?
+-      then do:
+-         for each {&buf_obj-hist} where {&buf_obj-hist}.db-num   = {&Param_1}  
+-                                    and {&buf_obj-hist}.doc-code = {&Param_2}
+-                                    and {&buf_obj-hist}.corr-user-db-num = v-corr-user-db-num
+-         no-lock:
+-            create X_c-obj-hist.
+-            buffer-copy {&buf_obj-hist} to X_c-obj-hist.
+-            if {&buf_obj-hist}.subject <> "order-doc" and 
+-               {&buf_obj-hist}.subject <> "*" then
+-            do:
+-              run getRecordsByChipNum in this-procedure ((buffer X_c-obj-hist:handle), {&buf_obj-hist}.subject).
+-            end.
+-         end.
+-      end.
+-      else do:
+-         for each {&buf_obj-hist} where 
+-                  {&buf_obj-hist}.db-num           = {&Param_1}  
+-              and {&buf_obj-hist}.doc-code         = {&Param_2}
+-              and {&buf_obj-hist}.corr-user-db-num = v-corr-user-db-num
+-              and {&buf_obj-hist}.chip-num         = p-chip-num  
+-             no-lock:
+-           run getRecordsByChipNum in this-procedure (?, "order-doc").
+-           run getRecordsByChipNum in this-procedure (?, "order-doc-attr").
+-           run getRecordsByChipNum in this-procedure (?, "order-line").
+-           run getRecordsByChipNum in this-procedure (?, "order-line-attr").
+-         end.
+-      end.
+-   end.
+-   
+-     
+-{ gbl/fltopend.i
+-          &where-cond = " TRUE "
+-          &by         = " by X_c-obj-hist.chip-num  " }
+-  
+-  return true.
+-end.
++{ ref/cordhist.i}
+ 
+-procedure getRecordsByChipNum:
+-  define input parameter iXObjHist as handle no-undo. /* X_c-obj-hist */
+-  define input parameter iTable as character no-undo.
+-  
+-  define variable vXObjHist   as handle    no-undo.  
+-  define variable vHistTable  as character no-undo.  
+-  define variable vQuery      as handle    no-undo.
+-  define variable vEachWhere  as character no-undo .
+-  define variable vBufSubj    as handle    no-undo.
+-    
+-  vHistTable = substitute("c-&1",iTable).
+-  CREATE BUFFER vBufSubj FOR TABLE vHistTable.
+-  vEachWhere  = substitute(
+-    "for each &1 where &1.db-num = &2 and &1.doc-code = &3 and &1.corr-user-db-num = &4 and &1.chip-num = &5"
+-    ,vHistTable
+-    ,{&buf_obj-hist}.db-num
+-    ,{&buf_obj-hist}.doc-code
+-    ,{&buf_obj-hist}.corr-user-db-num
+-    ,{&buf_obj-hist}.chip-num)
+-  .
+-/*run gbl/inidebug.p.*/
+-  create query vQuery.
+-  vQuery:set-buffers(vBufSubj).
+-  vQuery:query-prepare(vEachWhere).
+-  vQuery:query-open.
+ 
+-  vQuery:get-first(no-lock).
+-  do while not vQuery:query-off-end:
+-    if iXObjHist = ? then do:
+-      create buffer vXObjHist for table "X_c-obj-hist".  
+-      vXObjHist:buffer-copy(buffer {&buf_obj-hist}:handle).
+-    end.
+-    else vXObjHist = iXObjHist.
+-    vXObjHist:buffer-copy(vQuery:get-buffer-handle()).
+-    vXObjHist:buffer-field("subject"):buffer-value = iTable.
+-    vQuery:get-next(no-lock).
+-  end.
+-  vQuery:QUERY-CLOSE(). 
+-  DELETE OBJECT vQuery.
+-end procedure.
+-
+-procedure order-doc-proc :
+-  &glob table order-doc
+-  { ref/cord_table-proc.i &exclude="" &method="sts,getStsOrder" &label=""}
+-end procedure.
+-
+-procedure order-doc-attr-proc :
+-  &glob table order-doc-attr
+-  {ref/cord_table-proc.i
+-    &and="and buf_c-{&table}.attr-code = X_c-obj-hist.attr-code"
+-    &exclude="db-num,doc-code"
+-    &label=""
+-    &method=""
+-  }
+-end.
+-
+-procedure order-line-proc :
+-  &glob table order-line
+-  {ref/cord_table-proc.i
+-    &and="and buf_c-{&table}.line-num = X_c-obj-hist.line-num"
+-    &exclude="db-num,doc-code"
+-    &label=""
+-    &method=""
+-  }
+-end procedure.
+-
+-procedure order-line-attr-proc :
+-  &glob table order-line-attr
+-  {ref/cord_table-proc.i
+-    &and="and buf_c-{&table}.line-num = X_c-obj-hist.line-num and buf_c-{&table}.attr-code = X_c-obj-hist.attr-code"
+-    &exclude="db-num,doc-code"
+-    &label=""
+-    &method=""
+-  }
+-end.
+-
+-function  getStsOrder returns character (iSts as int ):
+-   
+-   return orderStatus:GetLabel(iSts).
+-   
+-end.
+diff --git a/ref/cordhistone.w b/ref/cordhistone.w
+new file mode 100644
+--- /dev/null
++++ b/ref/cordhistone.w
+@@ -0,0 +1,34 @@
++&glob param_1 p-db-num-order
++define input  parameter {&Param_1} as int64 no-undo.
++&glob param_2 p-doc-code-order
++define input  parameter {&Param_2} as int64 no-undo.
++ 
++define variable orderStatus  as class ibs.th.str.order.sts.order no-undo .
++orderStatus =  new ibs.th.str.order.sts.order().
++ 
++{ gbl/objsrv.i }
++
++define variable vLabel as character no-undo.
++
++&glob proc_nextlevel ref/cordhistone.w 
++&glob buf_obj-hist c-order-head
++&Glob VisibleKeyField yes
++vLabel = "История по Заказу " + string({&Param_2}) + " по ДБ " + string({&Param_1}).
++{ref/brwhist.i 
++  &objhead = yes 
++  &lable = vLabel 
++  &objtt = yes
++  &addFields = "use-index chip-num use-index corr-user-db-num use-index user-name use-index sub
++                field line-num like ub.order-line.line-num
++                field attr-code like ub.order-doc-attr.attr-code
++                index pi-2 is primary unique
++                  db-num asc
++                  doc-code asc 
++                  line-num asc
++                  attr-code asc
++                  corr-user-db-num asc 
++                  chip-num asc
++                  subject asc"
++}
++
++{ ref/cordhist.i}
+diff --git a/ref/cutdhist.i b/ref/cutdhist.i
+new file mode 100644
+--- /dev/null
++++ b/ref/cutdhist.i
+@@ -0,0 +1,608 @@
++{str/utd-err.i}
++function get-subject returns character
++  ( p-subject as character ) :
++/*------------------------------------------------------------------------------
++  Purpose:
++    Notes:
++------------------------------------------------------------------------------*/
++&scop hn-obj-hist-code p-subject
++  return p-subject.   /* Function return value. */
++
++end function.
++ 
++procedure local-view-cange:
++   define output parameter odescription as character no-undo.
++   if X_c-obj-hist.subject eq "utd"
++   then
++      run utd-proc (output odescription).
++   else if X_c-obj-hist.subject eq "utd-err"
++   then
++      run utd-err-proc (output odescription).
++   else if X_c-obj-hist.subject eq "utd-lines"
++   then
++      run utd-lines-proc (output odescription).
++   else if X_c-obj-hist.subject eq "utd-marking-lines"
++   then
++      run utd-marking-lines-proc (output odescription).
++   else if X_c-obj-hist.subject eq "utd-attr"
++   then
++      run utd-attr-proc (output odescription).
++   else if X_c-obj-hist.subject eq "utd-err-attr"
++   then
++      run utd-err-attr-proc (output odescription).
++   else if X_c-obj-hist.subject eq "utd-lines-attr"
++   then
++      run utd-lines-attr-proc (output odescription).
++   else if X_c-obj-hist.subject eq "utd-marking-lines-attr"
++   then
++      run utd-marking-lines-attr-proc (output odescription).
++   
++end procedure.
++  
++function local-open-br returns logical 
++(  p-open-query     as logical    ,
++  p-find-next       as logical    ,
++  p-find-condition as character ):
++     define variable sort-column-phrase as character no-undo .
++     define variable l-query-was-opened as logical no-undo .
++   for each X_c-obj-hist :
++      delete X_c-obj-hist.
++   end.
++   if p-mode eq "one"
++   then do:
++      if p-chip-num eq ?
++      then do:
++         for each {&buf_obj-hist} where {&buf_obj-hist}.DB-NUM = p-DB-NUM-utd  
++                                    and {&buf_obj-hist}.doc-id = p-doc-id-utd
++                                    and {&buf_obj-hist}.corr-user-db-num = v-corr-user-db-num
++         no-lock:
++            create X_c-obj-hist.
++            buffer-copy {&buf_obj-hist} to X_c-obj-hist.
++         end.
++      end.
++      else do:
++         for each {&buf_obj-hist} where {&buf_obj-hist}.corr-user-db-num   eq v-corr-user-db-num
++                                    and {&buf_obj-hist}.chip-num           eq p-chip-num  
++         no-lock:
++            &glob addTable utd-err
++            for each c-{&addTable} where c-{&addTable}.corr-user-db-num   eq v-corr-user-db-num
++                                   and c-{&addTable}.chip-num           eq p-chip-num
++            no-lock:
++               create X_c-obj-hist.
++               buffer-copy {&buf_obj-hist} to X_c-obj-hist.
++               buffer-copy c-{&addTable} to X_c-obj-hist
++               assign 
++                  X_c-obj-hist.subject = "{&addTable}"
++               .
++            end.
++            &glob addTable utd-lines
++            for each c-{&addTable} where c-{&addTable}.corr-user-db-num   eq v-corr-user-db-num
++                                   and c-{&addTable}.chip-num           eq p-chip-num
++            no-lock:
++               create X_c-obj-hist.
++               buffer-copy {&buf_obj-hist} to X_c-obj-hist.
++               buffer-copy c-{&addTable} to X_c-obj-hist
++               assign 
++                  X_c-obj-hist.subject = "{&addTable}"
++               .
++            end.
++            &glob addTable utd-marking-lines
++            for each c-{&addTable} where c-{&addTable}.corr-user-db-num   eq v-corr-user-db-num
++                                   and c-{&addTable}.chip-num           eq p-chip-num
++            no-lock:
++               create X_c-obj-hist.
++               buffer-copy {&buf_obj-hist} to X_c-obj-hist.
++               buffer-copy c-{&addTable} to X_c-obj-hist
++               assign 
++                  X_c-obj-hist.subject = "{&addTable}"
++               .
++            end.
++            &glob addTable utd-attr
++            for each c-{&addTable} where c-{&addTable}.corr-user-db-num   eq v-corr-user-db-num
++                                   and c-{&addTable}.chip-num           eq p-chip-num
++                                   
++            no-lock:
++               create X_c-obj-hist.
++               buffer-copy {&buf_obj-hist} to X_c-obj-hist.
++               buffer-copy c-{&addTable} to X_c-obj-hist
++               assign 
++                  X_c-obj-hist.subject = "{&addTable}"
++               .
++            end.
++            &glob addTable utd-err-attr
++            for each c-{&addTable} where c-{&addTable}.corr-user-db-num   eq v-corr-user-db-num
++                                   and c-{&addTable}.chip-num           eq p-chip-num
++            no-lock:
++               create X_c-obj-hist.
++               buffer-copy {&buf_obj-hist} to X_c-obj-hist.
++               buffer-copy c-{&addTable} to X_c-obj-hist
++               assign 
++                  X_c-obj-hist.subject = "{&addTable}"
++               .
++            end.
++            &glob addTable utd-lines-attr
++            for each c-{&addTable} where c-{&addTable}.corr-user-db-num   eq v-corr-user-db-num
++                                   and c-{&addTable}.chip-num           eq p-chip-num
++            no-lock:
++               create X_c-obj-hist.
++               buffer-copy {&buf_obj-hist} to X_c-obj-hist.
++               buffer-copy c-{&addTable} to X_c-obj-hist
++               assign 
++                  X_c-obj-hist.subject = "{&addTable}"
++               .
++            end.
++            &glob addTable utd-marking-lines-attr
++            for each c-{&addTable} where c-{&addTable}.corr-user-db-num   eq v-corr-user-db-num
++                                   and c-{&addTable}.chip-num           eq p-chip-num
++            no-lock:
++               create X_c-obj-hist.
++               buffer-copy {&buf_obj-hist} to X_c-obj-hist.
++               buffer-copy c-{&addTable} to X_c-obj-hist
++               assign 
++                  X_c-obj-hist.subject = "{&addTable}"
++               .
++            end.
++            &glob addTable utd
++            for each c-{&addTable} where c-{&addTable}.corr-user-db-num   eq v-corr-user-db-num
++                                   and c-{&addTable}.chip-num           eq p-chip-num
++                                   
++            no-lock:
++               create X_c-obj-hist.
++               buffer-copy {&buf_obj-hist} to X_c-obj-hist.
++               buffer-copy c-{&addTable} to X_c-obj-hist
++               assign 
++                  X_c-obj-hist.subject = "{&addTable}"
++               .
++            end.
++            
++         end.
++      end.
++   end.
++   
++     
++{ gbl/fltopend.i
++          &where-cond = " TRUE "
++          
++          &by         = " by X_c-obj-hist.chip-num  " }
++  
++  return true.
++end.
++
++function  getStsMark returns character (ists as int ):
++   
++   return StatusMark:GetLabel(ists).
++   
++end.
++
++
++function  getStsTh returns character (ists as int ):
++   
++   return StatusTH:GetLabel(ists).
++   
++end.
++function  getStsEdi returns character (ists as int ):
++   
++   return if ists eq 0 then "" else StatusEDI:GetLabel(ists).
++   
++end.
++function  getStsEdocType returns character (itype as int ):
++   
++   return if itype eq 0 then "" else  EdocType:GetLabel(itype).
++   
++end.
++
++procedure utd-proc :
++define output parameter p-description as character no-undo .
++define buffer current_c-utd for ub.c-utd  .
++define variable v-mess as character no-undo.
++
++do
++on error undo, return error return-value
++:
++  find first current_c-utd no-lock where
++               current_c-utd.db-num = X_c-obj-hist.db-num
++           and current_c-utd.doc-id = X_c-obj-hist.doc-id
++       
++          and current_c-utd.chip-num = X_c-obj-hist.chip-num
++          and current_c-utd.corr-user-db-num = X_c-obj-hist.corr-user-db-num no-error .
++  if not avail current_c-utd then do:
++      v-mess = "Неверная ссылка на c-utd в таблице c-utd-head".
++     
++      return error  v-mess .
++  end.
++ 
++&scop fields-name-list "DocumentExt,OrganizationExt,LoadDate,parentDocumentExt,parentOrganizationExt,RevocationStatus,RecipientResponseStatus,TypeId,CounteragentId,~
++CustomDocumentId,DocumentNumber,DocumentDate,Timestamp,ReceiptStatus,Direction,ModifyDate,PackageId,EDocType,AmendmentRequested,BaseDocumentNumber,BaseDocumentName,~
++BaseDocumentDate,cli-FnsParticipantId,cli-info,obj-FnsParticipantId,obj-info,sts,sts-edi,cli-type,cli-code,host-code,contract-code,obj-type,obj-code,~
++ModifyTime,doc-code,AdditInfo,comment,db-num,doc-id"
++
++define variable v-label-param as character no-undo .
++  v-label-param =
++   "OrganizationExt"     + {&delim-par} + "ID организации в ЭДО"                              + {&delim-par} + "" + {&delim-flf}
++ + "DocumentExt" + {&delim-par} + "ID документа в ЭДО"                          + {&delim-par} + "" + {&delim-flf}
++ + "LoadDate"      + {&delim-par} + "Дата загрузки"    + {&delim-par} + "" + {&delim-flf}
++ + "parentOrganizationExt"     + {&delim-par} + "ID организации в родительском документе в ЭДО"   + {&delim-par} + "" + {&delim-flf}
++ + "parentDocumentExt"      + {&delim-par} + "ID родительского документа в ЭДО"                                + {&delim-par} + "" + {&delim-flf}
++ + "RevocationStatus"       + {&delim-par} + "Статус аннулирования документа" + {&delim-par} + "" + {&delim-flf}
++ + "RecipientResponseStatus"  + {&delim-par} + "Состояние ответного действия"        + {&delim-par} + "" + {&delim-flf}
++ + "TypeId"  + {&delim-par} + "Тип документа ЭДО"                    + {&delim-par} + "" + {&delim-flf}
++ + "CounteragentId"     + {&delim-par} + "Контрагент документа"                       + {&delim-par} + "" + {&delim-flf}
++ + "CustomDocumentId"     + {&delim-par} + "Идентификатор документа, определяемый внешней системой"                       + {&delim-par} + "" + {&delim-flf}
++ + "DocumentNumber"    + {&delim-par} + "Номер документа"                            + {&delim-par} + "" + {&delim-flf}
++ + "DocumentDate"     + {&delim-par} + "Дата документа"                       + {&delim-par} + "" + {&delim-flf}
++ + "Timestamp"    + {&delim-par} + "Дата и время создания в ЭДО"                            + {&delim-par} + "" + {&delim-flf}
++ + "ReceiptStatus"     + {&delim-par} + "Состояние ИОП на документ"                       + {&delim-par} + "" + {&delim-flf}
++ + "Direction"    + {&delim-par} + "Направление документа"                            + {&delim-par} + "" + {&delim-flf}
++ + "ModifyDate"     + {&delim-par} + "Дата изменения"                       + {&delim-par} + "" + {&delim-flf}
++ + "ModifyTime"     + {&delim-par} + "Время изменения"                       + {&delim-par} + "" + {&delim-flf}
++ + "PackageId"    + {&delim-par} + "ID пакета в ЭДО"                            + {&delim-par} + "" + {&delim-flf}
++ + "EDocType"     + {&delim-par} + "Тип документа"                       + {&delim-par} + "getStsEdocType" + {&delim-flf}
++ + "AmendmentRequested"    + {&delim-par} + "Зарошена корректировка"                            + {&delim-par} + "" + {&delim-flf}
++ + "BaseDocumentNumber"     + {&delim-par} + "Номер договора"                       + {&delim-par} + "" + {&delim-flf}
++ + "BaseDocumentName"    + {&delim-par} + "Наименование договора"                            + {&delim-par} + "" + {&delim-flf}
++ + "BaseDocumentDate"     + {&delim-par} + "Дата договора"                       + {&delim-par} + "" + {&delim-flf}
++ + "cli-FnsParticipantId"    + {&delim-par} + "ID подразделения отправителя"                            + {&delim-par} + "" + {&delim-flf}
++ + "cli-info"    + {&delim-par} + "Инф. отправителя"                            + {&delim-par} + "" + {&delim-flf}
++ + "obj-FnsParticipantId"     + {&delim-par} + "ID подразделения получателя"                       + {&delim-par} + "" + {&delim-flf}
++ + "obj-info"    + {&delim-par} + "Инф. получателя"                            + {&delim-par} + "" + {&delim-flf}
++ + "sts"     + {&delim-par} + "Статус TH"                       + {&delim-par} + "getStsTh" + {&delim-flf}
++ + "sts-edi"    + {&delim-par} + "Статус ЭДО"                            + {&delim-par} + "getStsEdi" + {&delim-flf}
++ + "cli-type"    + {&delim-par} + "Тип отправителя"                            + {&delim-par} + "" + {&delim-flf}
++ + "cli-code"     + {&delim-par} + "Код отправителя"                       + {&delim-par} + "" + {&delim-flf}
++ + "host-code"    + {&delim-par} + "Фирма"                            + {&delim-par} + "" + {&delim-flf}
++ + "obj-type"     + {&delim-par} + "Тип объекта"                       + {&delim-par} + "" + {&delim-flf}
++ + "obj-code"    + {&delim-par} + "Код объекта"                            + {&delim-par} + "" + {&delim-flf}
++ + "doc-code"    + {&delim-par} + "Номер накладной"                            + {&delim-par} + "" + {&delim-flf}
++ + "total"    + {&delim-par} + "Сумма"                            + {&delim-par} + "" + {&delim-flf}
++ + "comment"    + {&delim-par} + "Комментарий"                            + {&delim-par} + "" + {&delim-flf}
++ + "Vat"    + {&delim-par} + "НДС"                            + {&delim-par} + "" + {&delim-flf}
++  
++ + "AdditInfo"        + {&delim-par} + "Ошибки"  + {&delim-par} + ""  + {&delim-flf}
++ + "db-num"     + {&delim-par} + "db-num"  + {&delim-par} + "" + {&delim-flf}
++ + "doc-id"     + {&delim-par} + "doc-id"  + {&delim-par} + "".
++
++  run proc-full-temp-changes in this-procedure (
++                                               input current_c-utd.action = integer({&hn-create})
++                                              ,input current_c-utd.action = integer({&hn-delete})
++                                              ,input  buffer current_c-utd:handle
++                                              ,input  "utd" /*{&table_utd}*/
++                                              ,input  {&fields-name-list}
++                                              ,input  v-label-param).
++
++end. /*doe*/
++end procedure. /* utd-proc */
++
++procedure utd-attr-proc :
++define output parameter p-description as character no-undo .
++&glob tab-attr utd-attr
++define buffer current_c-{&tab-attr} for ub.c-{&tab-attr}  .
++define variable v-mess as character no-undo.
++
++   do
++   on error undo, return error return-value
++   :
++     find first current_c-{&tab-attr} no-lock where
++                  current_c-{&tab-attr}.db-num = X_c-obj-hist.db-num
++              and current_c-{&tab-attr}.doc-id = X_c-obj-hist.doc-id
++             and current_c-{&tab-attr}.attr-code = X_c-obj-hist.attr-code
++             and current_c-{&tab-attr}.chip-num = X_c-obj-hist.chip-num
++             and current_c-{&tab-attr}.corr-user-db-num = X_c-obj-hist.corr-user-db-num no-error .
++     if not avail current_c-{&tab-attr} then do:
++         v-mess = "Неверная ссылка на c-{&tab-attr} в таблице c-utd-head".
++        
++         return error  v-mess .
++     end.
++      &scop fields-name-list "attr-code,attr-value"
++   
++   define variable v-label-param as character no-undo .
++     v-label-param =
++      "attr-code"     + {&delim-par} + "атрибут"                              + {&delim-par} + "" + {&delim-flf}
++    + "attr-value"        + {&delim-par} + "Значение атрибута"  + {&delim-par} + "" .
++      
++     run proc-full-temp-changes in this-procedure (
++                                                  input current_c-{&tab-attr}.action = integer({&hn-create})
++                                                 ,input current_c-{&tab-attr}.action = integer({&hn-delete})
++                                                 ,input  buffer current_c-{&tab-attr}:handle
++                                                 ,input  "{&tab-attr}" /*{&table_utd}*/
++                                                 ,input  {&fields-name-list}
++                                                 ,input  v-label-param).
++   end.
++end.
++define variable mCheckType as character no-undo.
++define variable mCodeErr as character no-undo.
++
++function  err-text returns character (iCheckObj as character ):
++   
++   return if iCheckObj  eq "" then "" else GetTextErrortype( mCheckType, mCodeErr, iCheckObj,"all").
++   
++end.
++
++procedure utd-err-proc :
++define output parameter p-description as character no-undo .
++define buffer current_c-utd-err for ub.c-utd-err  .
++define variable v-mess as character no-undo.
++
++do
++on error undo, return error return-value
++:
++  find first current_c-utd-err no-lock where
++               current_c-utd-err.db-num = X_c-obj-hist.db-num
++           and current_c-utd-err.doc-id = X_c-obj-hist.doc-id
++       and current_c-utd-err.CheckType = X_c-obj-hist.CheckType
++       and current_c-utd-err.CodeErr = X_c-obj-hist.CodeErr
++       and current_c-utd-err.CheckObj = X_c-obj-hist.CheckObj
++       and current_c-utd-err.reckey = X_c-obj-hist.reckey
++          and current_c-utd-err.chip-num = X_c-obj-hist.chip-num
++          and current_c-utd-err.corr-user-db-num = X_c-obj-hist.corr-user-db-num no-error .
++  if not avail current_c-utd-err then do:
++      v-mess = "Неверная ссылка на c-utd в таблице c-utd-head".
++     
++      return error  v-mess .
++  end.
++ mCheckType = current_c-utd-err.CheckType.
++ mCodeErr = current_c-utd-err.CodeErr.
++ 
++         
++&scop fields-name-list "CheckType,CodeErr,CheckObj,reckey,LineNum"
++
++define variable v-label-param as character no-undo .
++  v-label-param =
++   "CheckType"     + {&delim-par} + "Тип ошибки"                              + {&delim-par} + "" + {&delim-flf}
++ + "LineNum" + {&delim-par} + "Линия"                          + {&delim-par} + "" + {&delim-flf}
++ + "CodeErr" + {&delim-par} + "Код ошибки"                          + {&delim-par} + "" + {&delim-flf}
++ + "CheckObj"      + {&delim-par} + "Текст"    + {&delim-par} + "err-text" + {&delim-flf}
++ + "reckey"        + {&delim-par} + "ключ записи с ошибкой"  + {&delim-par} + "" .
++
++  run proc-full-temp-changes in this-procedure (
++                                               input current_c-utd-err.action = integer({&hn-create})
++                                              ,input current_c-utd-err.action = integer({&hn-delete})
++                                              ,input  buffer current_c-utd-err:handle
++                                              ,input  "utd-err" /*{&table_utd}*/
++                                              ,input  {&fields-name-list}
++                                              ,input  v-label-param).
++
++end. /*doe*/
++end procedure.
++
++&glob tab-attr utd-err-attr
++procedure {&tab-attr}-proc :
++define output parameter p-description as character no-undo .
++
++define buffer current_c-{&tab-attr} for ub.c-{&tab-attr}  .
++define variable v-mess as character no-undo.
++
++   do
++   on error undo, return error return-value
++   :
++     find first current_c-{&tab-attr} no-lock where
++                  current_c-{&tab-attr}.db-num = X_c-obj-hist.db-num
++              and current_c-{&tab-attr}.doc-id = X_c-obj-hist.doc-id
++              and current_c-{&tab-attr}.CheckType = X_c-obj-hist.CheckType
++              and current_c-{&tab-attr}.CodeErr = X_c-obj-hist.CodeErr
++              and current_c-{&tab-attr}.CheckObj = X_c-obj-hist.CheckObj
++              and current_c-{&tab-attr}.reckey = X_c-obj-hist.reckey
++             and current_c-{&tab-attr}.attr-code = X_c-obj-hist.attr-code
++             and current_c-{&tab-attr}.chip-num = X_c-obj-hist.chip-num
++             and current_c-{&tab-attr}.corr-user-db-num = X_c-obj-hist.corr-user-db-num no-error .
++     if not avail current_c-{&tab-attr} then do:
++         v-mess = "Неверная ссылка на c-{&tab-attr} в таблице c-utd-head".
++        
++         return error  v-mess .
++     end.
++      &scop fields-name-list "CheckType,CodeErr,CheckObj,reckey,attr-code,attr-value,LineNum"
++   
++   define variable v-label-param as character no-undo .
++     v-label-param =
++     "CheckType"     + {&delim-par} + "Тип ошибки"                              + {&delim-par} + "" + {&delim-flf}
+++ "LineNum" + {&delim-par} + "Линия"                          + {&delim-par} + "" + {&delim-flf}
++ 
++    + "CodeErr" + {&delim-par} + "Код ошибки"                          + {&delim-par} + "" + {&delim-flf}
++    + "CheckObj"      + {&delim-par} + "Текст"    + {&delim-par} + "err-text" + {&delim-flf}
++    + "reckey"        + {&delim-par} + "ключ записи с ошибкой"  + {&delim-par} + "" + {&delim-flf}
++    + "attr-code"     + {&delim-par} + "атрибут"                              + {&delim-par} + "" + {&delim-flf}
++    + "attr-value"        + {&delim-par} + "Значение атрибута"  + {&delim-par} + "" .
++      
++     run proc-full-temp-changes in this-procedure (
++                                                  input current_c-{&tab-attr}.action = integer({&hn-create})
++                                                 ,input current_c-{&tab-attr}.action = integer({&hn-delete})
++                                                 ,input  buffer current_c-{&tab-attr}:handle
++                                                 ,input  "{&tab-attr}" /*{&table_utd}*/
++                                                 ,input  {&fields-name-list}
++                                                 ,input  v-label-param).
++   end.
++end.
++
++procedure utd-lines-proc :
++define output parameter p-description as character no-undo .
++define buffer current_c-utd-lines for ub.c-utd-lines  .
++define variable v-mess as character no-undo.
++
++do
++on error undo, return error return-value
++:
++  find first current_c-utd-lines no-lock where
++               current_c-utd-lines.db-num = X_c-obj-hist.db-num
++           and current_c-utd-lines.doc-id = X_c-obj-hist.doc-id
++           and current_c-utd-lines.linenum = X_c-obj-hist.linenum
++          and current_c-utd-lines.chip-num = X_c-obj-hist.chip-num
++          and current_c-utd-lines.corr-user-db-num = X_c-obj-hist.corr-user-db-num no-error .
++  if not avail current_c-utd-lines then do:
++      v-mess = "Неверная ссылка на c-utd-lines в таблице c-utd-head".
++     
++      return error  v-mess .
++  end.
++ 
++
++         
++&scop fields-name-list "LineNum,ProductCode,Article,UnitCode,ParcelType,TaxRate,Vat,Total,Quantity,TotalWithVatExcluded,gds-code,GdsName,sts"
++
++define variable v-label-param as character no-undo .
++  v-label-param =
++   "LineNum"     + {&delim-par} + "Номер линии"                              + {&delim-par} + "" + {&delim-flf}
++ + "ProductCode" + {&delim-par} + "Товар в ЭДО"                          + {&delim-par} + "" + {&delim-flf}
++ + "Article"      + {&delim-par} + "Артикл в ЭДО"    + {&delim-par} + "" + {&delim-flf}
++ + "UnitCode" + {&delim-par} + "Ед. в ЭДО"                          + {&delim-par} + "" + {&delim-flf}
++/* + "ParcelType"      + {&delim-par} + "Текст"    + {&delim-par} + "err-text" + {&delim-flf}*/
++ + "TaxRate" + {&delim-par} + "НДС,%"                          + {&delim-par} + "" + {&delim-flf}
++ + "Vat"      + {&delim-par} + "Сумма НДС"    + {&delim-par} + "" + {&delim-flf}
++ + "Total" + {&delim-par} + "Сумма"                          + {&delim-par} + "" + {&delim-flf}
++ + "TotalWithVatExcluded"      + {&delim-par} + "Сумма без ндс"    + {&delim-par} + "" + {&delim-flf}
++ + "gds-code" + {&delim-par} + "Код товара"                          + {&delim-par} + "" + {&delim-flf}
++/* + "GdsName"      + {&delim-par} + "Наименование"    + {&delim-par} + "" + {&delim-flf}*/
++ + "sts"        + {&delim-par} + "Статус"  + {&delim-par} + "".
++
++  run proc-full-temp-changes in this-procedure (
++                                               input         current_c-utd-lines.action = integer({&hn-create})
++                                              ,input         current_c-utd-lines.action = integer({&hn-delete})
++                                              ,input  buffer current_c-utd-lines:handle
++                                              ,input                  "utd-lines" /*{&table_utd}*/
++                                              ,input  {&fields-name-list}
++                                              ,input  v-label-param).
++
++end. /*doe*/
++end procedure.
++
++&glob tab-attr utd-lines-attr
++procedure {&tab-attr}-proc :
++define output parameter p-description as character no-undo .
++
++define buffer current_c-{&tab-attr} for ub.c-{&tab-attr}  .
++define variable v-mess as character no-undo.
++
++   do
++   on error undo, return error return-value
++   :
++     find first current_c-{&tab-attr} no-lock where
++                  current_c-{&tab-attr}.db-num = X_c-obj-hist.db-num
++              and current_c-{&tab-attr}.doc-id = X_c-obj-hist.doc-id
++              and current_c-{&tab-attr}.linenum = X_c-obj-hist.linenum
++             and current_c-{&tab-attr}.attr-code = X_c-obj-hist.attr-code
++             and current_c-{&tab-attr}.chip-num = X_c-obj-hist.chip-num
++             and current_c-{&tab-attr}.corr-user-db-num = X_c-obj-hist.corr-user-db-num no-error .
++     if not avail current_c-{&tab-attr} then do:
++         v-mess = "Неверная ссылка на c-{&tab-attr} в таблице c-utd-head".
++        
++         return error  v-mess .
++     end.
++      &scop fields-name-list "LineNum,attr-code,attr-value"
++   
++   define variable v-label-param as character no-undo .
++     v-label-param =
++     "LineNum"     + {&delim-par} + "Номер линии"                              + {&delim-par} + "" + {&delim-flf}
++     + "attr-code"     + {&delim-par} + "атрибут"                              + {&delim-par} + "" + {&delim-flf}
++     + "attr-value"        + {&delim-par} + "Значение атрибута"  + {&delim-par} + "" .
++      
++     run proc-full-temp-changes in this-procedure (
++                                                  input current_c-{&tab-attr}.action = integer({&hn-create})
++                                                 ,input current_c-{&tab-attr}.action = integer({&hn-delete})
++                                                 ,input  buffer current_c-{&tab-attr}:handle
++                                                 ,input  "{&tab-attr}" /*{&table_utd}*/
++                                                 ,input  {&fields-name-list}
++                                                 ,input  v-label-param).
++   end.
++end.
++
++procedure utd-marking-lines-proc :
++define output parameter p-description as character no-undo .
++define buffer current_c-utd-marking-lines for ub.c-utd-marking-lines  .
++define variable v-mess as character no-undo.
++
++do
++on error undo, return error return-value
++:
++  find first current_c-utd-marking-lines no-lock where
++               current_c-utd-marking-lines.db-num = X_c-obj-hist.db-num
++           and current_c-utd-marking-lines.doc-id = X_c-obj-hist.doc-id
++           and current_c-utd-marking-lines.linenum = X_c-obj-hist.linenum
++        and current_c-utd-marking-lines.mark = X_c-obj-hist.mark
++          and current_c-utd-marking-lines.chip-num = X_c-obj-hist.chip-num
++          and current_c-utd-marking-lines.corr-user-db-num = X_c-obj-hist.corr-user-db-num no-error .
++  if not avail current_c-utd-marking-lines then do:
++      v-mess = "Неверная ссылка на c-utd-lines в таблице c-utd-head".
++     
++      return error  v-mess .
++  end.
++         
++&scop fields-name-list "LineNum,doc-level,site,gds-code,mark,sts"
++
++define variable v-label-param as character no-undo .
++  v-label-param =
++   "LineNum"     + {&delim-par} + "Номер линии"                              + {&delim-par} + "" + {&delim-flf}
++ + "doc-level " + {&delim-par} + "Уровень вложености марки( 1 привязан к документу) "                          + {&delim-par} + "" + {&delim-flf}
++ + "site"      + {&delim-par} + "Сторона (- Возврат)"    + {&delim-par} + "" + {&delim-flf}
++ + "gds-code" + {&delim-par} + "Код товара"                          + {&delim-par} + "" + {&delim-flf}
++ + "mark" + {&delim-par} + "Марка"                          + {&delim-par} + "" + {&delim-flf}
++ + "sts"        + {&delim-par} + "Статус"  + {&delim-par} + "getStsMark" .
++
++  run proc-full-temp-changes in this-procedure (
++                                               input         current_c-utd-marking-lines.action = integer({&hn-create})
++                                              ,input         current_c-utd-marking-lines.action = integer({&hn-delete})
++                                              ,input  buffer current_c-utd-marking-lines:handle
++                                              ,input                  "utd-marking-lines" /*{&table_utd}*/
++                                              ,input  {&fields-name-list}
++                                              ,input  v-label-param).
++
++end. /*doe*/
++end procedure.
++&glob tab-attr utd-marking-lines-attr
++procedure {&tab-attr}-proc :
++define output parameter p-description as character no-undo .
++
++   define buffer current_c-{&tab-attr} for ub.c-{&tab-attr}  .
++   define variable v-mess as character no-undo.
++   
++   do
++   on error undo, return error return-value
++   :
++     find first current_c-{&tab-attr} no-lock where
++                  current_c-{&tab-attr}.db-num = X_c-obj-hist.db-num
++              and current_c-{&tab-attr}.doc-id = X_c-obj-hist.doc-id
++              and current_c-{&tab-attr}.linenum = X_c-obj-hist.linenum
++              and current_c-{&tab-attr}.mark = X_c-obj-hist.mark
++             and current_c-{&tab-attr}.attr-code = X_c-obj-hist.attr-code
++             and current_c-{&tab-attr}.chip-num = X_c-obj-hist.chip-num
++             and current_c-{&tab-attr}.corr-user-db-num = X_c-obj-hist.corr-user-db-num no-error .
++     if not avail current_c-{&tab-attr} then do:
++         v-mess = "Неверная ссылка на c-{&tab-attr} в таблице c-utd-head".
++        
++         return error  v-mess .
++     end.
++      &scop fields-name-list "LineNum,mark,attr-code,attr-value"
++   
++   define variable v-label-param as character no-undo .
++     v-label-param =
++     "LineNum"     + {&delim-par} + "Номер линии"                              + {&delim-par} + "" + {&delim-flf}
++     + "mark" + {&delim-par} + "Марка"                          + {&delim-par} + "" + {&delim-flf}
++     + "attr-code"     + {&delim-par} + "атрибут"                              + {&delim-par} + "" + {&delim-flf}
++     + "attr-value"        + {&delim-par} + "Значение атрибута"  + {&delim-par} + "" .
++      
++     run proc-full-temp-changes in this-procedure (
++                                                  input current_c-{&tab-attr}.action = integer({&hn-create})
++                                                 ,input current_c-{&tab-attr}.action = integer({&hn-delete})
++                                                 ,input  buffer current_c-{&tab-attr}:handle
++                                                 ,input  "{&tab-attr}" /*{&table_utd}*/
++                                                 ,input  {&fields-name-list}
++                                                 ,input  v-label-param).
++   end.
++end.
++
++PROCEDURE proc-find-obj-code :
++/*------------------------------------------------------------------------------
++  Purpose:
++  Parameters:  <none>
++  Notes:
++------------------------------------------------------------------------------*/
++define input parameter p-next as logical no-undo.
++define input parameter p-obj-code as character no-undo.
++
++if p-obj-code = "" then return .
++
++run OpenBr in this-procedure
++    (input false /* p-open-query */
++    ,input true  /* p-find-next  */
++    ,input substitute("and X_c-obj-hist.doc-id = &1 "
++      , p-obj-code)
++    ,input v-corr-user-db-num
++    ).
++apply "entry":u to sch-obj-code in frame Dialog-Frame.
++END PROCEDURE.
+diff --git a/ref/cutdhist.w b/ref/cutdhist.w
+--- a/ref/cutdhist.w
++++ b/ref/cutdhist.w
+@@ -2,8 +2,6 @@
+ define input  parameter {&Param_1} as int64 no-undo.
+ &glob param_2 p-doc-id-utd
+ define input  parameter {&Param_2} as int64 no-undo.
+- 
+-
+ 
+ { gbl/objsrv.i }
+ define variable StatusTH   as class     ibs.th.str.utd.sts.th  no-undo .
+@@ -13,619 +11,42 @@ define variable StatusMark  as class    
+ StatusTH = ObjSrv:Env:Utd:Sts:TH.
+ StatusEDI = ObjSrv:Env:Utd:Sts:EDI.
+ EdocType = ObjSrv:Env:Utd:EDocType.
+-StatusMark =ObjSrv:Env:marking:sts:mark.
++StatusMark = ObjSrv:Env:marking:sts:mark.
+ 
+-function fLabel returns character forward.
++define variable vLabel as character no-undo.
+ 
++&glob proc_nextlevel ref/cutdhistone.w 
+ &glob buf_obj-hist c-utd-head
+ &Glob VisibleKeyField yes
+-{ref/brwhist.i &buf_obj-hist = c-utd-head &objhead = yes &lable = fLabel() &objtt = yes}
+-
+-
+-function fLabel returns character :
+-   return if p-mode eq "one"  then "История по УПД " + string(p-doc-id-utd) + " по ДБ " + string(p-dB-NUM-utd) else "История по УПД".
++{ref/brwhist.i &Paramonly = yes &objhead = yes}
++if p-mode <> "one" then
++do:
++  vLabel = "История по УПД".
++  {ref/brwhist.i 
++    &objhead       = yes 
++    &lable         = vLabel
++    &by-sort       = "BY X_c-obj-hist.db-num BY X_c-obj-hist.doc-id"
++    &browse-fields = "X_c-obj-hist.db-num COLUMN-LABEL 'БД' FORMAT '>>9':U
++                      X_c-obj-hist.doc-id COLUMN-LABEL 'Внутр.№' FORMAT '>>>>>>>>9':U "
++  }
+ end.
+-
+-{str/utd-err.i}
+-function get-subject returns character
+-  ( p-subject as character ) :
+-/*------------------------------------------------------------------------------
+-  Purpose:
+-    Notes:
+-------------------------------------------------------------------------------*/
+-&scop hn-obj-hist-code p-subject
+-  return p-subject.   /* Function return value. */
+-
+-end function.
+- 
+-procedure local-view-cange:
+-   define output parameter odescription as character no-undo.
+-   if X_c-obj-hist.subject eq "utd"
+-   then
+-      run utd-proc (output odescription).
+-   else if X_c-obj-hist.subject eq "utd-err"
+-   then
+-      run utd-err-proc (output odescription).
+-   else if X_c-obj-hist.subject eq "utd-lines"
+-   then
+-      run utd-lines-proc (output odescription).
+-   else if X_c-obj-hist.subject eq "utd-marking-lines"
+-   then
+-      run utd-marking-lines-proc (output odescription).
+-   else if X_c-obj-hist.subject eq "utd-attr"
+-   then
+-      run utd-attr-proc (output odescription).
+-   else if X_c-obj-hist.subject eq "utd-err-attr"
+-   then
+-      run utd-err-attr-proc (output odescription).
+-   else if X_c-obj-hist.subject eq "utd-lines-attr"
+-   then
+-      run utd-lines-attr-proc (output odescription).
+-   else if X_c-obj-hist.subject eq "utd-marking-lines-attr"
+-   then
+-      run utd-marking-lines-attr-proc (output odescription).
+-   
+-end procedure.
+-  
+-function local-open-br returns logical 
+-(  p-open-query     as logical    ,
+-  p-find-next       as logical    ,
+-  p-find-condition as character ):
+-     define variable sort-column-phrase as character no-undo .
+-     define variable l-query-was-opened as logical no-undo .
+-   for each X_c-obj-hist :
+-      delete X_c-obj-hist.
+-   end.
+-   if p-mode eq "one"
+-   then do:
+-      if p-chip-num eq ?
+-      then do:
+-         for each {&buf_obj-hist} where {&buf_obj-hist}.DB-NUM = p-DB-NUM-utd  
+-                                    and {&buf_obj-hist}.doc-id = p-doc-id-utd
+-                                    and {&buf_obj-hist}.corr-user-db-num = v-corr-user-db-num
+-         no-lock:
+-            create X_c-obj-hist.
+-            buffer-copy {&buf_obj-hist} to X_c-obj-hist.
+-         end.
+-      end.
+-      else do:
+-         for each {&buf_obj-hist} where {&buf_obj-hist}.DB-NUM             eq p-DB-NUM-utd  
+-                                    and {&buf_obj-hist}.doc-id             eq p-doc-id-utd
+-                                    and {&buf_obj-hist}.corr-user-db-num   eq v-corr-user-db-num
+-                                    and {&buf_obj-hist}.chip-num           eq p-chip-num  
+-         no-lock:
+-            &glob addTable utd-err
+-            for each c-{&addTable} where  c-{&addTable}.DB-NUM          eq p-DB-NUM-utd  
+-                                   and c-{&addTable}.doc-id             eq p-doc-id-utd
+-                                   and c-{&addTable}.corr-user-db-num   eq v-corr-user-db-num
+-                                   and c-{&addTable}.chip-num           eq p-chip-num
+-            no-lock:
+-               create X_c-obj-hist.
+-               buffer-copy {&buf_obj-hist} to X_c-obj-hist.
+-               buffer-copy c-{&addTable} to X_c-obj-hist
+-               assign 
+-                  X_c-obj-hist.subject = "{&addTable}"
+-               .
+-            end.
+-            &glob addTable utd-lines
+-            for each c-{&addTable} where  c-{&addTable}.DB-NUM          eq p-DB-NUM-utd  
+-                                   and c-{&addTable}.doc-id             eq p-doc-id-utd
+-                                   and c-{&addTable}.corr-user-db-num   eq v-corr-user-db-num
+-                                   and c-{&addTable}.chip-num           eq p-chip-num
+-            no-lock:
+-               create X_c-obj-hist.
+-               buffer-copy {&buf_obj-hist} to X_c-obj-hist.
+-               buffer-copy c-{&addTable} to X_c-obj-hist
+-               assign 
+-                  X_c-obj-hist.subject = "{&addTable}"
+-               .
+-            end.
+-            &glob addTable utd-marking-lines
+-            for each c-{&addTable} where  c-{&addTable}.DB-NUM          eq p-DB-NUM-utd  
+-                                   and c-{&addTable}.doc-id             eq p-doc-id-utd
+-                                   and c-{&addTable}.corr-user-db-num   eq v-corr-user-db-num
+-                                   and c-{&addTable}.chip-num           eq p-chip-num
+-            no-lock:
+-               create X_c-obj-hist.
+-               buffer-copy {&buf_obj-hist} to X_c-obj-hist.
+-               buffer-copy c-{&addTable} to X_c-obj-hist
+-               assign 
+-                  X_c-obj-hist.subject = "{&addTable}"
+-               .
+-            end.
+-            &glob addTable utd-attr
+-            for each c-{&addTable} where  c-{&addTable}.DB-NUM          eq p-DB-NUM-utd  
+-                                   and c-{&addTable}.doc-id             eq p-doc-id-utd
+-                                   and c-{&addTable}.corr-user-db-num   eq v-corr-user-db-num
+-                                   and c-{&addTable}.chip-num           eq p-chip-num
+-                                   
+-            no-lock:
+-               create X_c-obj-hist.
+-               buffer-copy {&buf_obj-hist} to X_c-obj-hist.
+-               buffer-copy c-{&addTable} to X_c-obj-hist
+-               assign 
+-                  X_c-obj-hist.subject = "{&addTable}"
+-               .
+-            end.
+-            &glob addTable utd-err-attr
+-            for each c-{&addTable} where  c-{&addTable}.DB-NUM          eq p-DB-NUM-utd  
+-                                   and c-{&addTable}.doc-id             eq p-doc-id-utd
+-                                   and c-{&addTable}.corr-user-db-num   eq v-corr-user-db-num
+-                                   and c-{&addTable}.chip-num           eq p-chip-num
+-            no-lock:
+-               create X_c-obj-hist.
+-               buffer-copy {&buf_obj-hist} to X_c-obj-hist.
+-               buffer-copy c-{&addTable} to X_c-obj-hist
+-               assign 
+-                  X_c-obj-hist.subject = "{&addTable}"
+-               .
+-            end.
+-            &glob addTable utd-lines-attr
+-            for each c-{&addTable} where  c-{&addTable}.DB-NUM          eq p-DB-NUM-utd  
+-                                   and c-{&addTable}.doc-id             eq p-doc-id-utd
+-                                   and c-{&addTable}.corr-user-db-num   eq v-corr-user-db-num
+-                                   and c-{&addTable}.chip-num           eq p-chip-num
+-            no-lock:
+-               create X_c-obj-hist.
+-               buffer-copy {&buf_obj-hist} to X_c-obj-hist.
+-               buffer-copy c-{&addTable} to X_c-obj-hist
+-               assign 
+-                  X_c-obj-hist.subject = "{&addTable}"
+-               .
+-            end.
+-            &glob addTable utd-marking-lines-attr
+-            for each c-{&addTable} where  c-{&addTable}.DB-NUM          eq p-DB-NUM-utd  
+-                                   and c-{&addTable}.doc-id             eq p-doc-id-utd
+-                                   and c-{&addTable}.corr-user-db-num   eq v-corr-user-db-num
+-                                   and c-{&addTable}.chip-num           eq p-chip-num
+-            no-lock:
+-               create X_c-obj-hist.
+-               buffer-copy {&buf_obj-hist} to X_c-obj-hist.
+-               buffer-copy c-{&addTable} to X_c-obj-hist
+-               assign 
+-                  X_c-obj-hist.subject = "{&addTable}"
+-               .
+-            end.
+-            &glob addTable utd
+-            for each c-{&addTable} where  c-{&addTable}.DB-NUM          eq p-DB-NUM-utd  
+-                                   and c-{&addTable}.doc-id             eq p-doc-id-utd
+-                                   and c-{&addTable}.corr-user-db-num   eq v-corr-user-db-num
+-                                   and c-{&addTable}.chip-num           eq p-chip-num
+-                                   
+-            no-lock:
+-               create X_c-obj-hist.
+-               buffer-copy {&buf_obj-hist} to X_c-obj-hist.
+-               buffer-copy c-{&addTable} to X_c-obj-hist
+-               assign 
+-                  X_c-obj-hist.subject = "{&addTable}"
+-               .
+-            end.
+-            
+-         end.
+-      end.
+-   end.
+-   
+-     
+-{ gbl/fltopend.i
+-          &where-cond = " TRUE "
+-          
+-          &by         = " by X_c-obj-hist.chip-num  " }
+-  
+-  return true.
+-end.
+-
+-function  getStsMark returns character (ists as int ):
+-   
+-   return StatusMark:GetLabel(ists).
+-   
+-end.
+-
+-
+-function  getStsTh returns character (ists as int ):
+-   
+-   return StatusTH:GetLabel(ists).
+-   
+-end.
+-function  getStsEdi returns character (ists as int ):
+-   
+-   return if ists eq 0 then "" else StatusEDI:GetLabel(ists).
+-   
+-end.
+-function  getStsEdocType returns character (itype as int ):
+-   
+-   return if itype eq 0 then "" else  EdocType:GetLabel(itype).
+-   
++else do:
++  run ref/cutdhistone.w(
++    {&param_1},
++    {&param_2},
++    parParentProc,
++    p-curr-host-code,
++    p-curr-obj-type,
++    p-curr-obj-code,
++    bttns,
++    p-mode,
++    p-corr-user-db-num,
++    p-corr-user-name,
++    p-subject,
++    p-db-num,
++    p-chip-num,
++    input-output p-rid-list
++  ).
+ end.
+ 
+-procedure utd-proc :
+-define output parameter p-description as character no-undo .
+-define buffer current_c-utd for ub.c-utd  .
+-define variable v-mess as character no-undo.
+-
+-do
+-on error undo, return error return-value
+-:
+-  find first current_c-utd no-lock where
+-               current_c-utd.db-num = X_c-obj-hist.db-num
+-           and current_c-utd.doc-id = X_c-obj-hist.doc-id
+-       
+-          and current_c-utd.chip-num = X_c-obj-hist.chip-num
+-          and current_c-utd.corr-user-db-num = X_c-obj-hist.corr-user-db-num no-error .
+-  if not avail current_c-utd then do:
+-      v-mess = "Неверная ссылка на c-utd в таблице c-utd-head".
+-     
+-      return error  v-mess .
+-  end.
+- 
+-&scop fields-name-list "DocumentExt,OrganizationExt,LoadDate,parentDocumentExt,parentOrganizationExt,RevocationStatus,RecipientResponseStatus,TypeId,CounteragentId,~
+-CustomDocumentId,DocumentNumber,DocumentDate,Timestamp,ReceiptStatus,Direction,ModifyDate,PackageId,EDocType,AmendmentRequested,BaseDocumentNumber,BaseDocumentName,~
+-BaseDocumentDate,cli-FnsParticipantId,cli-info,obj-FnsParticipantId,obj-info,sts,sts-edi,cli-type,cli-code,host-code,contract-code,obj-type,obj-code,~
+-ModifyTime,doc-code,AdditInfo,comment"
+-
+-define variable v-label-param as character no-undo .
+-  v-label-param =
+-   "OrganizationExt"     + {&delim-par} + "ID организации в ЭДО"                              + {&delim-par} + "" + {&delim-flf}
+- + "DocumentExt" + {&delim-par} + "ID документа в ЭДО"                          + {&delim-par} + "" + {&delim-flf}
+- + "LoadDate"      + {&delim-par} + "Дата загрузки"    + {&delim-par} + "" + {&delim-flf}
+- + "parentOrganizationExt"     + {&delim-par} + "ID организации в родительском документе в ЭДО"   + {&delim-par} + "" + {&delim-flf}
+- + "parentDocumentExt"      + {&delim-par} + "ID родительского документа в ЭДО"                                + {&delim-par} + "" + {&delim-flf}
+- + "RevocationStatus"       + {&delim-par} + "Статус аннулирования документа" + {&delim-par} + "" + {&delim-flf}
+- + "RecipientResponseStatus"  + {&delim-par} + "Состояние ответного действия"        + {&delim-par} + "" + {&delim-flf}
+- + "TypeId"  + {&delim-par} + "Тип документа ЭДО"                    + {&delim-par} + "" + {&delim-flf}
+- + "CounteragentId"     + {&delim-par} + "Контрагент документа"                       + {&delim-par} + "" + {&delim-flf}
+- + "CustomDocumentId"     + {&delim-par} + "Идентификатор документа, определяемый внешней системой"                       + {&delim-par} + "" + {&delim-flf}
+- + "DocumentNumber"    + {&delim-par} + "Номер документа"                            + {&delim-par} + "" + {&delim-flf}
+- + "DocumentDate"     + {&delim-par} + "Дата документа"                       + {&delim-par} + "" + {&delim-flf}
+- + "Timestamp"    + {&delim-par} + "Дата и время создания в ЭДО"                            + {&delim-par} + "" + {&delim-flf}
+- + "ReceiptStatus"     + {&delim-par} + "Состояние ИОП на документ"                       + {&delim-par} + "" + {&delim-flf}
+- + "Direction"    + {&delim-par} + "Направление документа"                            + {&delim-par} + "" + {&delim-flf}
+- + "ModifyDate"     + {&delim-par} + "Дата изменения"                       + {&delim-par} + "" + {&delim-flf}
+- + "ModifyTime"     + {&delim-par} + "Время изменения"                       + {&delim-par} + "" + {&delim-flf}
+- + "PackageId"    + {&delim-par} + "ID пакета в ЭДО"                            + {&delim-par} + "" + {&delim-flf}
+- + "EDocType"     + {&delim-par} + "Тип документа"                       + {&delim-par} + "getStsEdocType" + {&delim-flf}
+- + "AmendmentRequested"    + {&delim-par} + "Зарошена корректировка"                            + {&delim-par} + "" + {&delim-flf}
+- + "BaseDocumentNumber"     + {&delim-par} + "Номер договора"                       + {&delim-par} + "" + {&delim-flf}
+- + "BaseDocumentName"    + {&delim-par} + "Наименование договора"                            + {&delim-par} + "" + {&delim-flf}
+- + "BaseDocumentDate"     + {&delim-par} + "Дата договора"                       + {&delim-par} + "" + {&delim-flf}
+- + "cli-FnsParticipantId"    + {&delim-par} + "ID подразделения отправителя"                            + {&delim-par} + "" + {&delim-flf}
+- + "cli-info"    + {&delim-par} + "Инф. отправителя"                            + {&delim-par} + "" + {&delim-flf}
+- + "obj-FnsParticipantId"     + {&delim-par} + "ID подразделения получателя"                       + {&delim-par} + "" + {&delim-flf}
+- + "obj-info"    + {&delim-par} + "Инф. получателя"                            + {&delim-par} + "" + {&delim-flf}
+- + "sts"     + {&delim-par} + "Статус TH"                       + {&delim-par} + "getStsTh" + {&delim-flf}
+- + "sts-edi"    + {&delim-par} + "Статус ЭДО"                            + {&delim-par} + "getStsEdi" + {&delim-flf}
+- + "cli-type"    + {&delim-par} + "Тип отправителя"                            + {&delim-par} + "" + {&delim-flf}
+- + "cli-code"     + {&delim-par} + "Код отправителя"                       + {&delim-par} + "" + {&delim-flf}
+- + "host-code"    + {&delim-par} + "Фирма"                            + {&delim-par} + "" + {&delim-flf}
+- + "obj-type"     + {&delim-par} + "Тип объекта"                       + {&delim-par} + "" + {&delim-flf}
+- + "obj-code"    + {&delim-par} + "Код объекта"                            + {&delim-par} + "" + {&delim-flf}
+- + "doc-code"    + {&delim-par} + "Номер накладной"                            + {&delim-par} + "" + {&delim-flf}
+- + "total"    + {&delim-par} + "Сумма"                            + {&delim-par} + "" + {&delim-flf}
+- + "comment"    + {&delim-par} + "Комментарий"                            + {&delim-par} + "" + {&delim-flf}
+- + "Vat"    + {&delim-par} + "НДС"                            + {&delim-par} + "" + {&delim-flf}
+-  
+- + "AdditInfo"        + {&delim-par} + "Ошибки"  + {&delim-par} + "" .
+-
+-  run proc-full-temp-changes in this-procedure (
+-                                               input current_c-utd.action = integer({&hn-create})
+-                                              ,input current_c-utd.action = integer({&hn-delete})
+-                                              ,input  buffer current_c-utd:handle
+-                                              ,input  "utd" /*{&table_utd}*/
+-                                              ,input  {&fields-name-list}
+-                                              ,input  v-label-param).
+-
+-end. /*doe*/
+-end procedure. /* utd-proc */
+-
+-procedure utd-attr-proc :
+-define output parameter p-description as character no-undo .
+-&glob tab-attr utd-attr
+-define buffer current_c-{&tab-attr} for ub.c-{&tab-attr}  .
+-define variable v-mess as character no-undo.
+-
+-   do
+-   on error undo, return error return-value
+-   :
+-     find first current_c-{&tab-attr} no-lock where
+-                  current_c-{&tab-attr}.db-num = X_c-obj-hist.db-num
+-              and current_c-{&tab-attr}.doc-id = X_c-obj-hist.doc-id
+-             and current_c-{&tab-attr}.attr-code = X_c-obj-hist.attr-code
+-             and current_c-{&tab-attr}.chip-num = X_c-obj-hist.chip-num
+-             and current_c-{&tab-attr}.corr-user-db-num = X_c-obj-hist.corr-user-db-num no-error .
+-     if not avail current_c-{&tab-attr} then do:
+-         v-mess = "Неверная ссылка на c-{&tab-attr} в таблице c-utd-head".
+-        
+-         return error  v-mess .
+-     end.
+-      &scop fields-name-list "attr-code,attr-value"
+-   
+-   define variable v-label-param as character no-undo .
+-     v-label-param =
+-      "attr-code"     + {&delim-par} + "атрибут"                              + {&delim-par} + "" + {&delim-flf}
+-    + "attr-value"        + {&delim-par} + "Значение атрибута"  + {&delim-par} + "" .
+-      
+-     run proc-full-temp-changes in this-procedure (
+-                                                  input current_c-{&tab-attr}.action = integer({&hn-create})
+-                                                 ,input current_c-{&tab-attr}.action = integer({&hn-delete})
+-                                                 ,input  buffer current_c-{&tab-attr}:handle
+-                                                 ,input  "{&tab-attr}" /*{&table_utd}*/
+-                                                 ,input  {&fields-name-list}
+-                                                 ,input  v-label-param).
+-   end.
+-end.
+-define variable mCheckType as character no-undo.
+-define variable mCodeErr as character no-undo.
+-
+-function  err-text returns character (iCheckObj as character ):
+-   
+-   return if iCheckObj  eq "" then "" else GetTextErrortype( mCheckType, mCodeErr, iCheckObj,"all").
+-   
+-end.
+-
+-procedure utd-err-proc :
+-define output parameter p-description as character no-undo .
+-define buffer current_c-utd-err for ub.c-utd-err  .
+-define variable v-mess as character no-undo.
+-
+-do
+-on error undo, return error return-value
+-:
+-  find first current_c-utd-err no-lock where
+-               current_c-utd-err.db-num = X_c-obj-hist.db-num
+-           and current_c-utd-err.doc-id = X_c-obj-hist.doc-id
+-       and current_c-utd-err.CheckType = X_c-obj-hist.CheckType
+-       and current_c-utd-err.CodeErr = X_c-obj-hist.CodeErr
+-       and current_c-utd-err.CheckObj = X_c-obj-hist.CheckObj
+-       and current_c-utd-err.reckey = X_c-obj-hist.reckey
+-          and current_c-utd-err.chip-num = X_c-obj-hist.chip-num
+-          and current_c-utd-err.corr-user-db-num = X_c-obj-hist.corr-user-db-num no-error .
+-  if not avail current_c-utd-err then do:
+-      v-mess = "Неверная ссылка на c-utd в таблице c-utd-head".
+-     
+-      return error  v-mess .
+-  end.
+- mCheckType = current_c-utd-err.CheckType.
+- mCodeErr = current_c-utd-err.CodeErr.
+- 
+-         
+-&scop fields-name-list "CheckType,CodeErr,CheckObj,reckey,LineNum"
+-
+-define variable v-label-param as character no-undo .
+-  v-label-param =
+-   "CheckType"     + {&delim-par} + "Тип ошибки"                              + {&delim-par} + "" + {&delim-flf}
+- + "LineNum" + {&delim-par} + "Линия"                          + {&delim-par} + "" + {&delim-flf}
+- + "CodeErr" + {&delim-par} + "Код ошибки"                          + {&delim-par} + "" + {&delim-flf}
+- + "CheckObj"      + {&delim-par} + "Текст"    + {&delim-par} + "err-text" + {&delim-flf}
+- + "reckey"        + {&delim-par} + "ключ записи с ошибкой"  + {&delim-par} + "" .
+-
+-  run proc-full-temp-changes in this-procedure (
+-                                               input current_c-utd-err.action = integer({&hn-create})
+-                                              ,input current_c-utd-err.action = integer({&hn-delete})
+-                                              ,input  buffer current_c-utd-err:handle
+-                                              ,input  "utd-err" /*{&table_utd}*/
+-                                              ,input  {&fields-name-list}
+-                                              ,input  v-label-param).
+-
+-end. /*doe*/
+-end procedure.
+-
+-&glob tab-attr utd-err-attr
+-procedure {&tab-attr}-proc :
+-define output parameter p-description as character no-undo .
+-
+-define buffer current_c-{&tab-attr} for ub.c-{&tab-attr}  .
+-define variable v-mess as character no-undo.
+-
+-   do
+-   on error undo, return error return-value
+-   :
+-     find first current_c-{&tab-attr} no-lock where
+-                  current_c-{&tab-attr}.db-num = X_c-obj-hist.db-num
+-              and current_c-{&tab-attr}.doc-id = X_c-obj-hist.doc-id
+-              and current_c-{&tab-attr}.CheckType = X_c-obj-hist.CheckType
+-              and current_c-{&tab-attr}.CodeErr = X_c-obj-hist.CodeErr
+-              and current_c-{&tab-attr}.CheckObj = X_c-obj-hist.CheckObj
+-              and current_c-{&tab-attr}.reckey = X_c-obj-hist.reckey
+-             and current_c-{&tab-attr}.attr-code = X_c-obj-hist.attr-code
+-             and current_c-{&tab-attr}.chip-num = X_c-obj-hist.chip-num
+-             and current_c-{&tab-attr}.corr-user-db-num = X_c-obj-hist.corr-user-db-num no-error .
+-     if not avail current_c-{&tab-attr} then do:
+-         v-mess = "Неверная ссылка на c-{&tab-attr} в таблице c-utd-head".
+-        
+-         return error  v-mess .
+-     end.
+-      &scop fields-name-list "CheckType,CodeErr,CheckObj,reckey,attr-code,attr-value,LineNum"
+-   
+-   define variable v-label-param as character no-undo .
+-     v-label-param =
+-     "CheckType"     + {&delim-par} + "Тип ошибки"                              + {&delim-par} + "" + {&delim-flf}
+-+ "LineNum" + {&delim-par} + "Линия"                          + {&delim-par} + "" + {&delim-flf}
+- 
+-    + "CodeErr" + {&delim-par} + "Код ошибки"                          + {&delim-par} + "" + {&delim-flf}
+-    + "CheckObj"      + {&delim-par} + "Текст"    + {&delim-par} + "err-text" + {&delim-flf}
+-    + "reckey"        + {&delim-par} + "ключ записи с ошибкой"  + {&delim-par} + "" + {&delim-flf}
+-    + "attr-code"     + {&delim-par} + "атрибут"                              + {&delim-par} + "" + {&delim-flf}
+-    + "attr-value"        + {&delim-par} + "Значение атрибута"  + {&delim-par} + "" .
+-      
+-     run proc-full-temp-changes in this-procedure (
+-                                                  input current_c-{&tab-attr}.action = integer({&hn-create})
+-                                                 ,input current_c-{&tab-attr}.action = integer({&hn-delete})
+-                                                 ,input  buffer current_c-{&tab-attr}:handle
+-                                                 ,input  "{&tab-attr}" /*{&table_utd}*/
+-                                                 ,input  {&fields-name-list}
+-                                                 ,input  v-label-param).
+-   end.
+-end.
+-
+-procedure utd-lines-proc :
+-define output parameter p-description as character no-undo .
+-define buffer current_c-utd-lines for ub.c-utd-lines  .
+-define variable v-mess as character no-undo.
+-
+-do
+-on error undo, return error return-value
+-:
+-  find first current_c-utd-lines no-lock where
+-               current_c-utd-lines.db-num = X_c-obj-hist.db-num
+-           and current_c-utd-lines.doc-id = X_c-obj-hist.doc-id
+-           and current_c-utd-lines.linenum = X_c-obj-hist.linenum
+-          and current_c-utd-lines.chip-num = X_c-obj-hist.chip-num
+-          and current_c-utd-lines.corr-user-db-num = X_c-obj-hist.corr-user-db-num no-error .
+-  if not avail current_c-utd-lines then do:
+-      v-mess = "Неверная ссылка на c-utd-lines в таблице c-utd-head".
+-     
+-      return error  v-mess .
+-  end.
+- 
+-
+-         
+-&scop fields-name-list "LineNum,ProductCode,Article,UnitCode,ParcelType,TaxRate,Vat,Total,Quantity,TotalWithVatExcluded,gds-code,GdsName,sts"
+-
+-define variable v-label-param as character no-undo .
+-  v-label-param =
+-   "LineNum"     + {&delim-par} + "Номер линии"                              + {&delim-par} + "" + {&delim-flf}
+- + "ProductCode" + {&delim-par} + "Товар в ЭДО"                          + {&delim-par} + "" + {&delim-flf}
+- + "Article"      + {&delim-par} + "Артикл в ЭДО"    + {&delim-par} + "" + {&delim-flf}
+- + "UnitCode" + {&delim-par} + "Ед. в ЭДО"                          + {&delim-par} + "" + {&delim-flf}
+-/* + "ParcelType"      + {&delim-par} + "Текст"    + {&delim-par} + "err-text" + {&delim-flf}*/
+- + "TaxRate" + {&delim-par} + "НДС,%"                          + {&delim-par} + "" + {&delim-flf}
+- + "Vat"      + {&delim-par} + "Сумма НДС"    + {&delim-par} + "" + {&delim-flf}
+- + "Total" + {&delim-par} + "Сумма"                          + {&delim-par} + "" + {&delim-flf}
+- + "TotalWithVatExcluded"      + {&delim-par} + "Сумма без ндс"    + {&delim-par} + "" + {&delim-flf}
+- + "gds-code" + {&delim-par} + "Код товара"                          + {&delim-par} + "" + {&delim-flf}
+-/* + "GdsName"      + {&delim-par} + "Наименование"    + {&delim-par} + "" + {&delim-flf}*/
+- + "sts"        + {&delim-par} + "Статус"  + {&delim-par} + "" .
+-
+-  run proc-full-temp-changes in this-procedure (
+-                                               input         current_c-utd-lines.action = integer({&hn-create})
+-                                              ,input         current_c-utd-lines.action = integer({&hn-delete})
+-                                              ,input  buffer current_c-utd-lines:handle
+-                                              ,input                  "utd-lines" /*{&table_utd}*/
+-                                              ,input  {&fields-name-list}
+-                                              ,input  v-label-param).
+-
+-end. /*doe*/
+-end procedure.
+-
+-&glob tab-attr utd-lines-attr
+-procedure {&tab-attr}-proc :
+-define output parameter p-description as character no-undo .
+-
+-define buffer current_c-{&tab-attr} for ub.c-{&tab-attr}  .
+-define variable v-mess as character no-undo.
+-
+-   do
+-   on error undo, return error return-value
+-   :
+-     find first current_c-{&tab-attr} no-lock where
+-                  current_c-{&tab-attr}.db-num = X_c-obj-hist.db-num
+-              and current_c-{&tab-attr}.doc-id = X_c-obj-hist.doc-id
+-              and current_c-{&tab-attr}.linenum = X_c-obj-hist.linenum
+-             and current_c-{&tab-attr}.attr-code = X_c-obj-hist.attr-code
+-             and current_c-{&tab-attr}.chip-num = X_c-obj-hist.chip-num
+-             and current_c-{&tab-attr}.corr-user-db-num = X_c-obj-hist.corr-user-db-num no-error .
+-     if not avail current_c-{&tab-attr} then do:
+-         v-mess = "Неверная ссылка на c-{&tab-attr} в таблице c-utd-head".
+-        
+-         return error  v-mess .
+-     end.
+-      &scop fields-name-list "LineNum,attr-code,attr-value"
+-   
+-   define variable v-label-param as character no-undo .
+-     v-label-param =
+-     "LineNum"     + {&delim-par} + "Номер линии"                              + {&delim-par} + "" + {&delim-flf}
+-     + "attr-code"     + {&delim-par} + "атрибут"                              + {&delim-par} + "" + {&delim-flf}
+-     + "attr-value"        + {&delim-par} + "Значение атрибута"  + {&delim-par} + "" .
+-      
+-     run proc-full-temp-changes in this-procedure (
+-                                                  input current_c-{&tab-attr}.action = integer({&hn-create})
+-                                                 ,input current_c-{&tab-attr}.action = integer({&hn-delete})
+-                                                 ,input  buffer current_c-{&tab-attr}:handle
+-                                                 ,input  "{&tab-attr}" /*{&table_utd}*/
+-                                                 ,input  {&fields-name-list}
+-                                                 ,input  v-label-param).
+-   end.
+-end.
+-
+-procedure utd-marking-lines-proc :
+-define output parameter p-description as character no-undo .
+-define buffer current_c-utd-marking-lines for ub.c-utd-marking-lines  .
+-define variable v-mess as character no-undo.
+-
+-do
+-on error undo, return error return-value
+-:
+-  find first current_c-utd-marking-lines no-lock where
+-               current_c-utd-marking-lines.db-num = X_c-obj-hist.db-num
+-           and current_c-utd-marking-lines.doc-id = X_c-obj-hist.doc-id
+-           and current_c-utd-marking-lines.linenum = X_c-obj-hist.linenum
+-        and current_c-utd-marking-lines.mark = X_c-obj-hist.mark
+-          and current_c-utd-marking-lines.chip-num = X_c-obj-hist.chip-num
+-          and current_c-utd-marking-lines.corr-user-db-num = X_c-obj-hist.corr-user-db-num no-error .
+-  if not avail current_c-utd-marking-lines then do:
+-      v-mess = "Неверная ссылка на c-utd-lines в таблице c-utd-head".
+-     
+-      return error  v-mess .
+-  end.
+-         
+-&scop fields-name-list "LineNum,doc-level,site,gds-code,mark,sts"
+-
+-define variable v-label-param as character no-undo .
+-  v-label-param =
+-   "LineNum"     + {&delim-par} + "Номер линии"                              + {&delim-par} + "" + {&delim-flf}
+- + "doc-level " + {&delim-par} + "Уровень вложености марки( 1 привязан к документу) "                          + {&delim-par} + "" + {&delim-flf}
+- + "site"      + {&delim-par} + "Сторона (- Возврат)"    + {&delim-par} + "" + {&delim-flf}
+- + "gds-code" + {&delim-par} + "Код товара"                          + {&delim-par} + "" + {&delim-flf}
+- + "mark" + {&delim-par} + "Марка"                          + {&delim-par} + "" + {&delim-flf}
+- + "sts"        + {&delim-par} + "Статус"  + {&delim-par} + "getStsMark" .
+-
+-  run proc-full-temp-changes in this-procedure (
+-                                               input         current_c-utd-marking-lines.action = integer({&hn-create})
+-                                              ,input         current_c-utd-marking-lines.action = integer({&hn-delete})
+-                                              ,input  buffer current_c-utd-marking-lines:handle
+-                                              ,input                  "utd-marking-lines" /*{&table_utd}*/
+-                                              ,input  {&fields-name-list}
+-                                              ,input  v-label-param).
+-
+-end. /*doe*/
+-end procedure.
+-&glob tab-attr utd-marking-lines-attr
+-procedure {&tab-attr}-proc :
+-define output parameter p-description as character no-undo .
+-
+-   define buffer current_c-{&tab-attr} for ub.c-{&tab-attr}  .
+-   define variable v-mess as character no-undo.
+-   
+-   do
+-   on error undo, return error return-value
+-   :
+-     find first current_c-{&tab-attr} no-lock where
+-                  current_c-{&tab-attr}.db-num = X_c-obj-hist.db-num
+-              and current_c-{&tab-attr}.doc-id = X_c-obj-hist.doc-id
+-              and current_c-{&tab-attr}.linenum = X_c-obj-hist.linenum
+-              and current_c-{&tab-attr}.mark = X_c-obj-hist.mark
+-             and current_c-{&tab-attr}.attr-code = X_c-obj-hist.attr-code
+-             and current_c-{&tab-attr}.chip-num = X_c-obj-hist.chip-num
+-             and current_c-{&tab-attr}.corr-user-db-num = X_c-obj-hist.corr-user-db-num no-error .
+-     if not avail current_c-{&tab-attr} then do:
+-         v-mess = "Неверная ссылка на c-{&tab-attr} в таблице c-utd-head".
+-        
+-         return error  v-mess .
+-     end.
+-      &scop fields-name-list "LineNum,mark,attr-code,attr-value"
+-   
+-   define variable v-label-param as character no-undo .
+-     v-label-param =
+-     "LineNum"     + {&delim-par} + "Номер линии"                              + {&delim-par} + "" + {&delim-flf}
+-     + "mark" + {&delim-par} + "Марка"                          + {&delim-par} + "" + {&delim-flf}
+-     + "attr-code"     + {&delim-par} + "атрибут"                              + {&delim-par} + "" + {&delim-flf}
+-     + "attr-value"        + {&delim-par} + "Значение атрибута"  + {&delim-par} + "" .
+-      
+-     run proc-full-temp-changes in this-procedure (
+-                                                  input current_c-{&tab-attr}.action = integer({&hn-create})
+-                                                 ,input current_c-{&tab-attr}.action = integer({&hn-delete})
+-                                                 ,input  buffer current_c-{&tab-attr}:handle
+-                                                 ,input  "{&tab-attr}" /*{&table_utd}*/
+-                                                 ,input  {&fields-name-list}
+-                                                 ,input  v-label-param).
+-   end.
+-end.
+\ No newline at end of file
++{ ref/cutdhist.i}
+\ No newline at end of file
+diff --git a/ref/cutdhistone.w b/ref/cutdhistone.w
+new file mode 100644
+--- /dev/null
++++ b/ref/cutdhistone.w
+@@ -0,0 +1,23 @@
++&glob param_1 p-dB-NUM-utd
++define input  parameter {&Param_1} as int64 no-undo.
++&glob param_2 p-doc-id-utd
++define input  parameter {&Param_2} as int64 no-undo.
++
++{ gbl/objsrv.i }
++define variable StatusTH   as class     ibs.th.str.utd.sts.th  no-undo .
++define variable StatusEDI  as class     ibs.th.str.utd.sts.edi no-undo .
++define variable EdocType  as class     ibs.th.str.utd.edoctype no-undo .
++define variable StatusMark  as class     ibs.th.str.marking.sts.mark no-undo .
++StatusTH = ObjSrv:Env:Utd:Sts:TH.
++StatusEDI = ObjSrv:Env:Utd:Sts:EDI.
++EdocType = ObjSrv:Env:Utd:EDocType.
++StatusMark = ObjSrv:Env:marking:sts:mark.
++
++define variable vLabel as character no-undo.
++
++&glob buf_obj-hist c-utd-head
++&Glob VisibleKeyField yes
++vLabel = "История по УПД " + string(p-doc-id-utd) + " по ДБ " + string(p-dB-NUM-utd).
++{ref/brwhist.i &objhead = yes &lable = vLabel &objtt=yes}
++
++{ ref/cutdhist.i}
+\ No newline at end of file
+diff --git a/str/calldocs.w b/str/calldocs.w
+--- a/str/calldocs.w
++++ b/str/calldocs.w
+@@ -890,6 +890,7 @@ ON WINDOW-CLOSE OF FRAME {&FRAME-NAME} A
+ MAIN-BLOCK:
+ DO ON ERROR   UNDO MAIN-BLOCK, LEAVE MAIN-BLOCK
+    ON END-KEY UNDO MAIN-BLOCK, LEAVE MAIN-BLOCK:
++/*run gbl/inidebug.p.*/
+   /* для жесткого фильтра по оплате */
+   find first sch-pay  no-lock where recid( sch-pay  ) = doc-rec no-error.
+ 
+@@ -954,7 +955,7 @@ DO ON ERROR   UNDO MAIN-BLOCK, LEAVE MAI
+   if is-finvalue = "yes" then do:
+      run align-buttons in this-procedure (input (frame {&frame-name}:handle), input v-button-order, input 1).
+   end.
+-  if parlist-mode = 'doc':u then do:
++  if parlist-mode = 'doc':u or parlist-mode = {&g___object} then do:
+      c-t-doc.corr-date:label = "Изменен" .
+   end.
+   else do:
+@@ -1237,7 +1238,7 @@ case parlist-mode :
+     &by         = "  " }
+   end. /* {&company} */
+   when {&g___object} then do:
+-    frame {&frame-name} :title = title0 + "Объект : " + p-obj-type + " ":U + string( p-obj-code ).
++    frame {&frame-name} :title = "История по документам " + "Объект : " + p-obj-type + " ":U + string( p-obj-code ).
+     assign filter-point = {&g___object}
+             objects = 2.
+     { gbl/fltopend.i
+diff --git a/str/calldocs_.p b/str/calldocs_.p
+new file mode 100644
+--- /dev/null
++++ b/str/calldocs_.p
+@@ -0,0 +1,35 @@
++&glob param_1 iDocCode
++define input  parameter {&Param_1} like ub.trn-doc.doc-code no-undo.
++
++{ gbl/objsrv.i }
++{ cmp/str-glbl.i     }
++define buffer c-trn-doc for ub.c-trn-doc. 
++
++&glob buf_obj-hist c-trn-doc
++&Glob VisibleKeyField yes
++{ref/brwhist.i &Paramonly = yes}
++
++if iDocCode <> ? then
++do:
++  find first c-trn-doc no-lock where 
++             c-trn-doc.doc-code = iDocCode no-error.
++  if not avail c-trn-doc then
++  do:
++    message "Документ не найден." view-as alert-box.
++    return.  
++  end. 
++end.             
++
++run str/calldocs.w ( input  parparentproc,
++                     input  if p-mode = "one" then "doc" else {&g___object},
++                     input  "",
++                     input  "",
++                     input  ?,
++                     input  no,
++                     input  "":U,
++                     input  if iDocCode <> ? then iDocCode else "":U,
++                     input  ?,
++                     input  if avail trn-doc then recid(trn-doc) else ?,
++                     input  p-curr-obj-type,
++                     input  p-curr-obj-code,
++                     output p-rid-list ).
+diff --git a/str/history.w b/str/history.w
+new file mode 100644
+--- /dev/null
++++ b/str/history.w
+@@ -0,0 +1,502 @@
++&ANALYZE-SUSPEND _VERSION-NUMBER AB_v10r12 GUI
++&ANALYZE-RESUME
++/* Connected Databases 
++*/
++&Scoped-define WINDOW-NAME CURRENT-WINDOW
++&Scoped-define FRAME-NAME Dialog-Frame
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CUSTOM _DEFINITIONS Dialog-Frame 
++/*------------------------------------------------------------------------
++
++$Revision$
++$Author$
++$Date$
++$Workfile$
++$Archive$
++
++Просмотр истории по таблицам
++
++Автор: Ростовцев Александр
++Дата создания: 16/04/2026
++Author: 
++Creation date:
++
++
++------------------------------------------------------------------------*/
++
++/* ***************************  Definitions  ************************** */
++
++/* Parameters Definitions ---                                           */
++define input parameter parparentproc as widget-handle no-undo.
++
++define variable vss-revision    as character no-undo init "$Revision$":U .
++define variable vss-author      as character no-undo init "$Author$":U .
++define variable vss-date        as character no-undo init "$Date$":U .
++define variable vss-workfile    as character no-undo init "$Workfile$":U .
++define variable vss-archive     as character no-undo init "$Archive$":U .
++define variable vss-description as character no-undo init "Просмотр истории по таблицам".
++{ cmp/vssrevis.i }
++{ cmp/str-glbl.i }
++{ cmp/showinf.i }
++{ gbl/color.i }
++{ gbl/getcntxt.i def }
++/* Local Variable Definitions ---                                       */
++
++&scoped-define FILE_TABLES "cmp\history.txt"
++
++define temp-table ttHistory no-undo
++  field fTable as character label "Таблица" format "X(15)"
++  field fName  as character label "Наименование объекта" format "X(30)"
++  field fProc  as character label "Процедура просмотра"
++  field fLabel as character
++  field fField as character
++  field fType  as character
++.
++
++define stream inStr.
++define variable mMode as character no-undo.
++define variable mIdList as character no-undo.
++
++&scoped-define PARAMS parparentproc,v-cntxt-host-code-obj,v-cntxt-obj-type,v-cntxt-obj-code,'',mMode,?,'','',sys-ctrl.db-num,?,input-output mIdList
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++&ANALYZE-SUSPEND _UIB-PREPROCESSOR-BLOCK 
++
++/* ********************  Preprocessor Definitions  ******************** */
++
++&Scoped-define PROCEDURE-TYPE Dialog-Box
++&Scoped-define DB-AWARE no
++
++/* Name of designated FRAME-NAME and/or first browse and/or first query */
++&Scoped-define FRAME-NAME Dialog-Frame
++&Scoped-define BROWSE-NAME BROWSE-tables
++
++/* Internal Tables (found by Frame, Query & Browse Queries)             */
++&Scoped-define INTERNAL-TABLES ttHistory
++
++/* Definitions for BROWSE BROWSE-tables                                 */
++&Scoped-define FIELDS-IN-QUERY-BROWSE-tables ttHistory.fTable ttHistory.fName   
++&Scoped-define ENABLED-FIELDS-IN-QUERY-BROWSE-tables   
++&Scoped-define SELF-NAME BROWSE-tables
++&Scoped-define QUERY-STRING-BROWSE-tables FOR EACH ttHistory by ttHistory.fTable
++&Scoped-define OPEN-QUERY-BROWSE-tables OPEN QUERY {&SELF-NAME} FOR EACH ttHistory by ttHistory.fTable.
++&Scoped-define TABLES-IN-QUERY-BROWSE-tables ttHistory
++&Scoped-define FIRST-TABLE-IN-QUERY-BROWSE-tables ttHistory
++
++
++/* Definitions for DIALOG-BOX Dialog-Frame                              */
++&Scoped-define OPEN-BROWSERS-IN-QUERY-Dialog-Frame ~
++    ~{&OPEN-QUERY-BROWSE-tables}
++
++/* Standard List Definitions                                            */
++&Scoped-Define ENABLED-OBJECTS b-exit b-view BROWSE-tables 
++
++/* Custom List Definitions                                              */
++/* List-1,List-2,List-3,List-4,List-5,List-6                            */
++
++/* _UIB-PREPROCESSOR-BLOCK-END */
++&ANALYZE-RESUME
++
++
++
++/* ***********************  Control Definitions  ********************** */
++
++/* Define a dialog box                                                  */
++
++/* Menu Definitions                                                     */
++DEFINE MENU POPUP-MENU-b-view 
++       MENU-ITEM m_one          LABEL "По одному объекту"
++       MENU-ITEM m_all          LABEL "По всем объектам".
++
++
++/* Definitions of the field level widgets                               */
++DEFINE BUTTON b-exit 
++     LABEL "Выход" 
++     SIZE 15 BY 1.14.
++
++DEFINE BUTTON b-view 
++     LABEL "Просмотр" 
++     SIZE 15 BY 1.14.
++
++/* Query definitions                                                    */
++&ANALYZE-SUSPEND
++DEFINE QUERY BROWSE-tables FOR 
++      ttHistory SCROLLING.
++&ANALYZE-RESUME
++
++/* Browse definitions                                                   */
++DEFINE BROWSE BROWSE-tables
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _DISPLAY-FIELDS BROWSE-tables Dialog-Frame _FREEFORM
++  QUERY BROWSE-tables DISPLAY
++      ttHistory.fTable
++      ttHistory.fName
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++    WITH NO-ROW-MARKERS SEPARATORS SIZE 84 BY 15.24 ROW-HEIGHT-CHARS .76 FIT-LAST-COLUMN.
++
++
++/* ************************  Frame Definitions  *********************** */
++
++DEFINE FRAME Dialog-Frame
++     b-exit AT ROW 1.48 COL 3 WIDGET-ID 2
++     b-view AT ROW 1.48 COL 20 WIDGET-ID 4
++     BROWSE-tables AT ROW 3.14 COL 3 WIDGET-ID 200
++     SPACE(1.59) SKIP(0.94)
++    WITH VIEW-AS DIALOG-BOX KEEP-TAB-ORDER 
++         SIDE-LABELS NO-UNDERLINE THREE-D  SCROLLABLE 
++         TITLE "История изменений"
++         CANCEL-BUTTON b-exit WIDGET-ID 100.
++
++
++/* *********************** Procedure Settings ************************ */
++
++&ANALYZE-SUSPEND _PROCEDURE-SETTINGS
++/* Settings for THIS-PROCEDURE
++   Type: Dialog-Box
++   Allow: Basic,Browse,DB-Fields,Query
++ */
++&ANALYZE-RESUME _END-PROCEDURE-SETTINGS
++
++
++
++/* ***********  Runtime Attributes and AppBuilder Settings  *********** */
++
++&ANALYZE-SUSPEND _RUN-TIME-ATTRIBUTES
++/* SETTINGS FOR DIALOG-BOX Dialog-Frame
++   FRAME-NAME                                                           */
++/* BROWSE-TAB BROWSE-tables b-view Dialog-Frame */
++ASSIGN 
++       FRAME Dialog-Frame:SCROLLABLE       = FALSE.
++
++ASSIGN 
++       b-view:POPUP-MENU IN FRAME Dialog-Frame       = MENU POPUP-MENU-b-view:HANDLE.
++ASSIGN 
++   b-view:MENU-MOUSE = 1.
++   
++/* _RUN-TIME-ATTRIBUTES-END */
++&ANALYZE-RESUME
++
++
++/* Setting information for Queries and Browse Widgets fields            */
++
++&ANALYZE-SUSPEND _QUERY-BLOCK BROWSE BROWSE-tables
++/* Query rebuild information for BROWSE BROWSE-tables
++     _START_FREEFORM
++OPEN QUERY {&SELF-NAME} FOR EACH ttHistory by ttHistory.fTable.
++     _END_FREEFORM
++     _Query            is OPENED
++*/  /* BROWSE BROWSE-tables */
++&ANALYZE-RESUME
++
++ 
++
++
++
++/* ************************  Control Triggers  ************************ */
++
++&Scoped-define SELF-NAME Dialog-Frame
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL Dialog-Frame Dialog-Frame
++ON WINDOW-CLOSE OF FRAME Dialog-Frame /* История изменений */
++DO:
++  APPLY "END-ERROR":U TO SELF.
++END.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++&Scoped-define SELF-NAME b-exit
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL b-exit Dialog-Frame
++ON CHOOSE OF b-exit IN FRAME Dialog-Frame /* Выход */
++DO:
++  APPLY "END-ERROR":U TO SELF.
++END.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++&Scoped-define BROWSE-NAME BROWSE-tables
++&Scoped-define SELF-NAME BROWSE-tables
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL BROWSE-tables Dialog-Frame
++ON RETURN OF BROWSE-tables IN FRAME Dialog-Frame
++DO:
++  apply "choose":U to b-view in frame {&frame-name}.
++END.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++&Scoped-define SELF-NAME m_all
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL m_all Dialog-Frame
++ON CHOOSE OF MENU-ITEM m_all /* По всем объектам */
++DO:
++  if not avail ttHistory then
++    return no-apply.
++
++  if ttHistory.fProc = "" then 
++  do:
++    message "В настройках просмотра истории не задана процедура просмотра истории." skip
++            "Обратитесь к разработчикам." view-as alert-box.
++    return no-apply.
++  end.
++  
++  if ttHistory.fField = "" then
++    run getIdent in this-procedure (ttHistory.fTable). 
++
++  mMode = {&all}.
++  run runHistoryProc in this-procedure("", ttHistory.fProc ).
++END.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++&Scoped-define SELF-NAME m_one
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL m_one Dialog-Frame
++ON CHOOSE OF MENU-ITEM m_one /* По одному объекту */
++DO:
++  define variable vIdent  as character no-undo.
++  
++  if not avail ttHistory then
++    return no-apply.
++    
++  if ttHistory.fProc = "" then 
++  do:
++    message "В настройках просмотра истории не задана процедура просмотра истории по одному объекту." skip
++            "Обратитесь к разработчикам." view-as alert-box.
++    return no-apply.
++  end.
++  
++  if ttHistory.fField = "" then
++    run getIdent in this-procedure (ttHistory.fTable). 
++    
++/*  message ttHistory.fField skip*/
++/*          ttHistory.fLabel skip*/
++/*          ttHistory.fType      */
++/*  view-as alert-box.           */
++  
++  run str/histparam.w (ttHistory.fLabel, ttHistory.fType, output vIdent).
++
++/*  message vIdent view-as alert-box. */
++  if vIdent = "" then
++    return no-apply.
++  mMode = "one".
++  run runHistoryProc in this-procedure(vIdent, ttHistory.fProc).
++  
++END.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++&UNDEFINE SELF-NAME
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CUSTOM _MAIN-BLOCK Dialog-Frame 
++
++
++/* ***************************  Main Block  *************************** */
++
++/* Parent the dialog-box to the ACTIVE-WINDOW, if there is no parent.   */
++IF VALID-HANDLE(ACTIVE-WINDOW) AND FRAME {&FRAME-NAME}:PARENT eq ?
++THEN FRAME {&FRAME-NAME}:PARENT = ACTIVE-WINDOW.
++
++
++/* Now enable the interface and wait for the exit condition.            */
++/* (NOTE: handle ERROR and END-KEY so cleanup code will always fire.    */
++MAIN-BLOCK:
++DO ON ERROR   UNDO MAIN-BLOCK, LEAVE MAIN-BLOCK
++   ON END-KEY UNDO MAIN-BLOCK, LEAVE MAIN-BLOCK:
++
++  run getTables in this-procedure no-error.
++  if error-status:error then return.
++
++  find first sys-ctrl no-lock.
++  { gbl/getcntxt.i get }
++
++  RUN enable_UI.
++  WAIT-FOR GO OF FRAME {&FRAME-NAME}.
++END.
++RUN disable_UI.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++/* **********************  Internal Procedures  *********************** */
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE disable_UI Dialog-Frame  _DEFAULT-DISABLE
++PROCEDURE disable_UI :
++/*------------------------------------------------------------------------------
++  Purpose:     DISABLE the User Interface
++  Parameters:  <none>
++  Notes:       Here we clean-up the user-interface by deleting
++               dynamic widgets we have created and/or hide 
++               frames.  This procedure is usually called when
++               we are ready to "clean-up" after running.
++------------------------------------------------------------------------------*/
++  /* Hide all frames. */
++  HIDE FRAME Dialog-Frame.
++END PROCEDURE.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE enable_UI Dialog-Frame  _DEFAULT-ENABLE
++PROCEDURE enable_UI :
++/*------------------------------------------------------------------------------
++  Purpose:     ENABLE the User Interface
++  Parameters:  <none>
++  Notes:       Here we display/view/enable the widgets in the
++               user-interface.  In addition, OPEN all queries
++               associated with each FRAME and BROWSE.
++               These statements here are based on the "Other 
++               Settings" section of the widget Property Sheets.
++------------------------------------------------------------------------------*/
++  ENABLE b-exit b-view BROWSE-tables 
++      WITH FRAME Dialog-Frame.
++  {&OPEN-BROWSERS-IN-QUERY-Dialog-Frame}
++END PROCEDURE.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE getIdent Dialog-Frame 
++PROCEDURE getIdent :
++/*------------------------------------------------------------------------------
++  Purpose:     
++  Parameters:  <none>
++  Notes:       
++------------------------------------------------------------------------------*/
++  define input parameter iTable as character no-undo.  
++  
++  define buffer buf_ttHistory for ttHistory.
++  define buffer buf_file  for ub._File.
++  define buffer buf_field for ub._Field.
++  define buffer buf_index for ub._Index.
++  define buffer buf_index-field for ub._Index-Field.
++  define variable vComma as character no-undo.  
++  
++  find first buf_ttHistory where buf_ttHistory.fTable = iTable.
++  
++  for first buf_file no-lock where
++          buf_file._file-name = iTable
++     ,first buf_index no-lock where
++            recid(buf_index) = buf_file._prime-index
++     ,each  buf_index-field no-lock where
++            buf_index-field._Index-recid = recid(buf_index)
++     ,first buf_field no-lock where
++            recid(buf_field) = buf_index-field._Field-recid
++  : 
++    assign
++      vComma = if buf_ttHistory.fField = "" then "" else ","
++      buf_ttHistory.fField = substitute("&1&2&3", buf_ttHistory.fField, vComma, buf_field._Field-name)
++      buf_ttHistory.fType  = substitute("&1&2&3", buf_ttHistory.fType, vComma, buf_field._Data-type)
++      buf_ttHistory.fLabel  = substitute(
++        "&1&2&3", buf_ttHistory.fLabel, 
++        vComma, 
++        if buf_field._Label <> "" and buf_field._Label <> ? then buf_field._Label else buf_field._Field-name
++      )
++    . 
++  end.
++
++END PROCEDURE.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE getTables Dialog-Frame 
++PROCEDURE getTables :
++/*------------------------------------------------------------------------------
++  Purpose:     
++  Parameters:  <none>
++  Notes:       
++------------------------------------------------------------------------------*/
++define variable vTable as character no-undo.
++define variable vName  as character no-undo.
++define variable vProc  as character no-undo.
++
++if search({&FILE_TABLES}) = ? then
++do:
++  message substitute("Не найден файл настроек &1.",{&FILE_TABLES}) view-as alert-box.
++  return error.
++end.
++
++
++input stream inStr from value(search({&FILE_TABLES})).
++READ_FILE:
++repeat:
++  import stream inStr vTable vName vProc.
++  if vTable begins "//" then next READ_FILE.
++  create ttHistory.
++  assign
++    ttHistory.fTable    = vTable
++    ttHistory.fName     = vName
++    ttHistory.fProc     = vProc
++  .
++end.
++input stream inStr close.
++
++END PROCEDURE.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE runHistoryProc Dialog-Frame 
++PROCEDURE runHistoryProc :
++/*------------------------------------------------------------------------------
++  Purpose:     
++  Parameters:  <none>
++  Notes:       
++------------------------------------------------------------------------------*/
++  define input parameter pIdent as character no-undo.
++  define input parameter pProc  as character no-undo.
++
++  case ttHistory.fType:
++    when "character" then do:
++/*      vIdent = '0104606532014339215iEdGpjf"K?qB'.*/
++      run value(pProc) (
++        if pIdent <> "" then pIdent else ?,
++        {&PARAMS}
++      ).
++    end.
++    when "character,character" then do:
++      run value(pProc) (
++        if pIdent <> "" then entry(1,pIdent) else ?,
++        if pIdent <> "" then entry(2,pIdent) else ?,
++        {&PARAMS}
++      ).
++    end.
++    when "integer,integer" then do:
++      run value(pProc) (
++        if pIdent <> "" then int(entry(1,pIdent)) else ?,
++        if pIdent <> "" then int(entry(2,pIdent)) else ?,
++        {&PARAMS}
++      ).
++    end.
++    when "int64" then do:
++      run value(pProc) (
++        if pIdent <> "" then int64(pIdent) else ?,
++        {&PARAMS}
++      ).
++    end.
++    when "integer" then do:
++      run value(pProc) (
++        if pIdent <> "" then int(pIdent) else ?,
++        {&PARAMS}
++      ).
++    end.
++    otherwise do:
++      message
++        substitute("Для входных параметров типа &1 необходимо доработать вызов просмотра истории.", ttHistory.fType)
++        view-as alert-box.
++    end.
++  end case.
++END PROCEDURE.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
+diff --git a/str/histparam.w b/str/histparam.w
+new file mode 100644
+--- /dev/null
++++ b/str/histparam.w
+@@ -0,0 +1,329 @@
++&ANALYZE-SUSPEND _VERSION-NUMBER AB_v10r12 GUI
++&ANALYZE-RESUME
++&Scoped-define WINDOW-NAME CURRENT-WINDOW
++&Scoped-define FRAME-NAME Dialog-Frame
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CUSTOM _DEFINITIONS Dialog-Frame 
++/*------------------------------------------------------------------------
++
++$Revision$
++$Author$
++$Date$
++$Workfile$
++$Archive$
++
++Ввод уникального идентификатора записи для просмотра истории
++
++Автор: Ростовцев Александр
++Дата создания: 16/04/2026
++Author: 
++Creation date:
++
++
++------------------------------------------------------------------------*/
++
++/* ***************************  Definitions  ************************** */
++
++/* Parameters Definitions ---                                           */
++
++define variable vss-revision    as character no-undo init "$Revision$":U .
++define variable vss-author      as character no-undo init "$Author$":U .
++define variable vss-date        as character no-undo init "$Date$":U .
++define variable vss-workfile    as character no-undo init "$Workfile$":U .
++define variable vss-archive     as character no-undo init "$Archive$":U .
++define variable vss-description as character no-undo init "Ввод уникального идентификатора записи".
++{ cmp/vssrevis.i }
++{ cmp/str-glbl.i }
++{ cmp/showinf.i }
++{ gbl/color.i }
++
++/* ***************************  Definitions  ************************** */
++
++/* Parameters Definitions ---                                           */
++define input  parameter iLabel as character no-undo.
++define input  parameter iTypes as character no-undo.
++define output parameter oIdent as character no-undo.
++
++/* Local Variable Definitions ---                                       */
++define temp-table ttFill no-undo
++  field fLabel  as handle
++  field fFill   as handle
++  field fType   as character
++  field fFormat as character
++.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++&ANALYZE-SUSPEND _UIB-PREPROCESSOR-BLOCK 
++
++/* ********************  Preprocessor Definitions  ******************** */
++
++&Scoped-define PROCEDURE-TYPE Dialog-Box
++&Scoped-define DB-AWARE no
++
++/* Name of designated FRAME-NAME and/or first browse and/or first query */
++&Scoped-define FRAME-NAME Dialog-Frame
++
++/* Standard List Definitions                                            */
++&Scoped-Define ENABLED-OBJECTS RECT-1 b-exit b-input 
++
++/* Custom List Definitions                                              */
++/* List-1,List-2,List-3,List-4,List-5,List-6                            */
++
++/* _UIB-PREPROCESSOR-BLOCK-END */
++&ANALYZE-RESUME
++
++
++
++/* ***********************  Control Definitions  ********************** */
++
++/* Define a dialog box                                                  */
++
++/* Definitions of the field level widgets                               */
++DEFINE BUTTON b-exit 
++     LABEL "Выход" 
++     SIZE 15 BY 1.14.
++
++DEFINE BUTTON b-input 
++     LABEL "Ввод" 
++     SIZE 15 BY 1.14.
++
++DEFINE RECTANGLE RECT-1
++     EDGE-PIXELS 2 GRAPHIC-EDGE  NO-FILL   
++     SIZE 72 BY 2.38.
++
++
++/* ************************  Frame Definitions  *********************** */
++
++DEFINE FRAME Dialog-Frame
++     b-exit AT ROW 1.48 COL 3 WIDGET-ID 2
++     b-input AT ROW 1.48 COL 19 WIDGET-ID 8
++     RECT-1 AT ROW 2.91 COL 2 WIDGET-ID 10
++     SPACE(1.79) SKIP(0.99)
++    WITH VIEW-AS DIALOG-BOX KEEP-TAB-ORDER 
++         SIDE-LABELS NO-UNDERLINE THREE-D  SCROLLABLE 
++         TITLE "Введите значения для идентификации записи" WIDGET-ID 100.
++
++
++/* *********************** Procedure Settings ************************ */
++
++&ANALYZE-SUSPEND _PROCEDURE-SETTINGS
++/* Settings for THIS-PROCEDURE
++   Type: Dialog-Box
++   Allow: Basic,Browse,DB-Fields,Query
++ */
++&ANALYZE-RESUME _END-PROCEDURE-SETTINGS
++
++
++
++/* ***********  Runtime Attributes and AppBuilder Settings  *********** */
++
++&ANALYZE-SUSPEND _RUN-TIME-ATTRIBUTES
++/* SETTINGS FOR DIALOG-BOX Dialog-Frame
++   FRAME-NAME                                                           */
++ASSIGN 
++       FRAME Dialog-Frame:SCROLLABLE       = FALSE
++       FRAME Dialog-Frame:HIDDEN           = TRUE.
++
++/* _RUN-TIME-ATTRIBUTES-END */
++&ANALYZE-RESUME
++
++ 
++
++
++
++/* ************************  Control Triggers  ************************ */
++
++&Scoped-define SELF-NAME Dialog-Frame
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL Dialog-Frame Dialog-Frame
++ON RETURN OF FRAME Dialog-Frame /* Введите значения для идентификации записи */
++anywhere DO:
++  if focus:type = "FILL-IN" then
++  do:
++    find first ttFill where ttFill.fFill = focus:handle.
++    
++    find next ttFill no-error.
++    if avail ttFill then
++      apply "ENTRY":U to ttFill.fFill.
++    else
++      apply "CHOOSE":U to b-input. 
++  end.
++END.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL Dialog-Frame Dialog-Frame
++ON WINDOW-CLOSE OF FRAME Dialog-Frame /* Введите значения для идентификации записи */
++DO:
++  APPLY "END-ERROR":U TO SELF.
++END.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++&Scoped-define SELF-NAME b-exit
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL b-exit Dialog-Frame
++ON CHOOSE OF b-exit IN FRAME Dialog-Frame /* Выход */
++DO:
++  APPLY "END-ERROR":U TO SELF.
++END.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++&Scoped-define SELF-NAME b-input
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL b-input Dialog-Frame
++ON CHOOSE OF b-input IN FRAME Dialog-Frame /* Ввод */
++DO:
++  oIdent = "".
++  for each ttFill:
++    if (ttFill.fType = "CHARACTER" and ttFill.fFill:screen-value = "") then
++    do:
++      message "Не все поля заполнены." view-as alert-box.
++      apply "entry":U to ttFill.fFill.
++      return no-apply.
++    end.
++    oIdent = oIdent + "," + ttFill.fFill:screen-value.
++  end.
++  oIdent = substring(oIdent,2).
++  APPLY "END-ERROR":U TO SELF.
++END.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++&UNDEFINE SELF-NAME
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CUSTOM _MAIN-BLOCK Dialog-Frame 
++
++
++/* ***************************  Main Block  *************************** */
++
++/* Parent the dialog-box to the ACTIVE-WINDOW, if there is no parent.   */
++IF VALID-HANDLE(ACTIVE-WINDOW) AND FRAME {&FRAME-NAME}:PARENT eq ?
++THEN FRAME {&FRAME-NAME}:PARENT = ACTIVE-WINDOW.
++
++
++/* Now enable the interface and wait for the exit condition.            */
++/* (NOTE: handle ERROR and END-KEY so cleanup code will always fire.    */
++MAIN-BLOCK:
++DO ON ERROR   UNDO MAIN-BLOCK, LEAVE MAIN-BLOCK
++   ON END-KEY UNDO MAIN-BLOCK, LEAVE MAIN-BLOCK:
++  
++  run buildFill in this-procedure.
++  
++  RUN enable_UI.
++  WAIT-FOR GO OF FRAME {&FRAME-NAME}.
++END.
++RUN disable_UI.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++/* **********************  Internal Procedures  *********************** */
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE buildFill Dialog-Frame 
++PROCEDURE buildFill :
++/*------------------------------------------------------------------------------
++  Purpose:     
++  Parameters:  <none>
++  Notes:       
++------------------------------------------------------------------------------*/
++define variable vCount as integer no-undo.
++define variable vFillIn as handle no-undo.
++define variable vStep   as decimal no-undo.
++
++&scoped-define FILL_COL    25
++&scoped-define FILL_WIDTH  45
++&scoped-define FILL_ROW    3.3
++&scoped-define FILL_HEIGHT 1
++
++
++do with frame {&frame-name}:
++
++  do vCount = 1 to num-entries(iLabel):
++    vStep = (vCount - 1) * 1.1.
++    create ttFill.
++    ttFill.fType = entry(vCount,iTypes).
++    ttFill.fFormat = if entry(vCount,iTypes) = "integer" or entry(vCount,iTypes) = "int64" then ">>>>>>>>9" else
++                     if entry(vCount,iTypes) = "decimal" then ">>>>>>>>9.9<<<<<" else "X(100)".
++
++    CREATE TEXT ttFill.fLabel
++    ASSIGN
++      FRAME = FRAME {&frame-name}:HANDLE
++      DATA-TYPE = "CHARACTER"
++      FORMAT = "x(" + string(length(entry(vCount,iLabel)) + 2) + ")"
++      SCREEN-VALUE = entry(vCount,iLabel) + ":"
++      ROW = {&FILL_ROW} + vStep 
++      COLUMN = {&FILL_COL} - 2 - length(entry(vCount,iLabel))
++    .
++    
++    CREATE FILL-IN ttFill.fFill
++    ASSIGN 
++      ROW = {&FILL_ROW} + vStep
++      COLUMN = {&FILL_COL}
++      DATA-TYPE = ttFill.fType 
++      FORMAT = ttFill.fFormat
++      WIDTH = {&FILL_WIDTH}
++      FRAME = frame {&frame-name}:HANDLE
++      SENSITIVE = yes
++      VISIBLE = TRUE
++      SIDE-LABEL-HANDLE = ttFill.fLabel
++    .
++    frame {&frame-name}:height = frame {&frame-name}:height + vStep.
++    rect-1:height = rect-1:height + vStep.
++  end.
++  
++  find first ttFill.
++  apply "ENTRY":U to ttFill.fFill.
++end.
++
++END PROCEDURE.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE disable_UI Dialog-Frame  _DEFAULT-DISABLE
++PROCEDURE disable_UI :
++/*------------------------------------------------------------------------------
++  Purpose:     DISABLE the User Interface
++  Parameters:  <none>
++  Notes:       Here we clean-up the user-interface by deleting
++               dynamic widgets we have created and/or hide 
++               frames.  This procedure is usually called when
++               we are ready to "clean-up" after running.
++------------------------------------------------------------------------------*/
++  /* Hide all frames. */
++  HIDE FRAME Dialog-Frame.
++END PROCEDURE.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE enable_UI Dialog-Frame  _DEFAULT-ENABLE
++PROCEDURE enable_UI :
++/*------------------------------------------------------------------------------
++  Purpose:     ENABLE the User Interface
++  Parameters:  <none>
++  Notes:       Here we display/view/enable the widgets in the
++               user-interface.  In addition, OPEN all queries
++               associated with each FRAME and BROWSE.
++               These statements here are based on the "Other 
++               Settings" section of the widget Property Sheets.
++------------------------------------------------------------------------------*/
++  ENABLE RECT-1 b-exit b-input 
++      WITH FRAME Dialog-Frame.
++  VIEW FRAME Dialog-Frame.
++  {&OPEN-BROWSERS-IN-QUERY-Dialog-Frame}
++END PROCEDURE.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++

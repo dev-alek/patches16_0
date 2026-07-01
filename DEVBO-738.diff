@@ -1,0 +1,1154 @@
+# HG changeset patch
+# User SSlivenko
+# Parent  5041094b2ea49d29b42be5eba5a85e5dad88b9fa
+refs #DEVBO-738 Синхронизация обмена СПН после восстановления УБД из бэкапа.
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-738
+
+diff --git a/cmp/str-glb4.p b/cmp/str-glb4.p
+--- a/cmp/str-glb4.p
++++ b/cmp/str-glb4.p
+@@ -1152,6 +1152,9 @@ run filwrlib_append-new-line in this-pro
+ /* Код региона reg-code */
+ { cmp/cr-prep.i 1 attr-reg-code         reg-code        " " reg-code        }
+ 
++/* Время последней синхронизации обмена СПН */
++{ cmp/cr-prep.i 1 attr-last-nws-sync         last-nws-sync        " " last-nws-sync        }
++
+ /* сюда добавлять новые названия атрибутов баз данных */
+ 
+ &glob db-attr-list '~
+diff --git a/gbl/attr-lib.p b/gbl/attr-lib.p
+--- a/gbl/attr-lib.p
++++ b/gbl/attr-lib.p
+@@ -14620,6 +14620,18 @@ end procedure.
+ &scop news-attr-reg-code true
+ &scop manual-edit-attr-reg-code 0
+ &scop batch-edit-attr-reg-code 0
++
++ /* Время последней синхронизации обмена СПН */
++&scop type-attr-last-nws-sync {&type-char}
++&scop format-attr-last-nws-sync "X(60)"
++&scop label-attr-last-nws-sync "Время последней синхронизации обмена СПН"
++&scop tooltip-attr-last-nws-sync "Время последней синхронизации обмена СПН"
++&scop user-can-edit-attr-last-nws-sync false
++&scop output-display-attr-last-nws-sync false
++&scop other-attr-last-nws-sync '':u
++&scop news-attr-last-nws-sync no
++&scop manual-edit-attr-last-nws-sync 0
++&scop batch-edit-attr-last-nws-sync 0
+ /* сюда добавлять новые параметры атрибутов баз данных */
+ 
+ &scop attr-temp-code ~
+@@ -14744,6 +14756,8 @@ procedure db-attr-code :
+       {&attr-temp-full-code}
+       &scop attr-code attr-reg-code
+       {&attr-temp-full-code}
++      &scop attr-code attr-last-nws-sync
++      {&attr-temp-full-code}
+       
+       /* сюда добавлять новые параметры атрибутов баз данных */
+       otherwise do:          
+@@ -14831,6 +14845,8 @@ procedure db-attr-tooltip :
+       {&attr-temp-code}
+       &scop attr-code attr-reg-code
+       {&attr-temp-code}
++      &scop attr-code attr-last-nws-sync
++      {&attr-temp-code}
+ 
+       /* сюда добавлять новые параметры атрибутов баз данных */
+       otherwise do:
+@@ -15105,6 +15121,8 @@ procedure db-attr-news :
+       {&attr-news-code}
+       &scop attr-code attr-reg-code
+       {&attr-news-code}
++      &scop attr-code attr-last-nws-sync
++      {&attr-news-code}
+       
+       /* сюда добавлять новые параметры атрибутов баз данных */
+       otherwise do:
+@@ -16069,6 +16087,8 @@ procedure ext-system-attr-news :
+       {&attr-news-code}
+       &scop attr-code attr-reg-code
+       {&attr-news-code}
++      &scop attr-code attr-last-nws-sync
++      {&attr-news-code}
+       
+ 
+       /* сюда добавлять новые параметры атрибутов ВС */
+diff --git a/nws/lib-nws.p b/nws/lib-nws.p
+--- a/nws/lib-nws.p
++++ b/nws/lib-nws.p
+@@ -574,7 +574,7 @@ procedure lib-nws_route-dump-write :
+       or v-avail-artic = true
+     then do:
+       if v-avail-gds-code = true then do:
+-        if fh_gds-code:buffer-value() <> ? then do:
++        if fh_gds-code:buffer-value() > 0 then do:
+           find first buf-rtdl_goods no-lock
+             where buf-rtdl_goods.gds-code = fh_gds-code:buffer-value()
+           no-error .
+diff --git a/nws/nws-hand.w b/nws/nws-hand.w
+--- a/nws/nws-hand.w
++++ b/nws/nws-hand.w
+@@ -566,8 +566,12 @@ END.
+ ON CHOOSE OF b-sync IN FRAME nws-hand /* Синхронизация */
+ DO:
+   define variable v-user-id as character no-undo .
++  define variable vOk as logical no-undo .
++  
+   v-user-id = g#auto-user-id + {&delim-par} + 'yes' .
++  
+   if not available X_db then return no-apply .
++  
+   { gbl/chk-actg.i
+     g#db-num
+     v-user-id
+@@ -585,28 +589,56 @@ DO:
+     }
+   if not v-have-rights
+   then do :
+-    message "Недостаточно прав для выполнения Cинхронизации БД " string(x_db.db-num) " с ТБД" view-as alert-box error.
++    if v-cur-db-num = 0
++    then do :
++      message "Недостаточно прав для выполнения Cинхронизации БД " string(x_db.db-num) " с ТБД" view-as alert-box error.
++    end .
++    else do :
++      message "Недостаточно прав для отправки запроса на Синхронизацию УБД с ТБД" view-as alert-box error.
++    end .
+     return no-apply .
+   end.
+-  run nws/sync.w (input parparentproc,
+-                  input X_db.db-num)
+-                  no-error .
+-  if error-status:error
++  if v-cur-db-num = 0
+   then do :
+-    run write-to-log( substitute( "&1. ERROR!!! Ошибка при синхронизации пакетов с БД &5&3&2&3&4"
+-                                  ,vss-workfile
+-                                  ,error-status:get-message(error-status:num-messages)
+-                                  ,{&new-line}
+-                                  ,return-value
+-                                  ,string(X_db.db-num)
+-                                )
+-                    ) .
+-  end.
+-/*  else do :                                                    */
+-/*    run write-to-log in this-procedure                         */
+-/*      ("Завершена синхронизация с БД " + string(X_db.db-num) ).*/
+-/*  end.                                                         */
+-
++    run nws/sync.w (input parparentproc,
++                    input X_db.db-num)
++                    no-error .
++    if error-status:error
++    then do :
++      run write-to-log( substitute( "&1. ERROR!!! Ошибка при синхронизации пакетов с БД &5&3&2&3&4"
++                                    ,vss-workfile
++                                    ,error-status:get-message(error-status:num-messages)
++                                    ,{&new-line}
++                                    ,return-value
++                                    ,string(X_db.db-num)
++                                  )
++                      ) .
++    end.
++  /*  else do :                                                    */
++  /*    run write-to-log in this-procedure                         */
++  /*      ("Завершена синхронизация с БД " + string(X_db.db-num) ).*/
++  /*  end.                                                         */
++  end .
++  else do :
++    message "Вы уверены что хотите отправить запрос в ТБД на Синхронизацию обмена СПН? Каталоги новостей будут очищены!" view-as alert-box question buttons yes-no update vOk .
++    if not vOk
++    then
++      return no-apply .
++    
++    run nws/send-sync-request.p (input parparentproc,
++                                 input X_db.db-num)
++                                 no-error .
++    if error-status:error
++    then do :
++      run write-to-log( substitute( "&1. ERROR!!! Ошибка при отправке запроса на Синхронизацию обмена СПН &3&2&3&4"
++                                    ,vss-workfile
++                                    ,error-status:get-message(error-status:num-messages)
++                                    ,{&new-line}
++                                    ,return-value
++                                  )
++                      ) .
++    end.
++  end .
+ 
+   {&OPEN-QUERY-br-pck-rcvd}
+   {&OPEN-QUERY-br-pck-sent}
+@@ -1143,7 +1175,7 @@ PROCEDURE enable_UI :
+          br-pck-rcvd news-log mark-num bt-not-sel-all bt-not-sel-desel-all
+       WITH FRAME nws-hand.
+   if v-cur-db-num <> 0 then do :
+-    disable bt-not-sel-all bt-not-sel-desel-all b-sync
++    disable bt-not-sel-all bt-not-sel-desel-all
+       WITH FRAME nws-hand.
+   end.
+   {&OPEN-BROWSERS-IN-QUERY-nws-hand}
+diff --git a/nws/nws-sync.p b/nws/nws-sync.p
+new file mode 100644
+--- /dev/null
++++ b/nws/nws-sync.p
+@@ -0,0 +1,587 @@
++
++/*------------------------------------------------------------------------
++    File        : nws-sync.p
++    Purpose     : 
++
++    Syntax      :
++
++    Description : Синхронизация обмена СПН в ТБД при получении запроса из УБД
++
++    Author(s)   : SSlivenko
++    Created     : Mon Jun 08 16:30:27 MSK 2026
++    Notes       :
++  ----------------------------------------------------------------------*/
++
++/* ***************************  Definitions  ************************** */
++
++block-level on error undo, throw.
++
++/* ********************  Preprocessor Definitions  ******************** */
++
++/* Parameters Definitions ---                                           */
++define input parameter parparentproc   as handle     no-undo .
++define input parameter p-db-num        as integer    no-undo .
++define input parameter p-last-sent-pck as integer    no-undo .
++define input parameter p-last-rcv-pck  as integer    no-undo .
++define output parameter pOk            as logical    no-undo init no .
++/* Local Variable Definitions ---                                       */
++
++define variable vss-revision    as character no-undo init "$Revision$":U .
++define variable vss-author      as character no-undo init "$Author$":U .
++define variable vss-date        as character no-undo init "$Date$":U .
++define variable vss-workfile    as character no-undo init "$Workfile$":U .
++define variable vss-archive     as character no-undo init "$Archive$":U .
++define variable vss-description as character no-undo init "Синхронизация новостей".
++{ cmp/vssrevis.i }
++{ cmp/trg-def.i  }
++{ nws/nws-def.i  }
++{ gbl/db-attr.i  }
++{ gbl/clntattr.i }
++{ bge/esysattr.i }
++
++define variable p-news as logical no-undo.
++define variable v-real-last-sent-pck as integer no-undo .
++define variable v-real-last-rcv-pck as integer no-undo .
++define variable v-curr-obj-type as character no-undo .
++define variable v-curr-obj-code as integer no-undo .
++define variable v-cmd-proc-handle as handle no-undo .
++define variable v-command as character no-undo .
++define variable v-cmd-code as integer no-undo .
++define variable v-db-list as character no-undo .
++/* ***************************  Main Block  *************************** */
++do
++on error undo, return error
++: 
++  for each pck-sent no-lock where pck-sent.db-num = p-db-num :
++    v-real-last-sent-pck = max(v-real-last-sent-pck, pck-sent.pack-num) .
++  end.
++  for each pck-rcvd no-lock where pck-rcvd.db-num = p-db-num :
++    v-real-last-rcv-pck = max(v-real-last-rcv-pck, pck-rcvd.pack-num) .
++  end.
++  if p-last-rcv-pck > v-real-last-sent-pck
++  then do :
++    return error "Номер последнего принятого пакета в УБД больше номера последнего отправленного пакета в ГБД!" .
++  end.
++  if p-last-sent-pck > v-real-last-rcv-pck
++  then do :
++    return error "Номер последнего отправленного пакета из УБД больше номера последнего принятого пакета в ГБД!" .
++  end.
++  if p-last-rcv-pck = v-real-last-sent-pck
++  and p-last-sent-pck = v-real-last-rcv-pck
++  then do :
++    return error "Номера последних пакетов в ГБД и УБД совпадают. Синхронизация не требуется." .
++  end.
++  
++  find first ub.clients no-lock where ub.clients.obj-type = {&shop}
++                                  and ub.clients.stts = 0
++                                  and ub.clients.db-num = p-db-num
++                                  no-error.
++  if not available ub.clients
++  then do :
++    return error  ("Не найден магазин в УБД " + string(p-db-num)) .
++  end.
++  
++  for each pck-sent exclusive-lock where pck-sent.db-num = p-db-num and pck-sent.pack-num > p-last-rcv-pck :
++    for each route exclusive-lock where route.db-num = p-db-num and route.last-pack = pck-sent.pack-num :
++      delete route .
++    end.
++    delete pck-sent .
++  end.
++  for each pck-rcvd exclusive-lock where pck-rcvd.db-num = p-db-num and pck-rcvd.pack-num > p-last-sent-pck :
++    delete pck-rcvd .
++  end. 
++  
++  for each route exclusive-lock where route.db-num = p-db-num and route.last-pack = -1 :
++    delete route .
++  end.
++  
++  v-curr-obj-type = ub.clients.obj-type .
++  v-curr-obj-code = ub.clients.obj-code .
++  
++  run create-routes no-error.
++  if error-status :error then do:
++    return error return-value .
++  end. 
++  
++  assign pOk = yes .
++  
++  run trg/userlog.p (
++        input 'utl'
++        , input ( ("Синхронизация новостей с УБД " + 
++                string(p-db-num) + 
++                substitute("; получ_до: &1; получ_после: &2; отпр_до: &3; отпр_после: 4", v-real-last-sent-pck, p-last-rcv-pck, v-real-last-rcv-pck, p-last-sent-pck) ) +
++                {&delim-key} + 
++                "nws/nws-sync.p")
++        , input ?
++        , input ?
++        , input ""
++        ) no-error.
++  if error-status :error
++  then do:
++    return error ("Ошибка записи истории действий пользователя" + {&new-line} + return-value + error-status:get-message(1)) .
++  end. 
++  
++  run write-to-log in this-procedure
++  ( input  substitute ("Произведена синхронизация новостей с УБД &1.&2Идентификатор пользователя: &3&2Номер последнего принятого пакета в УБД до синхронизации: &4&2Номер последнего принятого пакета в УБД после синхронизации: &5&2Номер последнего отправленного пакета из УБД до синхронизации: &6&2Номер последнего отправленного пакета из УБД после синхронизации: &7&2",
++                        string(p-db-num),
++                        {&new-line},
++                        g#auto-user-id,
++                        v-real-last-sent-pck,
++                        p-last-rcv-pck,
++                        v-real-last-rcv-pck,
++                        p-last-sent-pck
++                         ) ) .
++end .
++
++procedure create-routes :
++  
++  find first ub.db no-lock where ub.db.db-num = p-db-num .
++  run nws/cr-route.p ( input {&send-tbl}, input {&table_db}, input (buffer ub.db:handle), input string(p-db-num) ) no-error.
++  if error-status :error then do:
++    return error return-value.
++  end.
++  
++  for each ub.db-attr no-lock where ub.db-attr.db-num = ub.db.db-num :
++    run db-attr-news in this-procedure
++      ( input ub.db-attr.attr-code
++       ,output p-news
++      ) no-error.
++  
++    if p-news = true then do:
++      run nws/cr-route.p ( input {&send-tbl}, input {&table_db-attr}, input (buffer ub.db-attr:handle), input string(p-db-num) ) no-error.
++      if error-status :error then do:
++        return error return-value.
++      end.
++    end.
++  end.
++  
++  find first ub.clients no-lock where ub.clients.obj-type = v-curr-obj-type
++                                  and ub.clients.obj-code = v-curr-obj-code .
++  run nws/cr-route.p ( input {&send-tbl}, input {&table_clients}, input (buffer ub.clients:handle), input string(p-db-num) ) no-error. 
++  if error-status :error then do:
++    return error return-value.
++  end.
++  
++  find first ub.shop no-lock where ub.shop.obj-code = ub.clients.obj-code .  
++  run nws/cr-route.p ( input {&send-tbl}, input {&table_shop}, input (buffer ub.shop:handle), input string(p-db-num) ) no-error.
++  if error-status :error then do:
++    return error return-value.
++  end.
++  
++  for each ub.clients-attr no-lock where  ub.clients-attr.obj-type = ub.clients.obj-type
++                                      and ub.clients-attr.obj-code = ub.clients.obj-code :
++    run clntattr-news in this-procedure(input ub.clients-attr.attr-code,
++                                        output p-news) no-error.
++    if  p-news then do:
++      run nws/cr-route.p ( input {&send-tbl}, input {&table_clients-attr}, input (buffer ub.clients-attr:handle), input string(p-db-num) ) no-error.
++      if error-status :error then do:
++        return error return-value.
++      end.
++    end.                                    
++  end.    
++  
++  for each ub.ext-system no-lock where ub.ext-system.esys-db-num-exp = p-db-num or ub.ext-system.esys-db-num-imp = p-db-num :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_ext-system}, input (buffer ub.ext-system:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++    
++    for each ub.ext-system-attr no-lock where ub.ext-system-attr.esys-id  = ub.ext-system.esys-id
++                                          and ub.ext-system-attr.db-num   = ub.ext-system.db-num :
++      run ext-system-attr-news in this-procedure ( input ub.Ext-system-attr.esya-attr-code
++                                                  ,output p-news). 
++      if  p-news then do:                                                                                 
++        run nws/cr-route.p ( input {&send-tbl}, input {&table_ext-system-attr}, input (buffer ub.ext-system-attr:handle), input string(p-db-num) ) no-error. 
++        if error-status :error then do:
++          return error return-value.
++        end.
++      end.                                        
++    end.
++  end.
++  
++  for each ub.user-login-action-role no-lock where ub.user-login-action-role.db-num = p-db-num :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_user-login-action-role}, input (buffer ub.user-login-action-role:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++  end.  
++  
++  for each ub.action-role no-lock where ub.action-role.db-num = p-db-num :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_action-role}, input (buffer ub.action-role:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++  end. 
++  
++  for each ub.action-role-item no-lock where ub.action-role-item.db-num = p-db-num :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_action-role-item}, input (buffer ub.action-role-item:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++  end.      
++  
++  for each ub.schedule no-lock :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_schedule}, input (buffer ub.schedule:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++    
++    for each ub.schedule-attr no-lock where ub.schedule-attr.cre-db-num = ub.schedule.cre-db-num 
++                                        and ub.schedule-attr.task-type  = ub.schedule.task-type
++                                        and ub.schedule-attr.task-num   = ub.schedule.task-num
++                                        and ub.schedule-attr.task-num  <> -1 :
++      run nws/cr-route.p ( input {&send-tbl}, input {&table_schedule-attr}, input (buffer ub.schedule-attr:handle), input string(p-db-num) ) no-error. 
++      if error-status :error then do:
++        return error return-value.
++      end.                                    
++    end.                                      
++  end. 
++  
++  for each ub.config no-lock where ub.config.db-num = p-db-num :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_config}, input (buffer ub.config:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++  end.                                                  
++  
++  for each ub.thbj-attr no-lock :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_thbj-attr}, input (buffer ub.thbj-attr:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++  end.
++  
++  for each ub.clients no-lock :
++    if ub.clients.obj-type = v-curr-obj-type and ub.clients.obj-code = v-curr-obj-code
++    then next .
++    
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_clients}, input (buffer ub.clients:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++    
++    for each ub.clients-attr no-lock where  ub.clients-attr.obj-type = ub.clients.obj-type
++                                        and ub.clients-attr.obj-code = ub.clients.obj-code :
++      run clntattr-news in this-procedure(input ub.clients-attr.attr-code,
++                                          output p-news) no-error.
++      if  p-news then do:
++        run nws/cr-route.p ( input {&send-tbl}, input {&table_clients-attr}, input (buffer ub.clients-attr:handle), input string(p-db-num) ) no-error.
++        if error-status :error then do:
++          return error return-value.
++        end.
++      end.                                    
++    end. 
++  end.
++  
++  for each ub.pay-type no-lock :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_pay-type}, input (buffer ub.pay-type:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++  end.
++  
++  for each ub.cash-pay no-lock :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_cash-pay}, input (buffer ub.cash-pay:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++  end.
++  
++  for each ub.cash-pay-attr no-lock :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_cash-pay-attr}, input (buffer ub.cash-pay-attr:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.                                    
++  end.
++  
++  for each ub.tax no-lock :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_tax}, input (buffer ub.tax:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++  end.
++  
++  for each ub.tax-rate no-lock :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_tax-rate}, input (buffer ub.tax-rate:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++  end.
++  
++  for each ub.tax-rate-value no-lock :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_tax-rate-value}, input (buffer ub.tax-rate-value:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++  end.
++  
++  for each ub.tax-units no-lock :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_tax-units}, input (buffer ub.tax-units:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++  end.
++  
++  for each ub.currency no-lock :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_currency}, input (buffer ub.currency:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++  end.
++  
++  for each ub.curr-bank no-lock :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_curr-bank}, input (buffer ub.curr-bank:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++  end.
++  
++  for each ub.curr-shop no-lock where ub.curr-shop.obj-type = v-curr-obj-type
++                                  and ub.curr-shop.obj-code = v-curr-obj-code :
++    if Year(ub.curr-shop.exch-date ) <> 9999 then do:
++      run nws/cr-route.p ( input {&send-tbl}, input {&table_curr-shop}, input (buffer ub.curr-shop:handle), input string(p-db-num) ) no-error. 
++      if error-status :error then do:
++        return error return-value.
++      end.
++    end.
++  end.
++  
++  for each ub.country no-lock :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_country}, input (buffer ub.country:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++  end.
++  
++  for each ub.regions no-lock :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_regions}, input (buffer ub.regions:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++  end.
++  
++  for each ub.cash-desk no-lock where ub.cash-desk.db-num = p-db-num :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_cash-desk}, input (buffer ub.cash-desk:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++  end.
++  
++  for each ub.cash-desk-attr no-lock where ub.cash-desk-attr.db-num = p-db-num :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_cash-desk-attr}, input (buffer ub.cash-desk-attr:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++  end.
++/*  EXPSD-8369                                                                                                                                   */
++/*  for each ub.cashbook no-lock :                                                                                                               */
++/*    run nws/cr-route.p ( input {&send-tbl}, input {&table_cashbook}, input (buffer ub.cashbook:handle), input string(p-db-num) ) no-error.      */
++/*    if error-status :error then do:                                                                                                            */
++/*      return error return-value.                                                                                                               */
++/*    end.                                                                                                                                       */
++/*    for each ub.goods-attr exclusive-lock where ub.goods-attr.attr-code = {&attr-cash-book-id}                                                 */
++/*                                            and ub.goods-attr.attr-value = string(ub.cashbook.id):                                             */
++/*      run nws/cr-route.p ( input {&send-tbl}, input {&table_goods-attr}, input (buffer ub.goods-attr:handle), input string(p-db-num) ) no-error.*/
++/*      if error-status :error then do:                                                                                                          */
++/*        return error return-value.                                                                                                             */
++/*      end.                                                                                                                                     */
++/*    end.                                                                                                                                       */
++/*  end.                                                                                                                                         */
++  
++  for each ub.cashbookrule no-lock where ub.CashBookRule.Obj-type = v-curr-obj-type
++                                     and ub.CashBookRule.Obj-code = v-curr-obj-code :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_cashbookrule}, input (buffer ub.cashbookrule:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++  end.
++  
++  for each ub.OperServ no-lock :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_OperServ}, input (buffer ub.OperServ:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++    for each ub.goods-attr exclusive-lock where ub.goods-attr.attr-code = {&attr-oper-serv-id}
++                                            and ub.goods-attr.attr-value = string(ub.OperServ.id):
++      run nws/cr-route.p ( input {&send-tbl}, input {&table_goods-attr}, input (buffer ub.goods-attr:handle), input string(p-db-num) ) no-error. 
++      if error-status :error then do:
++        return error return-value.
++      end.                                        
++    end.                                          
++  end.
++  
++  for each ub.OperServAttr no-lock :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_OperServAttr}, input (buffer ub.OperServAttr:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++  end.
++  
++  run nws/cmd-bush.p persistent set v-cmd-proc-handle no-error .
++  if error-status :error
++  then do:
++    delete procedure v-cmd-proc-handle .
++    return error substitute("&1 &2 &3&4Ошибка при запуске процедуры cmd-bush.p&4" +
++                                        "&5&4&6"
++                                        ,vss-workfile
++                                        ,vss-revision
++                                        ,vss-description
++                                        ,{&new-line}
++                                        ,error-status:get-message(1)
++                                        ,return-value ).
++  end.
++  
++  define buffer buf_rp-by-call for ub.rp-by-call.
++  define buffer buf_rule-by-call for ub.rule-by-call.
++  define buffer buf_rule-call-param for ub.rule-call-param.
++  
++  for each db no-lock
++  where db.db-num > 0
++  :
++    assign
++    v-db-list = v-db-list + {&delim-nws} + string(db.db-num).
++  end.
++  v-db-list = trim(v-db-list, {&delim-nws}).
++
++  for each ub.dis-card-type no-lock :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_dis-card-type}, input (buffer ub.dis-card-type:handle), input string(p-db-num) ) no-error.
++    if error-status :error then do:
++      return error return-value.
++    end.
++    assign
++    v-command =  substitute("&2&1&3&1&4"
++                           , {&delim-cmd}
++                           , {&cmd-dct-send}
++                           , ub.dis-card-type.emitent-host-code
++                           , ub.dis-card-type.type
++                           ).
++    run begin-create-command in v-cmd-proc-handle
++      (input v-command /* p-command-name */
++      ,input "":U                /* p-db-list      */
++      ,output v-cmd-code        /* p-command-code */
++      ) no-error.
++    if error-status :error
++    then do:
++      message
++        vss-workfile vss-revision vss-description skip
++        substitute( "Ошибка при создании команды &1", {&cmd-dct-send} ) skip
++        error-status :get-message(1) skip
++        return-value skip
++        view-as alert-box error .
++      delete procedure v-cmd-proc-handle .
++      return error return-value .
++    end.
++    
++    run send-command in v-cmd-proc-handle
++      ( input v-cmd-code  /* p-command-code */
++        ,input v-db-list
++        ) no-error .
++    if error-status:error then do:
++      delete procedure v-cmd-proc-handle .
++      message
++      vss-workfile vss-revision vss-description skip
++      substitute( "Ошибка при отсылке команды &1", {&cmd-dct-send} ) skip
++      error-status :get-message(1) skip
++      return-value skip
++      view-as alert-box error .
++      return error return-value .
++    end.
++    
++    for each buf_rp-by-call where buf_rp-by-call.call_id = ub.dis-card-type.uniq-key-rec :
++      run nws/cr-route.p ( input {&send-tbl}, input {&table_rp-by-call}, input (buffer buf_rp-by-call:handle), input string(p-db-num) ) no-error.
++      if error-status :error then do:
++        return error return-value.
++      end.
++    end.
++    
++    for each buf_rule-by-call where buf_rule-by-call.call_id = ub.dis-card-type.uniq-key-rec :
++      run nws/cr-route.p ( input {&send-tbl}, input {&table_rule-by-call}, input (buffer buf_rule-by-call:handle), input string(p-db-num) ) no-error.
++      if error-status :error then do:
++        return error return-value.
++      end.
++    end.
++    
++    for each buf_rule-call-param where buf_rule-call-param.call_id = ub.dis-card-type.uniq-key-rec :
++      run nws/cr-route.p ( input {&send-tbl}, input {&table_rule-call-param}, input (buffer buf_rule-call-param:handle), input string(p-db-num) ) no-error.
++      if error-status :error then do:
++        return error return-value.
++      end.
++    end.
++    
++  end.
++  
++  delete procedure v-cmd-proc-handle no-error .
++  
++  for each ub.dis-card-mask no-lock :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_dis-card-mask}, input (buffer ub.dis-card-mask:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++  end.
++  
++  for each ub.dis-card no-lock :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_dis-card}, input (buffer ub.dis-card:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++    run str/saledc.p
++        (
++          input parparentproc
++        ,input this-procedure :handle
++        ,input ? /*p-log-handle*/
++        ,input {&dct-proc_one-card-add}
++        ,input ?  /*p-emitent-host-code*/
++        ,input '':U /*p-type*/
++        ,input 0 /*p-profile-id*/
++        ,input 0 /*p-codex-id*/
++        ,input 0 /*p-ruleset-id*/
++        ,input g#db-num
++        ,input ub.dis-card.d-card
++        ,input ? /*doc-date - выставим внутри*/
++        ,input ? /*fact-date - выставим внутри*/
++        ,input ? /*cre-pay*/
++        ,input 1 /*p-sign*/
++        ,input 1 /* p-direction */
++        ,input yes /*p-save*/
++        ) no-error .
++    if error-status:error then do:
++      return error return-value .
++    end.
++  end.
++  
++  for each ub.dis-host no-lock :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_dis-host}, input (buffer ub.dis-host:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++  end.
++  
++  for each ub.dis-card-property no-lock :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_dis-card-property}, input (buffer ub.dis-card-property:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++  end.
++  
++  for each ub.dis-rule no-lock :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_dis-rule}, input (buffer ub.dis-rule:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++  end.
++  
++  for each ub.dis-gds-rule no-lock :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_dis-gds-rule}, input (buffer ub.dis-gds-rule:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++  end.
++  
++  for each ub.dis-time-rule no-lock :
++    run nws/cr-route.p ( input {&send-tbl}, input {&table_dis-time-rule}, input (buffer ub.dis-time-rule:handle), input string(p-db-num) ) no-error. 
++    if error-status :error then do:
++      return error return-value.
++    end.
++  end.
++  
++end procedure .
+\ No newline at end of file
+diff --git a/nws/rcvd-nws.p b/nws/rcvd-nws.p
+--- a/nws/rcvd-nws.p
++++ b/nws/rcvd-nws.p
+@@ -30,6 +30,7 @@ def var vss-description as character no-undo init "Прием новостей из указанной БД".
+ { cmp/trg-def.i  }
+ { nws/nws-def.i  }
+ { adm/push-m.i   }
++{ gbl/db-attr.i  }
+ { gbl/getsect.i def }
+ 
+ do
+@@ -40,6 +41,7 @@ on endkey undo, return error substitute(
+ 
+   define buffer buf_db       for ub.db .
+   define buffer buf_sys-ctrl for ub.sys-ctrl .
++  define buffer buf_db-attr  for ub.db-attr .
+ 
+   define variable v-ver-num      as character no-undo .
+   define variable v-pack-num     as integer   no-undo .
+@@ -50,6 +52,12 @@ on endkey undo, return error substitute(
+ 
+   define variable v-rcvd-pack    as logical   no-undo .
+   define variable v-err-msg      as character no-undo .
++  
++  define variable v-mem as memptr no-undo .
++  define variable v-str as longchar no-undo .
++  define variable v-last-rcv-pck as integer no-undo .
++  define variable v-last-sent-pck as integer no-undo .
++  define variable vOk as logical no-undo .
+ 
+   define variable apusharh as logical   no-undo . /* для чтения параметра конфигурации */
+ 
+@@ -141,7 +149,112 @@ on endkey undo, return error substitute(
+     end.
+   end.
+ 
+-  if lookup( p-action, "analys,take+analys":U ) <> 0 then do:
++  if lookup( p-action, "analys,take+analys":U ) <> 0
++  then do:
++    if p-db-num > 0
++    then do transaction : /* Проверка запроса на синхронизацию обмена СПН */
++      assign
++        file-info:file-name = v-target-dir + {&back-slash-char} + "p9999999.txt"
++      .
++      if file-info:file-type <> ?
++      and file-info:file-type begins "F":U
++      then do :
++        copy-lob from file (v-target-dir + {&back-slash-char} + "p9999999.txt") to v-str .
++        v-mem = base64-decode (v-str) no-error .
++        copy-lob from v-mem to v-str no-error .
++        if v-str begins "needsync"
++        and num-entries(v-str, {&delim-par}) = 5
++        then do :
++          os-delete value (v-target-dir + {&back-slash-char} + "p9999999.txt") no-error .
++          os-delete value (v-source-dir + {&back-slash-char} + "p9999999.zip") no-error .
++          
++          find first buf_db-attr no-lock where buf_db-attr.db-num = p-db-num
++                                           and buf_db-attr.attr-code = "last-nws-sync"
++          no-error .
++          if integer(entry(2, v-str, {&delim-par})) = p-db-num
++          and (not available buf_db-attr
++               or (available buf_db-attr and datetime-tz(buf_db-attr.attr-value) < datetime-tz(entry(5, v-str, {&delim-par})))
++               )
++          then do :
++            run write-to-log( substitute( "Получен запрос на синхронизацию обмена СПН с БД &1", p-db-num ) ) .
++            
++            run nws/pck-num.p
++              ( input "put":U
++               ,input p-db-num
++               ,input-output v-pack-num
++               ,output v-pack-name
++               ,output v-source-dir
++               ,output v-target-dir
++               ,output v-temp-dir
++              ) no-error.
++            if error-status:error then do:
++              run write-to-log( substitute( "&1. Ошибка при генерации номера пакета. &2&3&2&4", vss-workfile, {&new-line}, error-status:get-message(1), return-value )
++                              ) .
++              return error.
++            end.
++            
++            os-delete value (v-source-dir) recursive .
++            os-delete value (v-target-dir) recursive .
++            os-delete value (v-temp-dir)   recursive .
++            
++            assign
++              file-info:file-name = v-source-dir
++            .
++            if file-info:file-type = ?
++            or not ( file-info:file-type begins "D":U )
++            then do:
++              os-create-dir value( v-source-dir ).
++              if os-error <> 0 then do:
++                return error string( vss-workfile + {&space-char}
++                                     + "Каталог" + {&space-char} + v-source-dir
++                                     + {&space-char} + "отсутствует, а создать его не удалось." ).
++              end.
++            end.
++            
++            assign
++              file-info:file-name = v-target-dir
++            .
++            if file-info:file-type = ?
++            or not ( file-info:file-type begins "D":U )
++            then do:
++              os-create-dir value( v-target-dir ).
++              if os-error <> 0 then do:
++                return error string( vss-workfile + {&space-char}
++                                     + "Каталог" + {&space-char} + v-target-dir
++                                     + {&space-char} + "отсутствует, а создать его не удалось." ).
++              end.
++            end.
++            
++            assign
++              v-last-rcv-pck  = integer(entry(3, v-str, {&delim-par}))
++              v-last-sent-pck = integer(entry(4, v-str, {&delim-par}))
++            .
++            run nws/nws-sync.p (input parparentproc,
++                                input p-db-num,
++                                input v-last-rcv-pck,
++                                input v-last-sent-pck,
++                                output vOk)
++                                no-error .
++            if not vOk
++            or error-status:error
++            then do :
++              run write-to-log( substitute( "Ошибка при синхронизация обмена СПН с БД &1&2&3", p-db-num, {&new-line}, return-value ) ) .
++            end .
++            if vOk
++            then do :
++              run db-attr-write in this-procedure
++              ( input p-db-num
++               ,input "last-nws-sync"
++               ,input entry(5, v-str, {&delim-par})
++              ) no-error.
++              
++              return .
++            end .
++          end .
++        end . 
++      end .
++    end .  /* Проверка запроса на синхронизацию обмена СПН */
++      
+     rcvd-pack:
+     do while TRUE
+     on error  undo, return error substitute( "&1 (rcvd-pack). &2&3&4", vss-workfile, return-value, {&new-line}, error-status :get-message ( 1 ) )
+diff --git a/nws/send-sync-request.p b/nws/send-sync-request.p
+new file mode 100644
+--- /dev/null
++++ b/nws/send-sync-request.p
+@@ -0,0 +1,173 @@
++
++/*------------------------------------------------------------------------
++    File        : send-sync-request.p
++    Purpose     : 
++
++    Syntax      :
++
++    Description : Отправка файла с запросом синхронизации обмена СПН с УБД на ТБД
++
++    Author(s)   : SSlivenko
++    Created     : Mon Jun 08 14:26:22 MSK 2026
++    Notes       :
++  ----------------------------------------------------------------------*/
++
++/* ***************************  Definitions  ************************** */
++
++block-level on error undo, throw.
++
++/* ********************  Preprocessor Definitions  ******************** */
++
++/* Parameters Definitions ---                                           */
++define input parameter parparentproc  as handle     no-undo .
++define input parameter p-db-num       as integer    no-undo .
++/* Local Variable Definitions ---                                       */
++
++define variable vss-revision    as character no-undo init "$Revision$":U .
++define variable vss-author      as character no-undo init "$Author$":U .
++define variable vss-date        as character no-undo init "$Date$":U .
++define variable vss-workfile    as character no-undo init "$Workfile$":U .
++define variable vss-archive     as character no-undo init "$Archive$":U .
++define variable vss-description as character no-undo init "Синхронизация новостей".
++{ cmp/vssrevis.i }
++{ cmp/trg-def.i  }
++{ nws/nws-def.i  }
++
++do
++on error undo, return error
++:
++
++  define variable vOk as logical no-undo .
++  define variable v-req as longchar no-undo .
++  define variable v-req64 as longchar no-undo .
++  define variable vMem as memptr no-undo .
++  define variable v-pack-num     as integer   no-undo .
++  define variable v-pack-name    as character no-undo .
++  define variable v-source-dir   as character no-undo .
++  define variable v-target-dir   as character no-undo .
++  define variable v-temp-dir     as character no-undo .
++  define variable v-err-msg      as character no-undo .
++  define variable v-real-last-sent-pck as integer no-undo init 0 .
++  define variable v-real-last-rcv-pck as integer no-undo init 0 .
++  
++  define buffer buf-dst_db   for ub.db .
++  define buffer buf-src_db   for ub.db .
++  define buffer buf_sys-ctrl for ub.sys-ctrl .
++  /* ***************************  Main Block  *************************** */
++
++  find first buf_sys-ctrl no-lock .
++
++  find first buf-src_db no-lock
++    where buf-src_db.db-num = buf_sys-ctrl.db-num
++    no-error
++  .
++  if not available buf-src_db then do:
++    run write-to-log( substitute( "&1. БД &2 не найдена", vss-workfile, buf_sys-ctrl.db-num ) ) .
++    return error.
++  end.
++
++  find first buf-dst_db no-lock
++    where buf-dst_db.db-num = p-db-num
++    no-error
++  .
++  if not available buf-dst_db then do:
++    run write-to-log( substitute( "&1. БД &2 не найдена", vss-workfile, p-db-num ) ) .
++    return error.
++  end.
++  
++  run nws/lock-nws.p
++    ( input p-db-num
++     ,buffer buf-dst_db
++    ) no-error.
++  if error-status:error then do:
++    run write-to-log( substitute( "&1. &2", vss-workfile, return-value ) ).
++    return .
++  end.
++  
++  assign v-pack-num = 9999999 .
++  run nws/pck-num.p
++    ( input "put":U
++     ,input p-db-num
++     ,input-output v-pack-num
++     ,output v-pack-name
++     ,output v-source-dir
++     ,output v-target-dir
++     ,output v-temp-dir
++    ) no-error.
++  if error-status:error then do:
++    assign
++      v-err-msg = substitute( "&1. Ошибка при генерации номера пакета. &2&3&2&4", vss-workfile, {&new-line}, error-status:get-message(1), return-value )
++    .
++    run write-to-log( v-err-msg ) .
++    return error.
++  end.
++  
++  assign
++    file-info:file-name = v-source-dir + {&back-slash-char} + v-pack-name
++  .
++  if file-info:file-type <> ?
++  then do :
++    message "Запрос на синхронизацию уже отправлен. Повторить?" view-as alert-box question buttons yes-no update vOk .
++    if not vOk
++    then 
++      return .
++  end .
++  
++  os-delete value (v-source-dir) recursive .
++  os-delete value (v-target-dir) recursive .
++  os-delete value (v-temp-dir)   recursive .
++  
++  assign
++    file-info:file-name = v-source-dir
++  .
++  if file-info:file-type = ?
++  or not ( file-info:file-type begins "D":U )
++  then do:
++    os-create-dir value( v-source-dir ).
++    if os-error <> 0 then do:
++      return error string( vss-workfile + {&space-char}
++                           + "Каталог" + {&space-char} + v-source-dir
++                           + {&space-char} + "отсутствует, а создать его не удалось." ).
++    end.
++  end.
++  
++  assign
++    file-info:file-name = v-target-dir
++  .
++  if file-info:file-type = ?
++  or not ( file-info:file-type begins "D":U )
++  then do:
++    os-create-dir value( v-target-dir ).
++    if os-error <> 0 then do:
++      return error string( vss-workfile + {&space-char}
++                           + "Каталог" + {&space-char} + v-target-dir
++                           + {&space-char} + "отсутствует, а создать его не удалось." ).
++    end.
++  end.
++  
++  for each pck-sent no-lock where pck-sent.db-num = p-db-num :
++    v-real-last-sent-pck = max(v-real-last-sent-pck, pck-sent.pack-num) .
++  end.
++  for each pck-rcvd no-lock where pck-rcvd.db-num = p-db-num :
++    v-real-last-rcv-pck = max(v-real-last-rcv-pck, pck-rcvd.pack-num) .
++  end.
++  
++  assign v-req = "needsync" + {&delim-par} + string(buf-src_db.db-num) + {&delim-par} + string(v-real-last-sent-pck) + {&delim-par} + string(v-real-last-rcv-pck) + {&delim-par} + string(now) .
++  copy-lob from v-req to vMem .
++  v-req64 = base64-encode(vMem) .
++  copy-lob from v-req64 to file (v-source-dir + {&back-slash-char} + v-pack-name) .
++  
++  run nws/s-g-pack.p
++    ( input "put":U
++     ,input "7zip":U
++     ,input v-pack-name
++     ,input v-source-dir
++     ,input v-target-dir
++     ,input v-temp-dir
++    ) no-error.
++  if error-status:error then do:
++    run write-to-log( substitute( "&1. Ошибка при отправке пакета. &2&3&2&4", vss-workfile, {&new-line}, error-status:get-message(1), return-value )
++                    ) .
++    return error.
++  end.
++end .
+diff --git a/nws/sync.w b/nws/sync.w
+--- a/nws/sync.w
++++ b/nws/sync.w
+@@ -179,7 +179,7 @@ DO:
+     v-real-last-sent-pck = max(v-real-last-sent-pck, pck-sent.pack-num) .
+   end.
+   for each pck-rcvd no-lock where pck-rcvd.db-num = p-dbnum :
+-    v-real-last-rcv-pck = max(v-real-last-sent-pck, pck-rcvd.pack-num) .
++    v-real-last-rcv-pck = max(v-real-last-rcv-pck, pck-rcvd.pack-num) .
+   end.
+   if v-last-rcv-pack > v-real-last-sent-pck
+   then do :
+@@ -198,6 +198,16 @@ DO:
+     return no-apply .
+   end.
+   
++  find first ub.clients no-lock where ub.clients.obj-type = {&shop}
++                                  and ub.clients.stts = 0
++                                  and ub.clients.db-num = p-dbnum
++                                  no-error.
++  if not available ub.clients
++  then do :
++    message ("Не найден магазин в УБД " + string(p-dbnum)) view-as alert-box.
++    return no-apply .
++  end.
++  
+   for each pck-sent exclusive-lock where pck-sent.db-num = p-dbnum and pck-sent.pack-num > v-last-rcv-pack :
+     for each route exclusive-lock where route.db-num = p-dbnum and route.last-pack = pck-sent.pack-num :
+       delete route .
+@@ -212,16 +222,6 @@ DO:
+     delete route .
+   end.
+   
+-  find first ub.clients no-lock where ub.clients.obj-type = 'маг'
+-                                  and ub.clients.stts = 0
+-                                  and ub.clients.db-num = p-dbnum
+-                                  no-error.
+-  if not available ub.clients
+-  then do :
+-    message ("Не найден магазин в УБД " + string(p-dbnum)) view-as alert-box.
+-    return no-apply .
+-  end.              
+-               
+   v-curr-obj-type = ub.clients.obj-type .
+   v-curr-obj-code = ub.clients.obj-code . 
+   

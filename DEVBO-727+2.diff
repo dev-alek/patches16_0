@@ -1,0 +1,17 @@
+# HG changeset patch
+# User VSpiridonov
+# Parent  dc4bc4ebb35bc6dda195e25527d444f83e753218
+refs #DEVBO-727+2  Временное отключение обмена новостями в ТБД. ТН 16.0
+                   устранение избыточных строк pck-sent в пакете
+
+diff --git a/nws/exp-pck.p b/nws/exp-pck.p
+--- a/nws/exp-pck.p
++++ b/nws/exp-pck.p
+@@ -246,6 +246,7 @@ if mFrameView
+     where ub.pck-sent.db-num   = p-db-num
+       and ub.pck-sent.rcvd     = no
+       and ub.pck-sent.pack-num < p-pack-num
++      and ub.pck-sent.SendTxtDate = ?
+   on error  undo, return error substitute( "&1 (for each ub.pck-sent). &2&3&4", vss-workfile, return-value, {&new-line}, error-status :get-message ( error-status :num-messages ) )
+   on stop   undo, return error substitute( "&1 (for each ub.pck-sent). stop", vss-workfile )
+   on endkey undo, return error substitute( "&1 (for each ub.pck-sent). endkey", vss-workfile )

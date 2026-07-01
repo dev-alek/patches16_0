@@ -1,0 +1,20 @@
+# HG changeset patch
+# Parent  dd719dc9b97ad98a9249710a64e0ffeaaa193c19
+
+diff --git a/trg/markw.p b/trg/markw.p
+--- a/trg/markw.p
++++ b/trg/markw.p
+@@ -61,7 +61,12 @@ if (old-marking.sts = objSrv:Env:Marking
+ then do:
+   ub.marking.sts = old-marking.sts.
+ end.
+-
++if ub.marking.sts = objSrv:Env:Marking:Sts:Mark:FreeZone:KeyIntDB
++then do:
++   session:debug-alert = yes.
++   message "FreeZone" 
++      view-as alert-box.
++end.
+ if ub.marking.sts <> old-marking.sts then do:
+    find first ub.marking-attr exclusive-lock where ub.marking-attr.mark = ub.marking.mark and 
+                                                    ub.marking-attr.attr-code = "sts-date" no-error .

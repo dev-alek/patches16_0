@@ -1,0 +1,21 @@
+# HG changeset patch
+# User ARostovtsev
+# Parent  f7db8e68ba606cc70219688706bee406ba6ea0f7
+refs #DEVBO-629 Большой размер УБД. РН-Москва. TH 16.0 #BTS-1871
+Уменьшение физического размера БД
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-629
+https://msk-exp-jira.expertek.local/browse/BTS-1871
+
+diff --git a/adm/l-i-pressdb.w b/adm/l-i-pressdb.w
+--- a/adm/l-i-pressdb.w
++++ b/adm/l-i-pressdb.w
+@@ -399,7 +399,7 @@ DO:
+ 
+     message
+       "Перенос БД завершен."
+-      view-as alert-box error
++      view-as alert-box
+     .
+ 
+     enable b-OK b-quit with frame {&frame-name}.

@@ -1,0 +1,167 @@
+# HG changeset patch
+# User SSlivenko
+# Parent  411874a4c2d7ae0ba2b88c516e4fd720d0a20366
+refs #5160 Выгрузка реализации в разрезе себестоимости
+
+http://exp-rm1/issues/5160
+
+diff -r 411874a4c2d7 -r c7e8be80acd8 rep/r-seb1c.p
+--- a/rep/r-seb1c.p	Thu Jan 16 15:33:08 2020 +0300
++++ b/rep/r-seb1c.p	Thu Jan 16 15:34:05 2020 +0300
+@@ -147,6 +147,31 @@
+   run make-tt.
+ end. /* obj-list */
+ 
++/*run gbl/inidebug.p .                                                             */
++/*for each tt-seb no-lock where tt-seb.KODVO <> "spi-prvo" :                       */
++/*  find first buf_goods no-lock where buf_goods.gds-code = integer(tt-seb.TOVAR) .*/
++/*  find first obj-list no-lock where obj-list.obj-name = tt-seb.NAMEA .           */
++/*  find first ub.recipe no-lock where                                             */
++/*             ub.recipe.prod-type = buf_goods.prod-type                           */
++/*         and ub.recipe.prod-code = buf_goods.prod-code                           */
++/*         and ub.recipe.artic     = buf_goods.artic                               */
++/*         and                                                                     */
++/*           (                                                                     */
++/*           ( ub.recipe.obj-type  = obj-list.obj-type                             */
++/*         and ub.recipe.obj-code  = obj-list.obj-code                             */
++/*           )                                                                     */
++/*          or                                                                     */
++/*           ( ub.recipe.obj-type  = "":U                                          */
++/*         and ub.recipe.obj-code  = 0                                             */
++/*           )                                                                     */
++/*           )                                                                     */
++/*         no-error.                                                               */
++/*  if available ub.recipe                                                         */
++/*  then do :                                                                      */
++/*    true .                                                                       */
++/*  end.                                                                           */
++/*end .                                                                            */
++
+ run dbflib-init in this-procedure.
+ 
+ run dbflib-add-field in this-procedure (
+@@ -574,7 +599,7 @@
+     .
+                                                                
+   end.    
+-  
++/*  
+   for each buf_trn-doc no-lock where  buf_trn-doc.shift-date    >=  x-Date-Start
+                                  and  buf_trn-doc.shift-date    <=  x-Date-End 
+                                  and  buf_trn-doc.obj-type      =   obj-list.obj-type
+@@ -648,7 +673,7 @@
+       end .                                   
+     end .                         
+   end .                                  
+-
++*/
+   for each buf_tt-seb no-lock where buf_tt-seb.KODVO <> "spi-prvo" :
+     for each tt-fbr no-lock where tt-fbr.comp-gds-code = integer(buf_tt-seb.TOVAR) :
+       find first tt-seb exclusive-lock where  tt-seb.DATAS = x-Date-End
+@@ -680,11 +705,106 @@
+       then do :
+         assign
+           tt-seb.SUMMA = tt-seb.SUMMA + (buf2_tt-seb.SUMMA * buf_tt-seb.chk-qnty / buf2_tt-seb.chk-qnty * (tt-fbr.inqr-qnty / tt-fbr.comp-qnty))
++          buf_tt-seb.SUMMA = buf_tt-seb.SUMMA - (buf2_tt-seb.SUMMA * buf_tt-seb.chk-qnty / buf2_tt-seb.chk-qnty * (tt-fbr.inqr-qnty / tt-fbr.comp-qnty))
+         .
+       end.                                  
+     end.
+   end.                    
+   
++  
++  for each tt-seb no-lock where tt-seb.KODVO <> "spi-prvo"
++                            and tt-seb.SUMMA <> 0  :
++    find first buf_goods no-lock where buf_goods.gds-code = integer(tt-seb.TOVAR) .
++    find first obj-list no-lock where obj-list.obj-name = tt-seb.NAMEA .
++    find first ub.recipe no-lock where
++               ub.recipe.prod-type = buf_goods.prod-type
++           and ub.recipe.prod-code = buf_goods.prod-code
++           and ub.recipe.artic     = buf_goods.artic
++           and
++             (
++             ( ub.recipe.obj-type  = obj-list.obj-type
++           and ub.recipe.obj-code  = obj-list.obj-code
++             )
++            or
++             ( ub.recipe.obj-type  = "":U
++           and ub.recipe.obj-code  = 0
++             )
++             )
++           no-error.
++    if available ub.recipe
++    then do :
++      for each buf_trn-doc no-lock where  buf_trn-doc.shift-date    >=  x-Date-Start
++                                     and  buf_trn-doc.shift-date    <=  x-Date-End 
++                                     and  buf_trn-doc.obj-type      =   obj-list.obj-type
++                                     and  buf_trn-doc.obj-code      =   obj-list.obj-code
++                                     and  buf_trn-doc.status_       =   {&fact}
++                                     and  buf_trn-doc.ext-doc-type  =   {&TDEDT_Peresort}:
++        for each buf_doc-line no-lock where buf_doc-line.doc-code = buf_trn-doc.doc-code
++                                    and buf_doc-line.artic    = buf_goods.artic
++                                    and buf_doc-line.prod-type = buf_goods.prod-type
++                                    and buf_doc-line.prod-code = buf_goods.prod-code
++                                    and buf_doc-line.fact-qnty >= 0 :
++          find first ub.parts-root no-lock where ub.parts-root.doc-code = buf_trn-doc.doc-code
++                                             and ub.parts-root.gds-code = buf_goods.gds-code
++                                             no-error .
++          if available ub.parts-root
++          then do :             
++            find first ub.goods no-lock where ub.goods.gds-code = ub.parts-root.orig-gds-code .
++            find first buf2_doc-line no-lock where buf2_doc-line.doc-code   = buf_doc-line.doc-code
++                                               and buf2_doc-line.artic      = ub.goods.artic
++                                               and buf2_doc-line.prod-type  = ub.goods.prod-type
++                                               and buf2_doc-line.prod-code  = ub.goods.prod-code
++                                               and buf2_doc-line.fact-qnty  < 0
++                                               no-error .
++            if available buf2_doc-line
++            then do :
++              for last buf_fbr-doc no-lock where  buf_fbr-doc.shift-date    >=  x-Date-Start
++                                             and  buf_fbr-doc.shift-date    <=  buf_trn-doc.shift-date 
++                                             and  buf_fbr-doc.obj-type      =   obj-list.obj-type
++                                             and  buf_fbr-doc.obj-code      =   obj-list.obj-code
++                                             and  buf_fbr-doc.status_       =   {&fact},
++              first buf_comp_fbr-line no-lock where buf_comp_fbr-line.doc-code = buf_fbr-doc.doc-code
++                                                     and buf_comp_fbr-line.is-comp = yes
++                                                     and buf_comp_fbr-line.artic = ub.goods.artic
++                                                     and buf_comp_fbr-line.prod-type  = ub.goods.prod-type
++                                                     and buf_comp_fbr-line.prod-code  = ub.goods.prod-code :
++                for each buf_ingr_fbr-line no-lock where buf_ingr_fbr-line.doc-code = buf_fbr-doc.doc-code
++                                                     and buf_ingr_fbr-line.is-comp = no
++                                                     and buf_ingr_fbr-line.recipe-code = buf_comp_fbr-line.recipe-code,
++                first tt-gds-list no-lock where tt-gds-list.artic     = buf_ingr_fbr-line.artic
++                                            and tt-gds-list.prod-type = buf_ingr_fbr-line.prod-type
++                                            and tt-gds-list.prod-code = buf_ingr_fbr-line.prod-code :   
++                  find first buf_tt-seb exclusive-lock where  buf_tt-seb.DATAS = tt-seb.DATAS
++                                                         and  buf_tt-seb.AZS   = tt-seb.AZS
++                                                         and  buf_tt-seb.TOVAR = string(tt-gds-list.gds-code, "99999999999")
++                                                         and  buf_tt-seb.KODVO = tt-seb.KODVO
++                                                         no-error . 
++                  if not available buf_tt-seb
++                  then do :
++                    create buf_tt-seb .
++                    assign
++                      buf_tt-seb.KODVO = tt-seb.KODVO
++                      buf_tt-seb.DATAS = tt-seb.DATAS
++                      buf_tt-seb.AZS   = tt-seb.AZS
++                      buf_tt-seb.NAMEA = tt-seb.NAMEA
++                      buf_tt-seb.TOVAR = string(tt-gds-list.gds-code, "99999999999")
++                      buf_tt-seb.NAMET = tt-gds-list.gds-name
++                      buf_tt-seb.POLUCH = ""
++                      buf_tt-seb.NAMEP = ""
++                    .
++                  end.  
++                  assign
++                    buf_tt-seb.SUMMA = buf_tt-seb.SUMMA + (tt-seb.SUMMA * (buf_ingr_fbr-line.fact-qnty / buf_comp_fbr-line.fact-qnty ) )
++                    tt-seb.SUMMA = tt-seb.SUMMA - (tt-seb.SUMMA * (buf_ingr_fbr-line.fact-qnty / buf_comp_fbr-line.fact-qnty ) )
++                  .                                                               
++                end.  /* buf_ingr_fbr-line   tt-gds-list  */                                   
++              end.   /* buf_fbr-doc   buf_comp_fbr-line  */                                    
++            end.  /* buf2_doc-line */
++          end. /* parts-root */       
++        end.  /* buf_doc-line */      
++      end.   /* buf_trn-doc */                           
++    end.   /* ub.recipe */
++  end.  /* tt-seb */
+                                   
+   end. /* do */
+ end procedure. /* make-tt */

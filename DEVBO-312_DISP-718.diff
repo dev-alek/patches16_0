@@ -1,0 +1,22 @@
+# HG changeset patch
+# User VSpiridonov
+# Parent  06d9d4f1a49a5ac9dba70b710a2b488c63419262
+refs #DEVBO-312_DISP-718
+файлы  добавл€ютс€ в задачах  DISP-718
+
+diff --git a/str/proc-startNewShiftTso.p b/str/proc-startNewShiftTso.p
+--- a/str/proc-startNewShiftTso.p
++++ b/str/proc-startNewShiftTso.p
+@@ -1,3 +1,4 @@
++block-level on error undo, throw.
+ define variable vss-revision    as character no-undo init "$Revision$":U .
+ define variable vss-author      as character no-undo init "$Author$":U .
+ define variable vss-date        as character no-undo init "$Date$":U .
+diff --git a/str/startNewShiftTso.p b/str/startNewShiftTso.p
+--- a/str/startNewShiftTso.p
++++ b/str/startNewShiftTso.p
+@@ -1,3 +1,4 @@
++block-level on error undo, throw.
+ define variable vss-revision    as character no-undo init "$Revision$":U .
+ define variable vss-author      as character no-undo init "$Author$":U .
+ define variable vss-date        as character no-undo init "$Date$":U .

@@ -1,0 +1,54 @@
+# HG changeset patch
+# User SSlivenko
+# Parent  3ea236447d1ca987d6ba432685f566f00c687e0a
+refs #DEVBO-2620 При формировании документов списания, инвентаризации и производства по Бадам и Антисептикам в пакетах для 1С ERP передаются GTIN и партии товара. #EXPSD-8088
+http://exp-jira.expertek.local:8080/browse/EXPSD-8088
+http://exp-jira.expertek.local:8080/browse/DEVBO-2620
+
+diff -r 3ea236447d1c -r a8807a7e3406 ibs/th/bge/1crn/subjects/trn-gd-doc.cls
+--- a/ibs/th/bge/1crn/subjects/trn-gd-doc.cls	Пн окт 09 13:31:17 2023 +0300
++++ b/ibs/th/bge/1crn/subjects/trn-gd-doc.cls	Пн окт 09 13:32:19 2023 +0300
+@@ -1049,6 +1049,11 @@
+           else
+           if ObjSrv:Env:ParametrsOfSection:GetSectionEDO(buf_parts.obj-type, buf_parts.obj-code):GetIsArticForType(v-gds-attr-value-old)
+           then do :
++            if v-gds-attr-value-old = "antiseptic"
++            or v-gds-attr-value-old = "Bad"
++            or v-gds-attr-value-old = "Badd2L7"
++            then return .
++            
+             if buf_trn-doc.ext-doc-type = {&TDEDT_Ras_Perem}
+             or buf_trn-doc.ext-doc-type = {&TDEDT_Pri_Perem}
+             then do:
+diff -r 3ea236447d1c -r a8807a7e3406 str/fbr-fact.p
+--- a/str/fbr-fact.p	Пн окт 09 13:31:17 2023 +0300
++++ b/str/fbr-fact.p	Пн окт 09 13:32:19 2023 +0300
+@@ -482,7 +482,11 @@
+                               OUTPUT varvalue,
+                               OUTPUT vartype
+                               ).
+-          if varvalue = "antiseptic" then next LK_RECEIPT_ .
++          if varvalue = "antiseptic"
++          or varvalue = "Bad"
++          or varvalue = "Badd2L7"
++          then next LK_RECEIPT_ .
++            
+           if varvalue > ""
+           and EDOParSec:GetIsArticForType(varvalue)
+           then do:
+diff -r 3ea236447d1c -r a8807a7e3406 str/trn-stat.p
+--- a/str/trn-stat.p	Пн окт 09 13:31:17 2023 +0300
++++ b/str/trn-stat.p	Пн окт 09 13:32:19 2023 +0300
+@@ -3469,7 +3469,11 @@
+                                 OUTPUT varvalue,
+                                 OUTPUT vartype
+                                 ).
+-            if varvalue = "antiseptic" then next LK_RECEIPT_ .
++            if varvalue = "antiseptic"
++            or varvalue = "Bad"
++            or varvalue = "Badd2L7"
++            then next LK_RECEIPT_ .
++            
+             if varvalue > ""
+             and EDOParSec:GetIsArticForType(varvalue)
+             then do:

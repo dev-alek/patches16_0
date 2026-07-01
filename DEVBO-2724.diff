@@ -1,0 +1,187 @@
+# HG changeset patch
+# User ARostovtsev
+# Parent  4d9eb0590efd06baa5372c5c706c03f25181bba0
+refs #DEVBO-2724 Ќе закрываетс€ смена в ј—” “Ќ при наличии чека с множественными отменами строки_“Ќ 16.0 #EXPSD-8229
+
+http://exp-jira.expertek.local:8080/browse/DEVBO-2724
+»справление ошибки распределени€ сумм в чеке при наличии неоднократного возврата одного и того же товара
+SC0017239953 ќшибочное распределение оплаты баллами ло€льности в секции chk-pays-r
+
+diff --git a/rep/r-pychk0.i b/rep/r-pychk0.i
+--- a/rep/r-pychk0.i
++++ b/rep/r-pychk0.i
+@@ -150,7 +150,7 @@ on endkey undo create-block, return erro
+       find first temp-chk-gds where
+                 temp-chk-gds.doc-code = ub.chk-gds.doc-code
+             AND temp-chk-gds.rec-type = pychk_rec-type
+-            and temp-chk-gds.b-code = ub.chk-gds.b-code
++            /*and temp-chk-gds.b-code = ub.chk-gds.b-code убрано разделение по коду товара, ищем по всему чеку */
+             and temp-chk-gds.line-num = 0
+             no-error.
+       if not available temp-chk-gds then do:
+@@ -182,7 +182,6 @@ on endkey undo create-block, return erro
+           temp-chk-gds.line-type = '':U
+           temp-chk-gds.num-lines = 0
+           temp-chk-gds.doc-qnty = 0
+-          temp-chk-gds.sum = 0
+           temp-chk-gds.flag  = no
+           .
+         end.
+@@ -214,7 +213,8 @@ on endkey undo create-block, return erro
+       end. /*if not available temp-chk-gds then do:*/
+       assign
+       temp-chk-gds.doc-qnty = temp-chk-gds.doc-qnty + ub.chk-gds.doc-qnty
+-      temp-chk-gds.sum = temp-chk-gds.sum + ub.chk-gds.doc-qnty * (ub.chk-gds.price-base - ub.chk-gds.discnt)
++      temp-chk-gds.sum = temp-chk-gds.sum + round(ub.chk-gds.doc-qnty * (ub.chk-gds.price-base - ub.chk-gds.discnt),2)
++      temp-chk-gds.ost-sum = temp-chk-gds.sum
+       temp-chk-gds.num-lines = temp-chk-gds.num-lines  + 1
+       .
+       find first temp-chk-gds use-index ijj where
+@@ -230,9 +230,7 @@ on endkey undo create-block, return erro
+         temp-chk-gds.b-code = ub.chk-gds.b-code
+         temp-chk-gds.gds-code = buf_bar-code.gds-code
+         temp-chk-gds.rec-type = pychk_rec-type
+-        temp-chk-gds.line-num = ub.chk-gds.line-num
+         .
+-
+       end.
+       else do:
+         assign
+@@ -262,12 +260,30 @@ on endkey undo create-block, return erro
+                               else '')
+       temp-chk-gds.line-sign = ub.chk-gds.line-sign
+       temp-chk-gds.discnt = ub.chk-gds.discnt
+-      temp-chk-gds.sum = ub.chk-gds.doc-qnty * (ub.chk-gds.price-base - ub.chk-gds.discnt)
++      temp-chk-gds.sum = round(ub.chk-gds.doc-qnty * (ub.chk-gds.price-base - ub.chk-gds.discnt),2)
++      temp-chk-gds.ost-sum = temp-chk-gds.sum
+       temp-chk-gds.rec-type = pychk_rec-type
+       temp-chk-gds.line-num = ub.chk-gds.line-num
+       temp-chk-gds.num-lines = 1
+       temp-chk-gds.density   = ub.chk-gds.density
+       .
++      /* если это возврат, то проверим продажа была по этому же чеку? */
++      if temp-chk-gds.sum < 0 then do:
++        /* если ƒа, то остаток нераспределенной суммы обнул€ем по продаже и возврату */
++        for first buf_temp-chk-gds where
++                  buf_temp-chk-gds.doc-code = temp-chk-gds.doc-code
++              and buf_temp-chk-gds.gds-code = temp-chk-gds.gds-code
++              and buf_temp-chk-gds.b-code   = temp-chk-gds.b-code
++              and buf_temp-chk-gds.doc-qnty = abs(temp-chk-gds.doc-qnty) 
++              and buf_temp-chk-gds.sum      = abs(temp-chk-gds.sum)
++              and buf_temp-chk-gds.ost-sum  <> 0     /* на еще провер€ть остаток суммы, а то в чеке может 1 и тот же товар несколько раз пробиватьс€ и возвращатьс€*/
++        :
++          assign
++            temp-chk-gds.ost-sum     = 0
++            buf_temp-chk-gds.ost-sum = 0
++          .
++        end.
++      end.
+     END. /* FOR EACH ub.chk-gds No-LOCK WHERE */
+     for each chk-discnt no-lock
+        where chk-discnt.doc-code = ub.chk-doc.doc-code
+@@ -472,7 +488,7 @@ on endkey undo create-block, return erro
+                    next dp.      
+                 find first  temp-chk-gds where
+                     temp-chk-gds.doc-code = ub.chk-doc.doc-code     
+-                    and buf_temp-chk-gds.b-code = temp-chk-gds.b-code          
++                    and buf_temp-chk-gds.b-code = temp-chk-gds.b-code
+                   and temp-chk-gds.line-num = 0
+                 no-error .
+                 if not available temp-chk-gds then next dp.
+@@ -533,7 +549,9 @@ on endkey undo create-block, return erro
+                   
+                 assign 
+                 buf_temp-chk-gds.sum = buf_temp-chk-gds.sum - buf_chk-gds-pay.tot-r-b
++                buf_temp-chk-gds.ost-sum = buf_temp-chk-gds.ost-sum - buf_chk-gds-pay.tot-r-b
+                 temp-chk-gds.sum =  temp-chk-gds.sum - buf_chk-gds-pay.tot-r-b
++                temp-chk-gds.ost-sum = temp-chk-gds.ost-sum - buf_chk-gds-pay.tot-r-b
+                 buf_temp-chk-gds.doc-qnty = buf_temp-chk-gds.doc-qnty - buf_chk-gds-pay.eff-doc-qnty
+                 temp-chk-pay.tot-r-b = temp-chk-pay.tot-r-b - buf_chk-gds-pay.tot-r-b
+                 pychk_dop-sumk = pychk_dop-sumk - buf_chk-gds-pay.tot-r-b
+@@ -592,13 +610,14 @@ on endkey undo create-block, return erro
+         assign
+         pychk_dop-sumk = min(abs(pychk_dop-sumg), abs(pychk_dop-sump))  * (if pychk_dop-sump > 0 then 1 else -1 ) * (if pychk_dop-sumg < 0 AND ub.chk-doc.chk-type = {&bef-rcpt-sale} then -1 else 1 ) /*квант*/
+         pychk_pay-sum = pychk_pay-sum - pychk_dop-sumk
+-        pychk_dop-sump = pychk_dop-sump - pychk_dop-sumk
+         pychk_dop-sumg = pychk_dop-sumg - pychk_dop-sumk
+         .
+         for each buf_temp-chk-gds where
+-                buf_temp-chk-gds.doc-code = ub.chk-doc.doc-code
+-            and buf_temp-chk-gds.b-code = temp-chk-gds.b-code
++                 buf_temp-chk-gds.doc-code = ub.chk-doc.doc-code
++             and buf_temp-chk-gds.rec-type = temp-chk-gds.rec-type
++/*            and buf_temp-chk-gds.b-code = temp-chk-gds.b-code  убрано разделение по коду товара, идем по всему чеку  */
+             and buf_temp-chk-gds.line-num  > 0
++            and buf_temp-chk-gds.ost-sum <> 0
+         by buf_temp-chk-gds.doc-code
+         by buf_temp-chk-gds.rec-type descending
+         by buf_temp-chk-gds.line-num
+@@ -612,7 +631,7 @@ on endkey undo create-block, return erro
+             end.
+           end case.
+           /* если строчка была принудительно размазана, то пропускаем ее */
+-          if not (buf_temp-chk-gds.sum = 0 and can-find (first temp-chk-dp no-lock where temp-chk-dp.pay-code = temp-chk-pay.pay-code and temp-chk-dp.doc-code = temp-chk-pay.doc-code and buf_temp-chk-gds.line-num  =  temp-chk-dp.line-num)) then do:
++          if pychk_dop-sump <> 0 and not (buf_temp-chk-gds.sum = 0 and can-find (first temp-chk-dp no-lock where temp-chk-dp.pay-code = temp-chk-pay.pay-code and temp-chk-dp.doc-code = temp-chk-pay.doc-code and buf_temp-chk-gds.line-num  =  temp-chk-dp.line-num)) then do:
+               if can-find (first temp-chk-dp no-lock where temp-chk-dp.pay-code = temp-chk-pay.pay-code and temp-chk-dp.doc-code = temp-chk-pay.doc-code) then do:
+                   find first buf_chk-gds-pay where buf_chk-gds-pay.doc-code = temp-chk-pay.doc-code
+                   and buf_chk-gds-pay.algo-num = {&current-algo-1}
+@@ -624,6 +643,18 @@ on endkey undo create-block, return erro
+                   if not available buf_chk-gds-pay then create buf_chk-gds-pay.
+               end.    
+               else create buf_chk-gds-pay.
++              if last(temp-chk-pay.line-num) then 
++                vsum = buf_temp-chk-gds.ost-sum.
++              else do:
++                vsum = if    temp-chk-gds.num-lines = 1
++                                              and abs(pychk_dop-sumk) <= abs(temp-chk-gds.sum)
++                                            then pychk_dop-sumk
++                                            else (pychk_dop-sumk * buf_temp-chk-gds.sum / temp-chk-gds.sum).
++                vsum = max(abs(vsum) , 0.01) * (if vsum < 0 then -1 else 1).
++                vsum = round(vsum,2).
++                vsum = min(abs(vsum), abs(pychk_dop-sump)) * (if vsum < 0 then -1 else 1).
++                vsum = min(abs(vsum), abs(buf_temp-chk-gds.ost-sum)) * (if vsum < 0 then -1 else 1).
++              end.
+               assign
+               buf_chk-gds-pay.doc-code = temp-chk-pay.doc-code
+               buf_chk-gds-pay.chk-type = ub.chk-doc.chk-type
+@@ -633,11 +664,6 @@ on endkey undo create-block, return erro
+               buf_chk-gds-pay.line-num = buf_temp-chk-gds.line-num
+               buf_chk-gds-pay.cpline-num = temp-chk-pay.line-num
+               buf_chk-gds-pay.pay-card = temp-chk-pay.pay-card
+-              vSum                     = (if    temp-chk-gds.num-lines = 1
+-                                            and abs(pychk_dop-sumk) <= abs(temp-chk-gds.sum)
+-                                          then pychk_dop-sumk
+-                                          else (pychk_dop-sumk * buf_temp-chk-gds.sum / temp-chk-gds.sum)
+-                                         )
+               buf_chk-gds-pay.tot-r-b = buf_chk-gds-pay.tot-r-b  + vSum
+               buf_chk-gds-pay.eff-base-rate = pychk_exch
+               buf_chk-gds-pay.eff-doc-qnty = (if buf_chk-gds-pay.eff-doc-qnty = ? then 0 else buf_chk-gds-pay.eff-doc-qnty) + (if (temp-chk-gds.num-lines = 1
+@@ -655,7 +681,7 @@ on endkey undo create-block, return erro
+               buf_chk-gds-pay.line-sign = buf_temp-chk-gds.line-sign
+               buf_chk-gds-pay.line-type = pychk_line-type-chr
+               buf_chk-gds-pay.rec-type = buf_temp-chk-gds.rec-type
+-          buf_chk-gds-pay.density  = buf_temp-chk-gds.density
++              buf_chk-gds-pay.density  = buf_temp-chk-gds.density
+               buf_chk-gds-pay.chk-date = ub.chk-doc.chk-date
+               buf_chk-gds-pay.chk-time = ub.chk-doc.chk-time
+               buf_chk-gds-pay.obj-type = ub.chk-doc.obj-type
+@@ -665,6 +691,8 @@ on endkey undo create-block, return erro
+               buf_chk-gds-pay.shift-num = ub.chk-doc.shift-num
+               buf_chk-gds-pay.shift-name= ub.chk-doc.shift-name
+               buf_temp-chk-gds.flag = yes  
++              pychk_dop-sump = pychk_dop-sump - vSum
++              buf_temp-chk-gds.ost-sum = buf_temp-chk-gds.ost-sum - vSum
+               .
+             end.
+         end.
+diff --git a/rep/real3tm.i b/rep/real3tm.i
+--- a/rep/real3tm.i
++++ b/rep/real3tm.i
+@@ -27,6 +27,7 @@ field discnt as decimal
+ field line-type  as character
+ field line-sign as logical
+ field sum as decimal
++field ost-sum as decimal   /* остаток нераспределенной суммы */
+ field line-num as integer
+ field num-lines as integer
+ field doc-qnty as decimal

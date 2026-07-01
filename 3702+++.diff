@@ -1,0 +1,18 @@
+# HG changeset patch
+# Parent  85bc57d39a796a5097d46f4cf9e38c759ecc29fd
+refs #3702 Интерфейс синхронизации товарного справочника с ЕГАИС
+
+http://exp-rm/redmine/issues/3702
+
+diff -r 85bc57d39a79 -r da709b453839 bge/egais-goods.w
+--- a/bge/egais-goods.w	Thu Dec 17 11:55:07 2015 +0300
++++ b/bge/egais-goods.w	Thu Dec 17 11:57:16 2015 +0300
+@@ -521,7 +521,7 @@
+                 buffer tt-gds:handle:buffer-copy (bh-gds-egais, "gds-code") .
+                 for first buf_goods exclusive-lock where buf_goods.gds-code = tt-gds.gds-code :
+                     assign
+-                        buf_goods.gds-name = tt-gds.gds-name
++/*                        buf_goods.gds-name = tt-gds.gds-name*/
+                         buf_goods.ms-base  = tt-gds.ms-base
+                         buf_goods.proof    = tt-gds.proof
+                     .

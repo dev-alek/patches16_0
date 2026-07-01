@@ -1,0 +1,22 @@
+# HG changeset patch
+# User SSlivenko
+# Parent  277dcc7d28c9df85d345f9db631ba49c6cb9b2d2
+refs #DISP-718 Создание скрипта для автоматического закрытия смен ТН на несколькихААЗС
+
+http://exp-jira.expertek.local:8080/browse/DISP-718
+
+diff --git a/ibs/th/str/tso_trg.cls b/ibs/th/str/tso_trg.cls
+--- a/ibs/th/str/tso_trg.cls
++++ b/ibs/th/str/tso_trg.cls
+@@ -684,6 +684,11 @@ class ibs.th.str.tso_trg:
+             vQuery:get-next (). /* Вывод из оборота */
+             next .
+          end .
++         if trim(buf_cash-desk.addr-path) = ""
++         then do :
++            vQuery:get-next (). /* Вывод из оборота */
++            next .
++         end .
+          create tt-tso.
+          assign
+             tt-tso.db-num       = buf_cash-desk.db-num

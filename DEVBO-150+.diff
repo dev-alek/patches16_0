@@ -1,0 +1,37 @@
+# HG changeset patch
+# User ARostovtsev
+# Parent  df7418f8a5a5eef0c09bf9d1288b0121c6f42f75
+refs #DEVBO-150+ Запрет приема марки по УПД, принятой ранее TH 16.0
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-150
+
+diff --git a/str/mark_browse.w b/str/mark_browse.w
+--- a/str/mark_browse.w
++++ b/str/mark_browse.w
+@@ -14,7 +14,6 @@ using ibs.th.str.marking.handlers.*.
+ 
+ $Revision$
+ $Author$
+-$Date$
+ $Workfile$
+ $Archive$
+ 
+@@ -2468,6 +2467,18 @@ PROCEDURE scan-mark :
+                         v-mark = "" .
+                         return no-apply.              
+                     end. /*if X_marking.sts = Marking:MarkError:KeyIntDB  then do:*/
++                    
++                    find first buf_utd-marking-lines no-lock where buf_utd-marking-lines.mark = X_marking.mark and buf_utd-marking-lines.db-num = X_marking.db-num and
++                        buf_utd-marking-lines.doc-id <> X_marking.doc-id no-error .
++                    if avail buf_utd-marking-lines and buf_utd-marking-lines.sts <> Marking:NotAvailable:KeyIntDB then
++                    do:
++                        F-text = "Марка принята раньше, повторная приемка запрещена" .
++                        display F-text with frame {&frame-name}.
++                        v-mark:screen-value = "" .
++                        v-mark = "" .
++                        return no-apply.              
++                    end.                     
++                    
+                     find first buf_utd-marking-lines exclusive-lock where buf_utd-marking-lines.mark = X_marking.mark and buf_utd-marking-lines.db-num = X_marking.db-num and
+                         buf_utd-marking-lines.doc-id = X_marking.doc-id no-error .
+                     if available (buf_utd-marking-lines) then 

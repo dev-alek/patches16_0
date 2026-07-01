@@ -1,0 +1,40 @@
+# HG changeset patch
+# User SSlivenko
+# Parent  2ce5eb195dbe5f716ace4a3671f42c6805f1ce61
+refs #DEVBO-507 Ïðèåìêà ÍÏ è ÑÓÃ ñ ÏÎêÌÈ 2017
+
+http://exp-jira.expertek.local:8080/browse/DEVBO-507
+http://exp-jira.expertek.local:8080/browse/EXPSD-4851
+
+diff -r 2ce5eb195dbe -r b74a9da2bc17 str/in-line.w
+--- a/str/in-line.w	×ò äåê 09 12:37:51 2021 +0300
++++ b/str/in-line.w	×ò äåê 09 13:59:51 2021 +0300
+@@ -435,21 +435,21 @@
+   r-country                            at row 3    col 83
+   tt-fr-doc-line.short-name            at row 3    col 85    colon-aligned no-label                   view-as text    size 10    by 0.7 fgcolor 4
+   
+-  tt-fr-doc-line.cli-qnty              at row 5    col 10.5  colon-aligned label "Ïî &ÒÒÍ"            view-as fill-in size 16    by 1 fgcolor 4 format "->>,>>>,>>9.999":U
++  tt-fr-doc-line.cli-qnty              at row 5    col 10.5  colon-aligned label "Ïî &ÒÒÍ"            view-as fill-in size 16    by 1 fgcolor 4 format "->>,>>>,>>9.9":U
+   tt-fr-doc-line.unit-cli              at row 5    col 26.5  colon-aligned no-label                   view-as fill-in size 7     by 1 fgcolor 4
+   r-units                              at row 5    col 35.5                no-label
+   tt-fr-doc-line.cst-code              at row 5    col 55    colon-aligned label "ÃÒÄ" FORMAT "X(31)"
+   
+-  tt-fr-doc-line.doc-density           at row 6    col 10.5  colon-aligned format    ">>9.9999999999" label "Ïëîòíîñòü"          VIEW-AS FILL-IN SIZE 16 BY 1 fgcolor 4
+-  tt-fr-doc-line.temperature           at row 6    col 30    colon-aligned format    "->9.99"         label "Ò"                  VIEW-AS FILL-IN SIZE 7  BY 1 fgcolor 4
++  tt-fr-doc-line.doc-density           at row 6    col 10.5  colon-aligned format    ">>9.9999" label "Ïëîòíîñòü"          VIEW-AS FILL-IN SIZE 16 BY 1 fgcolor 4
++  tt-fr-doc-line.temperature           at row 6    col 30    colon-aligned format    "->9.9"         label "Ò"                  VIEW-AS FILL-IN SIZE 7  BY 1 fgcolor 4
+   tt-fr-doc-line.cli-base-rate         at row 6    col 40    colon-aligned format ">>,>>9.9999999999" no-label                   VIEW-AS FILL-IN SIZE 18 BY 1
+   
+-  tt-fr-doc-line.doc-qnty  format ">>>,>>>,>>9.<<<"  at row 7    col 10.5  colon-aligned label "Ïî &íàêë"           view-as fill-in size 16    by 1
++  tt-fr-doc-line.doc-qnty  format ">>>,>>>,>>9"  at row 7    col 10.5  colon-aligned label "Ïî &íàêë"           view-as fill-in size 16    by 1
+   tt-fr-doc-line.unit-base             at row 7    col 26.5  colon-aligned no-label                   view-as text    size 7     by 1
+   b-docsec                             at row 7    col 32  
+-  tt-fr-doc-line.fact-qnty    format ">>>,>>>,>>9.<<<"  at row 8    col 10.5  colon-aligned    label "&Ôàêò"           view-as fill-in size 16    by 1
+-  tt-fr-doc-line.fact-density format ">>9.9999999999"   at row 8    col 27.0  colon-aligned no-label                   view-as fill-in size 16    by 1
+-  tt-fr-doc-line.fact-qnty-kg format ">>>,>>>,>>9.<<<"  at row 8    col 42.5  colon-aligned no-label                   view-as fill-in size 16    by 1
++  tt-fr-doc-line.fact-qnty    format ">>>,>>>,>>9"  at row 8    col 10.5  colon-aligned    label "&Ôàêò"           view-as fill-in size 16    by 1
++  tt-fr-doc-line.fact-density format ">>9.9999"   at row 8    col 27.0  colon-aligned no-label                   view-as fill-in size 16    by 1
++  tt-fr-doc-line.fact-qnty-kg format ">>>,>>>,>>9.9"  at row 8    col 42.5  colon-aligned no-label                   view-as fill-in size 16    by 1
+   tt-fr-doc-line.vat-pc                 at row 8    col 64    colon-aligned
+   tt-fr-doc-line.type-inp-vat           at row 8    col 73    no-label                   view-as toggle-box size 2 by 1
+   tt-fr-doc-line.slt-pc                 at row 9    col 50    colon-aligned

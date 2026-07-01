@@ -1,0 +1,670 @@
+# HG changeset patch
+# User ARostovtsev
+# Parent  5641d51a7b6dc8b248244fca23025d2f1578d70b
+refs #DEVBO-594 Аномально большой размер ТБД. ТН 16.0 #BTS-1820
+Чистка БД на дату
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-594
+https://msk-exp-jira.expertek.local/browse/BTS-1820
+
+diff --git a/cleandb/00037000.p b/cleandb/00037000.p
+--- a/cleandb/00037000.p
++++ b/cleandb/00037000.p
+@@ -42,8 +42,8 @@ run day-begin-fact-order in this-procedu
+     ,output v-beg-fact-order
+   ).
+ 
+-for first buf_clients no-lock
+-   where buf_clients.db-num = sys-ctrl.db-num
++for each buf_clients no-lock
++   where buf_clients.db-num <> ?
+ :
+   for each rvs-doc no-lock
+      where rvs-doc.obj-type   = buf_clients.obj-type
+@@ -57,7 +57,6 @@ for first buf_clients no-lock
+   end.
+ end.
+ 
+-output stream str-gen close.
+ {cleandb/setresval.i}
+ return vResult.
+ 
+diff --git a/cleandb/00037001.p b/cleandb/00037001.p
+--- a/cleandb/00037001.p
++++ b/cleandb/00037001.p
+@@ -40,8 +40,8 @@ run day-begin-fact-order in this-procedu
+      ,output v-beg-fact-order)
+ .
+ 
+-for first buf_clients no-lock
+-   where buf_clients.db-num = sys-ctrl.db-num
++for each buf_clients no-lock
++   where buf_clients.db-num <> ?
+ :
+     for each icnt-doc no-lock where 
+              icnt-doc.obj-type  =  buf_clients.obj-type 
+@@ -74,7 +74,6 @@ for first buf_clients no-lock
+     end.
+   end.
+ end.
+-output stream str-gen close.
+ {cleandb/setresval.i}
+ return vResult.
+ 
+diff --git a/cleandb/00043000.p b/cleandb/00043000.p
+--- a/cleandb/00043000.p
++++ b/cleandb/00043000.p
+@@ -99,8 +99,8 @@ define buffer buf_trn-doc for ub.trn-doc
+ 
+ on delete of ub.trn-doc         override do: end.
+ 
+-for first buf_clients no-lock
+-   where buf_clients.db-num = sys-ctrl.db-num
++for each buf_clients no-lock
++   where buf_clients.db-num <> ?
+ :
+   for each trn-doc no-lock where
+            trn-doc.obj-type   = buf_clients.obj-type 
+@@ -115,7 +115,6 @@ for first buf_clients no-lock
+   end.
+ end.
+ 
+-output stream str-gen close.
+ {cleandb/setresval.i}
+ return vResult.
+ 
+diff --git a/cleandb/00043001.p b/cleandb/00043001.p
+--- a/cleandb/00043001.p
++++ b/cleandb/00043001.p
+@@ -21,9 +21,10 @@ define variable vss-description as character no-undo init "Чистка УБД.".
+ { cmp/str-glbl.i }
+ { cleandb/defs.i }
+ 
+-define buffer trn-doc   for ub.trn-doc .
+-define buffer parts     for ub.parts .
+-define buffer buf_parts for ub.parts .
++define buffer trn-doc    for ub.trn-doc .
++define buffer parts      for ub.parts .
++define buffer buf_parts  for ub.parts .
++define buffer free_parts for ub.parts .
+ 
+ on delete of ub.parts         override do: end.
+ 
+@@ -36,14 +37,24 @@ on error undo, return error substitute("
+   find first trn-doc no-lock where
+              trn-doc.doc-code = parts.in-code
+   no-error.
+-  if not avail trn-doc then
++  if not avail trn-doc and 
++     not can-find(first free_parts where
++                        free_parts.obj-type  = parts.obj-type
++                    and free_parts.obj-code  = parts.obj-code
++                    and free_parts.artic     = parts.artic
++                    and free_parts.prod-type = parts.prod-type
++                    and free_parts.prod-code = parts.prod-code
++                    and free_parts.in-code   = parts.in-code
++                    and free_parts.out-code  = {&free-code}
++                    and free_parts.part-code = parts.part-code
++                    and free_parts.fact-qnty > 0) then
+   do:
++    /* удяляем, если уже удален док-т прихода и партия свободной зоны по этой партии уже обнулилась*/
+     run cleanTable in this-procedure.
+     { cleandb/delmainrec.i parts}
+   end.
+ end.
+ 
+-output stream str-gen close.
+ {cleandb/setresval.i}
+ return vResult.
+ 
+diff --git a/cleandb/00045000.p b/cleandb/00045000.p
+--- a/cleandb/00045000.p
++++ b/cleandb/00045000.p
+@@ -46,8 +46,8 @@ assign
+   find-fact-order =  integer(v-temp-date) + 0.99
+ .
+ 
+-for first buf_clients no-lock  where
+-         buf_clients.db-num = sys-ctrl.db-num
++for each buf_clients no-lock where
++         buf_clients.db-num <> ?
+ on error undo, return error SUBSTITUTE("&1 &2 &3", return-value, error-status:get-message(1), error-status:get-message(2))
+ :
+   v-doc-num = "2-" + buf_clients.obj-type  
+@@ -94,7 +94,6 @@ on error undo, return error SUBSTITUTE("
+   end.
+ end.
+ 
+-output stream str-gen close.
+ {cleandb/setresval.i}
+ return vResult.
+ 
+@@ -260,6 +259,7 @@ end procedure. /* copy-parts */
+ procedure partcopy_pr-docw :
+   /* привязывание архивных партий к переоценке */
+   /* см. partcopy.i                            */
++  define variable vMsg as character no-undo.
+ 
+   define input parameter  p-out-code         like ub.parts.out-code no-undo .
+   define parameter buffer buf_orig_parts     for ub.parts .
+@@ -306,7 +306,19 @@ procedure partcopy_pr-docw :
+       or buf_parts.doc-type  <> {&act-overvalue}
+       or buf_parts.PS        <> 'архив переоценки ' + p-out-code then 
+       do:
+-        output to value(vargen-file).
++        vMsg = 
++          "Ошибка при поиске архивной партии, привязанной к переоценке~n" +
++          substitute("Переоценка: &1~n", p-out-code) +
++          substitute("Артикул: &1 &2 &3~n", buf_parts.artic, buf_parts.prod-type, buf_parts.prod-code) +
++          substitute("status_: &1~n", buf_parts.status_) +
++          substitute("rsrv-free: &1~n", buf_parts.rsrv-free) +
++          substitute("doc-type: &1~n", buf_parts.doc-type) +
++          substitute("PS: &1~n", buf_parts.PS)
++        .
++        if valid-handle(varcall-back) then
++          run callback-write-to-log in varcall-back (
++            input vMsg
++          ) no-error .
+         put unformatted
+           "Ошибка при поиске архивной партии, привязанной к переоценке" skip
+           "Переоценка: " p-out-code skip
+@@ -316,7 +328,6 @@ procedure partcopy_pr-docw :
+           "doc-type: "   buf_parts.doc-type  skip
+           "PS: "         buf_parts.PS skip
+         .
+-        output close.
+         undo, return error .
+       end.
+     end.
+diff --git a/cleandb/00055000.p b/cleandb/00055000.p
+--- a/cleandb/00055000.p
++++ b/cleandb/00055000.p
+@@ -41,8 +41,8 @@ define buffer buf_fbr-pln  for ub.fbr-pl
+ on delete of ub.fbr-doc override do: end.
+ on delete of ub.fbr-pln override do: end.
+ 
+-for first buf_clients no-lock
+-    where buf_clients.db-num = sys-ctrl.db-num
++for each buf_clients no-lock
++    where buf_clients.db-num <> ?
+ :
+   for each fbr-doc no-lock
+      where fbr-doc.obj-type  = buf_clients.obj-type
+@@ -64,7 +64,6 @@ for first buf_clients no-lock
+   end.
+ end.
+ 
+-output stream str-gen close.
+ {cleandb/setresval.i}
+ return vResult.
+ 
+diff --git a/cleandb/00061000.p b/cleandb/00061000.p
+--- a/cleandb/00061000.p
++++ b/cleandb/00061000.p
+@@ -10,14 +10,14 @@ Creation date: 09/17/25
+ */
+ 
+ &scop Tables Документы на кассе с историей
+-&scop Tables cd-doc ~
+-cd-doc-attr ~
+-c-cd-doc ~
+-cd-doc-line ~
+-cd-doc-line-attr ~
+-c-cd-doc-line ~
+-cd-event-log ~
+-cd-event-log-attr
++/*&scop Tables cd-doc ~*/
++/*cd-doc-attr ~        */
++/*c-cd-doc ~           */
++/*cd-doc-line ~        */
++/*cd-doc-line-attr ~   */
++/*c-cd-doc-line ~      */
++/*cd-event-log ~       */
++/*cd-event-log-attr    */
+ 
+ define variable vss-revision    as character no-undo init "$Revision: aea5316774be, 0, rls $":U .
+ define variable vss-author      as character no-undo init "$Author: sibintek-soft $":U .
+@@ -37,8 +37,8 @@ define buffer buf_cd-event-log  for ub.c
+ on delete of ub.cd-doc            override do: end.
+ on delete of ub.cd-event-log      override do: end.
+ 
+-for first buf_clients no-lock
+-    where buf_clients.db-num = sys-ctrl.db-num
++for each buf_clients no-lock
++    where buf_clients.db-num <> ?
+ :
+   for each cd-doc no-lock where 
+            cd-doc.obj-type    = buf_clients.obj-type 
+@@ -63,7 +63,6 @@ for first buf_clients no-lock
+     { cleandb/delmainrec.i cd-event-log }
+   end.
+ end.
+-output stream str-gen close.
+ {cleandb/setresval.i}
+ return vResult.
+ 
+diff --git a/cleandb/00090000.p b/cleandb/00090000.p
+--- a/cleandb/00090000.p
++++ b/cleandb/00090000.p
+@@ -89,8 +89,8 @@ on delete of ub.fin-ob-before      overr
+ on delete of ub.fin-doc            override do: end.
+ on delete of ub.fin-statement      override do: end.
+ 
+-for first buf_clients no-lock
+-   where buf_clients.db-num = sys-ctrl.db-num
++for each buf_clients no-lock
++   where buf_clients.db-num <> ?
+ :
+ for each fin-ob no-lock where
+          fin-ob.host-code = buf_clients.host-code
+@@ -191,7 +191,6 @@ on error undo, return error substitute("
+ end.  
+ end.  /* for first buf_clients */
+ 
+-output stream str-gen close.
+ {cleandb/setresval.i}
+ return vResult.
+ 
+diff --git a/cleandb/00091000.p b/cleandb/00091000.p
+--- a/cleandb/00091000.p
++++ b/cleandb/00091000.p
+@@ -55,8 +55,8 @@ on delete of ub.payment   override do: e
+ on delete of ub.stop-list override do: end.
+ 
+ /*payment.source-type бывает  {&pmnt-cash-desk} {&pmnt-ord-doc} {&pmnt-trn-doc} {&pmnt-fin-doc} */
+-for first buf_clients no-lock
+-   where buf_clients.db-num = sys-ctrl.db-num
++for each buf_clients no-lock
++   where buf_clients.db-num <> ?
+ :
+ _payment:
+ for each payment no-lock where
+@@ -148,7 +148,6 @@ on error undo, return error SUBSTITUTE("
+ end.
+ end.  /* for first buf_clients */
+ 
+-output stream str-gen close.
+ {cleandb/setresval.i}
+ return vResult.
+ 
+diff --git a/cleandb/00127000.p b/cleandb/00127000.p
+--- a/cleandb/00127000.p
++++ b/cleandb/00127000.p
+@@ -41,16 +41,21 @@ on delete of ub.order-doc               
+ 
+ orderStatus =  new ibs.th.str.order.sts.order().
+ 
+-for each order-doc no-lock where
+-         order-doc.order-date < vardate-actual-docs
+-     and order-doc.sts = orderStatus:DeliveryCompleted:KeyIntDB
+-     and order-doc.db-num  = sys-ctrl.db-num
+-on error undo, return error SUBSTITUTE("&1 &2 &3", return-value, error-status:get-message(1), error-status:get-message(2))
++for each buf_clients no-lock
++   where buf_clients.db-num <> ?
+ :
+-  run cleanTable in this-procedure .
+-  { cleandb/delmainrec.i order-doc}
++  for each order-doc no-lock where
++           order-doc.order-date < vardate-actual-docs
++       and order-doc.sts = orderStatus:DeliveryCompleted:KeyIntDB
++       and order-doc.db-num  = buf_clients.db-num
++      use-index date-sts
++  on error undo, return error SUBSTITUTE("&1 &2 &3", return-value, error-status:get-message(1), error-status:get-message(2))
++  :
++    run cleanTable in this-procedure .
++    { cleandb/delmainrec.i order-doc}
++  end.
+ end.
+-output stream str-gen close.
++
+ {cleandb/setresval.i}
+ return vResult.
+ 
+diff --git a/cleandb/00169000.p b/cleandb/00169000.p
+--- a/cleandb/00169000.p
++++ b/cleandb/00169000.p
+@@ -61,8 +61,8 @@ run factord in this-procedure (
+   , output v-day-end-fact-order
+ ).
+ 
+-for first buf_clients no-lock
+-   where buf_clients.db-num = sys-ctrl.db-num
++for each buf_clients no-lock
++   where buf_clients.db-num <> ?
+ :
+   for each shift-obj exclusive-lock
+      where shift-obj.obj-type     = buf_clients.obj-type
+@@ -138,7 +138,6 @@ for first buf_clients no-lock
+   end.
+ end.
+ 
+-output stream str-gen close.
+ {cleandb/setresval.i}
+ return vResult.
+ 
+diff --git a/cleandb/00193000.p b/cleandb/00193000.p
+--- a/cleandb/00193000.p
++++ b/cleandb/00193000.p
+@@ -43,8 +43,8 @@ on delete of ub.wth-doc   override do: e
+ { cmp/str-glbl.i }
+ { cleandb/defs.i }
+ 
+-for first buf_clients no-lock
+-   where buf_clients.db-num = sys-ctrl.db-num
++for each buf_clients no-lock
++   where buf_clients.db-num <> ?
+ :
+   for each wth-doc no-lock where
+            wth-doc.host-code = buf_clients.host-code
+@@ -60,7 +60,6 @@ for first buf_clients no-lock
+   end.
+ end.
+ 
+-output stream str-gen close.
+ {cleandb/setresval.i}
+ return vResult.
+ 
+diff --git a/cleandb/00199000.p b/cleandb/00199000.p
+--- a/cleandb/00199000.p
++++ b/cleandb/00199000.p
+@@ -149,8 +149,8 @@ on delete of ub.arh-fin-ob-contr-obj-att
+ 
+ run factord-end-day in this-procedure ( vardate-actual-docs - 1, output var-fact-order-findoc).
+ 
+-for first buf_clients no-lock
+-   where buf_clients.db-num = sys-ctrl.db-num
++for each buf_clients no-lock where 
++         buf_clients.db-num <> ?
+ :
+ for each arh-fin-doc-an no-lock where
+          arh-fin-doc-an.host-code  = buf_clients.host-code
+@@ -479,6 +479,5 @@ on error undo, return error SUBSTITUTE("
+ end.
+ end.  /* for first buf_clients */
+ 
+-output stream str-gen close.
+ {cleandb/setresval.i}
+ return vResult.
+diff --git a/cleandb/00217000.p b/cleandb/00217000.p
+--- a/cleandb/00217000.p
++++ b/cleandb/00217000.p
+@@ -178,6 +178,5 @@ run factord-end-day in this-procedure ( 
+   ~{&arh-table-name~}-attr.fact-order = ~{&arh-table-name~}.fact-order
+ {&clean-table}
+ 
+-output stream str-gen close.
+ {cleandb/setresval.i}
+ return vResult.
+diff --git a/cleandb/00221000.p b/cleandb/00221000.p
+--- a/cleandb/00221000.p
++++ b/cleandb/00221000.p
+@@ -52,7 +52,6 @@ on error undo, return error SUBSTITUTE("
+   { cleandb/delmainrec.i price-doc-forming}
+ end.
+ 
+-output stream str-gen close.
+ {cleandb/setresval.i}
+ return vResult.
+ 
+diff --git a/cleandb/00230000.p b/cleandb/00230000.p
+--- a/cleandb/00230000.p
++++ b/cleandb/00230000.p
+@@ -32,7 +32,7 @@ define buffer buf_add-doc            for
+ on delete of ub.add-doc               override do: end.
+ 
+ for each buf_clients no-lock
+-   where buf_clients.db-num = sys-ctrl.db-num
++   where buf_clients.db-num <> ?
+ :
+   for each add-doc no-lock where 
+            add-doc.obj-type   = buf_clients.obj-type
+@@ -46,7 +46,6 @@ for each buf_clients no-lock
+   end.
+ end.
+ 
+-output stream str-gen close.
+ {cleandb/setresval.i}
+ return vResult.
+ 
+diff --git a/cleandb/00240000.p b/cleandb/00240000.p
+--- a/cleandb/00240000.p
++++ b/cleandb/00240000.p
+@@ -35,8 +35,8 @@ define buffer buf_schet-fact-doc for ub.
+ 
+ on delete of ub.schet-fact-doc override do: end.
+ 
+-for first buf_clients no-lock
+-   where buf_clients.db-num = sys-ctrl.db-num
++for each buf_clients no-lock where 
++         buf_clients.db-num <> ?
+ :
+   for each schet-fact-doc no-lock where 
+           schet-fact-doc.obj-type  = buf_clients.obj-type
+@@ -49,7 +49,6 @@ for first buf_clients no-lock
+   end.
+ end.
+ 
+-output stream str-gen close.
+ {cleandb/setresval.i}
+ return vResult.
+ 
+diff --git a/cleandb/00994000.p b/cleandb/00994000.p
+--- a/cleandb/00994000.p
++++ b/cleandb/00994000.p
+@@ -59,7 +59,6 @@ do v-ii = 1 to num-entries(lob-reslist-d
+ 
+ end.
+ 
+-output stream str-gen close.
+ {cleandb/setresval.i}
+ return vResult.
+ 
+diff --git a/cleandb/01000000.p b/cleandb/01000000.p
+--- a/cleandb/01000000.p
++++ b/cleandb/01000000.p
+@@ -44,8 +44,8 @@ define buffer buf_utd        for ub.utd.
+ 
+ on delete of ub.utd       override do: end.
+ 
+-for first buf_clients no-lock
+-   where buf_clients.db-num = sys-ctrl.db-num
++for each buf_clients no-lock where 
++         buf_clients.db-num <> ?
+ :
+   for each utd no-lock
+      where utd.host-code    = buf_clients.host-code
+@@ -58,7 +58,6 @@ for first buf_clients no-lock
+   end.
+ end.
+ 
+-output stream str-gen close.
+ {cleandb/setresval.i}
+ return vResult.
+ 
+diff --git a/cleandb/01030000.p b/cleandb/01030000.p
+new file mode 100644
+--- /dev/null
++++ b/cleandb/01030000.p
+@@ -0,0 +1,97 @@
++block-level on error undo, throw.
++/*
++
++Чистка БД. Таблицы истории. 
++
++Автор: Ростовцев Александр
++Дата создания: 07/11/2025
++Author: Aleksandr Rostovtsev
++Creation date: 11/07/25
++*/
++
++&scop Tables История действий пользователя
++/*&scop Tables c-user-log ~*/
++
++define variable vss-revision    as character no-undo init "$Revision: aea5316774be, 0, rls $":U .
++define variable vss-author      as character no-undo init "$Author: sibintek-soft $":U .
++define variable vss-date        as character no-undo init "$Date: Nov 07 2025 $":U .
++define variable vss-workfile    as character no-undo init "$Workfile: 01030000.p $":U .
++define variable vss-archive     as character no-undo init "$Archive: cleandb/01030000.p $".
++define variable vss-description as character no-undo init "Чистка УБД..".
++{ cmp/str-glbl.i }
++{ cmp/library.i  }
++{ cleandb/defs.i }
++
++define buffer buf_tables         for ub._file.
++define buffer buf_fields         for ub._field.
++
++/*run gbl/inidebug.p.*/
++
++LOOP_TABLES:
++for each buf_tables no-lock where
++         buf_tables._file-name begins "c-"
++:
++  find first buf_fields no-lock where
++             buf_fields._file-recid = recid(buf_tables)
++         and buf_fields._field-name = "corr-date"
++  no-error.
++  if not avail buf_fields then
++  /* если в таблице истории нет поля даты корректировки, то пропускаем  */
++  /* предполагаем, эти таблицы должны чиститься в "кусте" */
++    next LOOP_TABLES.
++  
++  run cleanTable in this-procedure (buf_tables._file-name) no-error.
++  if error-status:error then
++    return error return-value.
++  
++end.
++
++procedure cleanTable:
++  define input parameter iTable as character no-undo.
++
++  define variable vBuffer as handle no-undo.
++  define variable vQuery  as handle no-undo.
++  define variable vFor    as character no-undo.
++  define variable vCnt    as int64 no-undo.
++  
++  create buffer vBuffer for table iTable.
++  vBuffer:disable-load-triggers (false).
++  create query vQuery.
++  
++  vQuery:set-buffers(vBuffer).
++  vFor = substitute("FOR EACH &1 where &1.corr-date < &2",
++                    vBuffer:name, vardate-actual-docs).
++  vQuery:query-prepare(vFor) no-error.
++  if error-status:error then
++    return error error-status:get-message(1).
++  vQuery:query-open().
++  vQuery:get-first().
++  if error-status:error then
++    return error error-status:get-message(1).
++  do while vBuffer:available:
++    if valid-handle(varcall-back) and vCnt = 0 then
++      run callback-write-to-log in varcall-back (
++        input substitute("Чистка таблицы &1~n",iTable) 
++      ) no-error .
++    do transaction:
++       vBuffer:find-current (exclusive-lock).
++       vBuffer:buffer-delete ().
++    end.
++    vCnt = vCnt + 1.
++    if valid-handle(varcall-back) and vCnt mod 100000 = 0 then
++    do:
++      run callback-write-to-log in varcall-back (
++        input Substitute("Удалено &1 записей~n", vCnt)
++      ) no-error .
++    end.
++    vQuery:get-next().
++  end.
++  if valid-handle(varcall-back) and vCnt <> 0 then
++    run callback-write-to-log in varcall-back (
++      input Substitute("Удалено &1 записей~n", vCnt)
++    ) no-error .
++  vDeleted = vDeleted + vCnt.
++end procedure. 
++
++{cleandb/setresval.i}
++return vResult.
+diff --git a/cleandb/defs.i b/cleandb/defs.i
+--- a/cleandb/defs.i
++++ b/cleandb/defs.i
+@@ -16,13 +16,13 @@ Creation date: 09/12/25
+ */
+ 
+ define input parameter vardate-actual-docs    as date      no-undo. /*Дата актуальности документов */
+-define input parameter vargen-file            as character no-undo.
++define input parameter varcall-back           as handle no-undo.
+ 
+ define variable vDeleted as int64     no-undo.
+ define variable vResult  as character no-undo.
+ 
+-define stream str-gen.
+-output stream str-gen to value(vargen-file) append.
++/*define stream str-gen.                             */
++/*output stream str-gen to value(vargen-file) append.*/
+ 
+ define buffer buf_clients for ub.clients.
+ 
+@@ -30,12 +30,12 @@ define buffer buf_clients for ub.clients
+ {&Tables} ~
+ Удалено записей - string(vDeleted)
+ 
+-find first ub.sys-ctrl no-lock.
++find ub.sys-ctrl no-lock.
+ if not available ub.sys-ctrl then do:
+-   return error "В базе данных src не найдена уникальная запись sys-ctrl.".
++   return error "Не найдена уникальная запись sys-ctrl.".
+ end.
+-if ub.sys-ctrl.db-num = 0 then do:
+-   return error "Пакет очистки БД работает только в удаленной базе данных.".
+-end.
++/*if ub.sys-ctrl.db-num = 0 then do:                                          */
++/*   return error "Пакет очистки БД работает только в удаленной базе данных.".*/
++/*end.                                                                        */
+ 
+ /* $Workfile$ e n d */
+\ No newline at end of file
+diff --git a/utl/clean_db.i b/utl/clean_db.i
+--- a/utl/clean_db.i
++++ b/utl/clean_db.i
+@@ -127,4 +127,9 @@ assign
+   list-action.action    = 'p'
+   list-action.file-name = 'cleandb/01020000.p'
+   .
++create list-action .
++assign
++  list-action.action    = 'p'
++  list-action.file-name = 'cleandb/01030000.p'
++  .
+   
+\ No newline at end of file
+diff --git a/utl/clean_db.p b/utl/clean_db.p
+--- a/utl/clean_db.p
++++ b/utl/clean_db.p
+@@ -124,8 +124,10 @@ PROCEDURE run-load :
+       ).
+ 
+     /* запускаем расчет архивов  */
++    if buf_sys-ctrl.db-num <> 0 then
++    do:
+     find first buf_clients no-lock where 
+-               buf_clients.db-num = buf_sys-ctrl.db-num.
++               buf_clients.db-num = buf_sys-ctrl.db-num .
+     run write-to-log in this-procedure
+       ({&new-line} + "Расчет архивов." + {&new-line}
+       ,p-handle-callback
+@@ -155,6 +157,7 @@ PROCEDURE run-load :
+     do:
+       return error "Очистка БД невозможна.~nНе удалось рассчитать архивы.~n" + v-comment.   
+     end.
++    end.
+ 
+     /* заполняем временную таблицу, в которой заданы все действия */
+     run write-to-log in this-procedure
+@@ -242,7 +245,7 @@ PROCEDURE run-load :
+           /* запускаем утилиту */
+           run value( list-action.file-name )
+             (input p-date-actual-docs
+-            ,input v-gen-file
++            ,input p-handle-callback
+             )
+             no-error .
+ 

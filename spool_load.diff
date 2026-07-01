@@ -1,0 +1,28 @@
+# HG changeset patch
+# User DARuban
+# Parent  bc66744e3a4e42842967ae58d3d3fe0c8638ec2f
+Сокет сервер научился отдавать файлы на запросы с кассы:
+cmp/slips.xml
+cmp/spool.xml
+cmp/config.xml
+cmp/fuels.xml cmp/reports.xml
+
+diff --git a/ibs/th/skt/SktServer.cls b/ibs/th/skt/SktServer.cls
+--- a/ibs/th/skt/SktServer.cls
++++ b/ibs/th/skt/SktServer.cls
+@@ -300,9 +300,14 @@ class ibs.th.skt.SktServer:
+       hdoc:get-document-element(hRoot) no-error.
+       assign
+         client_ = hRoot:name no-error.
++
+ /*        logWrite:WriteFileToLog( req:Content).*/
+     end.
+-    
++    if client_ = "slips" or client_ = "spool" or  client_ = "config" or client_ = "fuels" or client_ = "reports"
++    then do:
++       req:HeadHTTP:queryAdr = client_ + ".xml". 
++       client_= "FileSend".
++    end.
+     /*далее случаи не по стандарту*/    
+     if not clientControl:availClient(client_) then 
+     do:

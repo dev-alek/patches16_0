@@ -1,0 +1,170 @@
+# HG changeset patch
+# User VSpiridonov
+# Parent  90b23b58565281af2c512ec999ea686d7bba93b2
+refs #DEVBO-727+1  Временное отключение обмена новостями в ТБД. ТН 16.0
+                   изменение формата максимального количества пакетов  max-p-queue (-1)
+
+diff --git a/adm/dbi.w b/adm/dbi.w
+--- a/adm/dbi.w
++++ b/adm/dbi.w
+@@ -8,11 +8,11 @@
+ &ANALYZE-SUSPEND _UIB-CODE-BLOCK _CUSTOM _DEFINITIONS dbi 
+ /*
+ 
+-$Revision$
+-$Author$
+-$Date$
+-$Workfile$
+-$Archive$
++$Revision: 8c1a0fd433e1, 1120, rls $
++$Author: SMMolotkov $
++$Date: Thu Dec 14 02:13:53 2017 +0300 $
++$Workfile: dbi.w $
++$Archive: adm/dbi.w $
+ 
+ Редактирование БД
+ 
+@@ -31,11 +31,11 @@ define input-output param  ri as recid n
+ define output parameter p-unload-history as logical no-undo .
+ 
+ /* Local Variable Definitions ---                                       */
+-define variable vss-revision    as character no-undo init "$Revision$":U .
+-define variable vss-author      as character no-undo init "$Author$":U .
+-define variable vss-date        as character no-undo init "$Date$":U .
+-define variable vss-workfile    as character no-undo init "$Workfile$":U .
+-define variable vss-archive     as character no-undo init "$Archive$":U .
++define variable vss-revision    as character no-undo init "$Revision: 8c1a0fd433e1, 1120, rls $":U .
++define variable vss-author      as character no-undo init "$Author: SMMolotkov $":U .
++define variable vss-date        as character no-undo init "$Date: Thu Dec 14 02:13:53 2017 +0300 $":U .
++define variable vss-workfile    as character no-undo init "$Workfile: dbi.w $":U .
++define variable vss-archive     as character no-undo init "$Archive: adm/dbi.w $":U .
+ define variable vss-description as character no-undo init "Редактирование БД".
+ { cmp/vssrevis.i "substitute('&1',mode)" }
+ { cmp/trg-def.i  }
+@@ -197,7 +197,7 @@ DEFINE FRAME dbi
+           VIEW-AS FILL-IN 
+           SIZE 14.4 BY 1
+      db.max-p-queue AT ROW 12.48 COL 53.6 COLON-ALIGNED
+-          LABEL "Кол-во неподтвержденных пакетов больше"
++          LABEL "Кол-во неподтвержденных пакетов больше" FORMAT "->>9"
+           VIEW-AS FILL-IN 
+           SIZE 6.2 BY 1
+      db.max-p-time AT ROW 13.71 COL 53.6 COLON-ALIGNED HELP
+diff --git a/adm/dbs.w b/adm/dbs.w
+--- a/adm/dbs.w
++++ b/adm/dbs.w
+@@ -8,11 +8,11 @@
+ &ANALYZE-SUSPEND _UIB-CODE-BLOCK _CUSTOM _DEFINITIONS d-db 
+ /*
+ 
+-$Revision$
+-$Author$
+-$Date$
+-$Workfile$
+-$Archive$
++$Revision: 19b15f56f81d, 2201, rls $
++$Author: druban $
++$Date: Wed Dec 25 15:23:58 2019 +0300 $
++$Workfile: dbs.w $
++$Archive: adm/dbs.w $
+ 
+ Справочник баз данных
+ 
+@@ -30,11 +30,11 @@ define input  parameter parparentproc as
+ define input  parameter p-mode as char  no-undo.        /* "{&lookup}, {&update}" */
+ define output parameter rid  as recid no-undo init ?. /* выбранная запись */
+ 
+-define variable vss-revision    as character no-undo init "$Revision$":u .
+-define variable vss-author      as character no-undo init "$Author$":u .
+-define variable vss-date        as character no-undo init "$Date$":u .
+-define variable vss-workfile    as character no-undo init "$Workfile$":u .
+-define variable vss-archive     as character no-undo init "$Archive$":u .
++define variable vss-revision    as character no-undo init "$Revision: 19b15f56f81d, 2201, rls $":u .
++define variable vss-author      as character no-undo init "$Author: druban $":u .
++define variable vss-date        as character no-undo init "$Date: Wed Dec 25 15:23:58 2019 +0300 $":u .
++define variable vss-workfile    as character no-undo init "$Workfile: dbs.w $":u .
++define variable vss-archive     as character no-undo init "$Archive: adm/dbs.w $":u .
+ define variable vss-description as character no-undo init "Справочник баз данных" .
+ { cmp/vssrevis.i }
+ { cmp/str-glbl.i }
+@@ -297,7 +297,7 @@ DEFINE BROWSE br-db
+       ub.db.remote-stock COLUMN-LABEL "Чужие" FORMAT "+/-":U
+       ub.db.send-check COLUMN-LABEL "Чеки" FORMAT "+/-":U
+       ub.db.on-line-rest COLUMN-LABEL "Мгнов" FORMAT "+/-":U
+-      ub.db.max-p-queue COLUMN-LABEL "Неподтв" FORMAT ">>>9":U
++      ub.db.max-p-queue COLUMN-LABEL "Неподтв" FORMAT "->>>9":U
+       ub.db.max-p-time FORMAT ">>>>>9":U
+       ub.db.max-p-size FORMAT ">>>,>>9":U
+       ub.db.db-key FORMAT "X(12)":U
+@@ -419,7 +419,7 @@ ASSIGN
+      _FldNameList[7]   > ub.db.on-line-rest
+ "db.on-line-rest" "Мгнов" "+/-" "logical" ? ? ? ? ? ? no ? no no ? yes no no "U" "" "" "" "" "" "" 0 no 0 no no
+      _FldNameList[8]   > ub.db.max-p-queue
+-"db.max-p-queue" "Неподтв" ">>>9" "integer" ? ? ? ? ? ? no ? no no ? yes no no "U" "" "" "" "" "" "" 0 no 0 no no
++"db.max-p-queue" "Неподтв" "->>9" "integer" ? ? ? ? ? ? no ? no no ? yes no no "U" "" "" "" "" "" "" 0 no 0 no no
+      _FldNameList[9]   > ub.db.max-p-time
+ "db.max-p-time" ? ">>>>>9" "integer" ? ? ? ? ? ? no ? no no ? yes no no "U" "" "" "" "" "" "" 0 no 0 no no
+      _FldNameList[10]   = ub.db.max-p-size
+diff --git a/nws/send-nws.p b/nws/send-nws.p
+--- a/nws/send-nws.p
++++ b/nws/send-nws.p
+@@ -51,6 +51,8 @@ on error undo, return error
+   define variable v-max-p-queue  as integer   no-undo .
+   define variable v-max-p-time   as integer   no-undo .
+   define variable v-err-msg      as character no-undo .
++  define variable v-send-1       as logical no-undo initial false. /* минус 1 */
++  define variable v-sent-count   as integer no-undo initial 0.
+ 
+   define temp-table t-list-pack no-undo
+     field pack-num    like ub.pck-sent.pack-num
+@@ -106,6 +108,10 @@ on error undo, return error
+       return .
+    end.
+ 
++   if buf-dst_db.max-p-queue = -1 then do:         /* минус 1 */
++    v-send-1 = true. 
++   end.
++
+   case p-action:
+     when "one-pack":U then do:
+       run write-to-log( substitute("Отправка одного пакета новостей в БД &1", p-db-num ) ) .
+@@ -208,6 +214,7 @@ on error undo, return error
+     end.
+ 
+     if p-action = "all":U
++       and v-send-1 = false          /* минус 1 */
+        and v-ind < v-max-p-queue
+     then do:
+       /* если неподтвержденных пакетов меньше чем задано в настройках, то и не будем их переформировывать */
+@@ -287,12 +294,31 @@ on error undo, return error
+                         ) .
+         return error.
+       end.
++      v-sent-count = v-sent-count + 1.
+     end.
+     if v-err-gen-pack <> 0 then do:
+       leave gen-pack.
+     end.
+   end.
+ 
++  /* минус 1 */
++  if v-send-1 = true then do:
++  do transaction:
++
++    find first buf-dst_db exclusive-lock
++        where buf-dst_db.db-num = p-db-num
++        no-error.
++    if not available buf-dst_db then do:
++        run write-to-log(substitute("&1. Не удалось обновить кол-во неподтвержденных пакетов для БД &2 ", vss-workfile, p-db-num)).
++        return error.
++    end.
++    assign buf-dst_db.max-p-queue = v-sent-count + 1.
++
++  end. 
++    run write-to-log(substitute("отправлено &1 пакетов, кол-во неподтвержденных пакетов для БД &2", v-sent-count, buf-dst_db.max-p-queue)).
++  end.
++
++
+   for each t-list-pack
+   on error undo, return error
+   :

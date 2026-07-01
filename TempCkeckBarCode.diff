@@ -1,0 +1,34 @@
+# HG changeset patch
+# User PGridchina
+# Parent  7b877552539527cdbf940846d4cd64208c78b898
+¬ременное отключение проверок типов бар-кодов
+
+diff -r 7b8775525395 -r 8dd84f813751 trg/prod-bc2.p
+--- a/trg/prod-bc2.p	ѕт июл 10 10:52:09 2020 +0300
++++ b/trg/prod-bc2.p	ѕт июл 10 11:02:06 2020 +0300
+@@ -614,6 +614,7 @@
+       undo, return error (if p-silent then v-mess else '').
+     end.
+   end case.
++  /*
+   if p-cdrg-type eq {&gtin}
+   then do:
+      if length(p-b-str) ne 14 
+@@ -644,7 +645,9 @@
+         undo, return error (if p-silent then v-mess else '').
+       end.
+   end. 
++  */
+   /* берем бар-код без контрольной суммы */
++  /*
+   bar_code = substr (p-b-str, 1, length (p-b-str) - 1).
+   run str/chk-sum.p
+     (input-output bar_code
+@@ -688,6 +691,7 @@
+     run err-mess in this-procedure ( input-output v-mess).
+     undo, return error (if p-silent then v-mess else '').
+   end.
++  */
+   run gbl/conf-rd.p ( input "bc-pfx"
+                       ,input  ""
+                       ,input ""

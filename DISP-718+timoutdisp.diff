@@ -1,0 +1,38 @@
+# HG changeset patch
+# User DARuban
+# Parent  fd22d29903d16d7bc6113da0e93d0015859af5e1
+refs #DISP-718 Создание скрипта для автоматического закрытия смен ТН на несколькихААЗС
+тайм аут при отправке в диспетчерскую уменьшен до 5 секунд
+http://exp-jira.expertek.local:8080/browse/DISP-718
+
+diff --git a/str/proc-startNewShiftTso.p b/str/proc-startNewShiftTso.p
+--- a/str/proc-startNewShiftTso.p
++++ b/str/proc-startNewShiftTso.p
+@@ -12,6 +12,7 @@ define variable mcicle as integer no-und
+ { gbl/getcntxa.i }
+ { bge/socet.i }
+ mFileLogSocet = "Async".
++mAddTimeOut = no.
+ define variable parparentproc as handle no-undo.
+ parparentproc = this-procedure.
+ DEFINE VARIABLE mERRtest AS CHARACTER NO-UNDO.
+@@ -41,6 +42,7 @@ procedure sendStat:
+ end.
+ procedure sendStatJson:
+    define input  parameter ijson as longchar no-undo.
++   def var vAddTimeOut as logical no-undo.  
+    
+    mContentType = "application/json".
+    run ConectSocet(mWorkShift:getDispSet():hostdisp,
+@@ -48,10 +50,9 @@ procedure sendStatJson:
+                    "THController/message",
+                    ijson,
+                    "",
+-                   ?,
++                   5,
+                    yes,
+                    "Отправка статуса в диспетчерскую").
+-   
+ end.
+ define new shared variable oxml-exch-dir as character no-undo .
+ define new shared variable oxml-heap-dir as character no-undo .

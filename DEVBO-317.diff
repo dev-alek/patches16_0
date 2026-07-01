@@ -1,0 +1,40 @@
+# HG changeset patch
+# User EShklyar
+# Parent  825dd511d29fc1d8983713116dea9baf5c87475b
+refs #DEVBO-317 Интерфейсы работы с УПД
+
+http://exp-jira.expertek.local:8080/browse/DEVBO-317
+Интерфейс статуса и истории движения марки
+
+diff --git a/str/mark_hist.w b/str/mark_hist.w
+--- a/str/mark_hist.w
++++ b/str/mark_hist.w
+@@ -215,6 +215,11 @@ DEFINE VARIABLE emission_Date AS CHARACT
+      VIEW-AS FILL-IN 
+      SIZE 14 BY 1 NO-UNDO.
+ 
++DEFINE VARIABLE emission_Date AS CHARACTER FORMAT "X(256)":U 
++     LABEL "Дата эмиссии кода маркировки" 
++     VIEW-AS FILL-IN 
++     SIZE 14 BY 1 NO-UNDO.
++
+ DEFINE VARIABLE f-gds-code AS CHARACTER FORMAT "X(256)":U 
+      LABEL "Код" 
+      VIEW-AS FILL-IN 
+@@ -279,6 +284,16 @@ DEFINE VARIABLE produced_Date AS CHARACT
+      VIEW-AS FILL-IN 
+      SIZE 14 BY 1 NO-UNDO.
+ 
++DEFINE VARIABLE mrc AS CHARACTER FORMAT "X(256)":U 
++     LABEL "МРЦ" 
++     VIEW-AS FILL-IN 
++     SIZE 14 BY 1 NO-UNDO.
++
++DEFINE VARIABLE produced_Date AS CHARACTER FORMAT "X(256)":U 
++     LABEL "Дата нанесения кода маркировки" 
++     VIEW-AS FILL-IN 
++     SIZE 14 BY 1 NO-UNDO.
++
+ DEFINE VARIABLE v-mark AS CHARACTER FORMAT "X(255)" 
+      LABEL "Марка" 
+      VIEW-AS FILL-IN 

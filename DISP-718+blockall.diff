@@ -1,0 +1,716 @@
+# HG changeset patch
+# User DRuban
+# Parent  21dffa0fab7b1970bc2e9b107ed4ed67c624f052
+refs #DISP-718 Создание скрипта для автоматического закрытия смен ТН на несколькихААЗС
+Отправка побмнды блокировки и разблокировки на все ТСО и заправщики не зависимо от ответа предыдущего устройства
+http://exp-jira.expertek.local:8080/browse/DISP-718
+
+diff --git a/str/blockplgdspm.w b/str/blockplgdspm.w
+--- a/str/blockplgdspm.w
++++ b/str/blockplgdspm.w
+@@ -174,14 +174,6 @@ DEFINE BUTTON b-mark
+    LABEL "&*" 
+    SIZE 3 BY 1.
+ 
+-DEFINE BUTTON b-repeate-block 
+-   LABEL "b-repeate-block" 
+-   SIZE 10 BY 1.
+-
+-DEFINE BUTTON b-repeate-unblock 
+-   LABEL "b-repeate-unblock" 
+-   SIZE 10 BY 1.
+-
+ DEFINE BUTTON b-unblock 
+    LABEL "&Разблок" 
+    SIZE 10 BY 1.
+@@ -251,8 +243,6 @@ DEFINE FRAME Dialog-Frame
+    b-cur AT ROW 1 COL 11.25
+    b-unblock AT ROW 1 COL 21.25
+    b-block AT ROW 1 COL 22
+-   b-repeate-block AT ROW 1 COL 22
+-   b-repeate-unblock AT ROW 1 COL 22
+    B-hist AT ROW 1 COL 92.88
+    b-help AT ROW 1 COL 95.88
+    search-goods AT ROW 2.25 COL 18 COLON-ALIGNED WIDGET-ID 2
+@@ -435,48 +425,7 @@ ON CHOOSE OF b-block IN FRAME Dialog-Frame /* Блок в МП */
+                {&OPEN-BROWSERS-IN-QUERY-Dialog-Frame}
+                return no-apply .
+             end.   
+-            
+-            run str/diallog.w ( input parparentproc
+-               ,input this-procedure
+-               ,input 'str/get-block-nozzle.p':U
+-               ,input (v-cntxt-obj-type + {&delim-par} +
+-               string(v-cntxt-obj-code) + {&delim-par} +
+-               string(0) + {&delim-par} +  /*p-remote */
+-               string(0) + {&delim-par} + /*p-shft-close*/
+-               {&delim-par} +
+-               {&delim-par} +
+-               {&delim-par} +
+-               substitute("&1,&2"
+-               ,"block"
+-               ,pl-list))
+-               ,input yes
+-               ,input ''
+-               ,input 'Блокировка выбранных пистолетов') .
+-            if not error-status:error then 
+-            do:
+-               if return-value begins "Для кассы" then 
+-               do:
+-                  message return-value
+-                     view-as alert-box question buttons yes-no update v-ok as logical  .
+-                  if v-ok then apply "choose" to b-repeate-block in frame {&frame-name} .
+-                  else                   message "Сообщите в службу поддержки о неуспешной попытке блокировки пистолетов"
+-                        view-as alert-box.
+-               end.
+-               else 
+-               do:
+-                  message "Блокировка пистолетов прошла успешно"
+-                     view-as alert-box.
+-               end.   
+-            end.
+-            else 
+-            do:
+-               message return-value
+-                  view-as alert-box question buttons yes-no update v-ok .
+-               if v-ok then apply "choose" to b-repeate-block in frame {&frame-name} .
+-               else                   message "Сообщите в службу поддержки о неуспешной попытке блокировки пистолетов"
+-                     view-as alert-box.
+-   
+-            end.
++            run repeate-block.
+             apply "choose" to b-exit in frame {&frame-name}.
+          end.   
+       end.
+@@ -551,124 +500,6 @@ ON CHOOSE OF b-mark IN FRAME Dialog-Fram
+ &ANALYZE-RESUME
+ 
+ 
+-&Scoped-define SELF-NAME b-repeate-block
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL b-repeate-block Dialog-Frame
+-ON CHOOSE OF b-repeate-block IN FRAME Dialog-Frame /* b-repeate-block */
+-   DO:
+-      define variable quest-ok as logical   no-undo .
+-      define variable ii       as integer   no-undo .
+-      define variable jj       as integer   no-undo .
+-      define variable list-pl  as character no-undo .
+-
+-            
+-      run str/diallog.w ( input parparentproc
+-         ,input this-procedure
+-         ,input 'str/get-block-nozzle.p':U
+-         ,input (v-cntxt-obj-type + {&delim-par} +
+-         string(v-cntxt-obj-code) + {&delim-par} +
+-         string(0) + {&delim-par} +  /*p-remote */
+-         string(0) + {&delim-par} + /*p-shft-close*/
+-         {&delim-par} +
+-         {&delim-par} +
+-         {&delim-par} +
+-         substitute("&1,&2"
+-         ,"block"
+-         ,pl-list))
+-         ,input yes
+-         ,input ''
+-         ,input 'Блокировка выбранных пистолетов') .
+-      if not error-status:error then 
+-      do:
+-         if return-value begins "Для кассы" then 
+-         do:
+-            message return-value
+-               view-as alert-box question buttons yes-no update v-ok as logical  .
+-            if v-ok then apply "choose" to b-repeate-block in frame {&frame-name} .
+-            else message "Сообщите в службу поддержки о неуспешной попытке блокировки пистолетов"
+-                  view-as alert-box.
+-               
+-         end.
+-         else 
+-         do:
+-            message "Блокировка пистолетов прошла успешно"
+-               view-as alert-box.
+-         end.   
+-
+-      end.
+-      else 
+-      do:
+-         message return-value
+-            view-as alert-box question buttons yes-no update v-ok .
+-         if v-ok then apply "choose" to b-repeate-block in frame {&frame-name} .
+-         else                   message "Сообщите в службу поддержки о неуспешной попытке блокировки пистолетов"
+-               view-as alert-box.
+-   
+-      end.
+-      apply "choose" to b-exit in frame {&frame-name}.
+-   END.
+-
+-/* _UIB-CODE-BLOCK-END */
+-&ANALYZE-RESUME
+-
+-
+-&Scoped-define SELF-NAME b-repeate-unblock
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL b-repeate-unblock Dialog-Frame
+-ON CHOOSE OF b-repeate-unblock IN FRAME Dialog-Frame /* b-repeate-unblock */
+-   DO:
+-      define variable quest-ok as logical   no-undo .
+-      define variable ii       as integer   no-undo .
+-      define variable jj       as integer   no-undo .
+-      define variable list-pl  as character no-undo .
+-
+-            
+-      run str/diallog.w ( input parparentproc
+-         ,input this-procedure
+-         ,input 'str/get-block-nozzle.p':U
+-         ,input (v-cntxt-obj-type + {&delim-par} +
+-         string(v-cntxt-obj-code) + {&delim-par} +
+-         string(0) + {&delim-par} +  /*p-remote */
+-         string(0) + {&delim-par} + /*p-shft-close*/
+-         {&delim-par} +
+-         {&delim-par} +
+-         {&delim-par} +
+-         substitute("&1,&2"
+-         ,"unblock"
+-         ,pl-list))
+-         ,input yes
+-         ,input ''
+-         ,input 'Разблокировка пистолетов') .
+-      if not error-status:error then 
+-      do:
+-         if return-value begins "Для кассы" then 
+-         do:
+-            message return-value
+-               view-as alert-box question buttons yes-no update v-ok as logical  .
+-            if v-ok then apply "choose" to b-repeate-unblock in frame {&frame-name} .
+-            else message "Сообщите в службу поддержки о неуспешной попытке разблокировки пистолетов"
+-                  view-as alert-box.
+-               
+-         end.
+-         else 
+-         do:
+-            message "Разблокировка пистолетов прошла успешно"
+-               view-as alert-box.
+-         end.   
+-
+-      end.
+-      else 
+-      do:
+-         message return-value
+-            view-as alert-box question buttons yes-no update v-ok .
+-         if v-ok then apply "choose" to b-repeate-block in frame {&frame-name} .
+-         else                   message "Сообщите в службу поддержки о неуспешной попытке разблокировки пистолетов"
+-               view-as alert-box.
+-   
+-      end.
+-      apply "choose" to b-exit in frame {&frame-name}.
+-   END.
+-
+-/* _UIB-CODE-BLOCK-END */
+-&ANALYZE-RESUME
+ 
+ 
+ &Scoped-define SELF-NAME b-unblock
+@@ -721,53 +552,7 @@ ON CHOOSE OF b-unblock IN FRAME Dialog-Frame /* Разблок */
+                      .         
+                end.   
+             end.   
+-
+-            run str/diallog.w ( input parparentproc
+-               ,input this-procedure
+-               ,input 'str/get-block-nozzle.p':U
+-               ,input (v-cntxt-obj-type + {&delim-par} +
+-               string(v-cntxt-obj-code) + {&delim-par} +
+-               string(1) + {&delim-par} +  /*p-remote */
+-               string(0) + {&delim-par} + /*p-shft-close*/
+-               {&delim-par} +
+-               {&delim-par} +
+-               {&delim-par} +
+-               substitute("&1,&2"
+-               ,"unblock"
+-               ,pl-list))
+-               ,input yes
+-               ,input ''
+-               ,input 'Разблокировка пистолетов') .
+-            if not error-status:error then 
+-            do:
+-               if return-value begins "Для кассы" then 
+-               do:
+-                  message return-value
+-                     view-as alert-box question buttons yes-no update v-ok as logical  .
+-                  if v-ok then apply "choose" to b-repeate-unblock in frame {&frame-name} .
+-                  else message "Сообщите в службу поддержки о неуспешной попытке разблокировки пистолетов"
+-                        view-as alert-box.
+-               
+-               end.
+-               else 
+-               do:
+-                  message "Разблокировка пистолетов прошла успешно"
+-                     view-as alert-box.
+-               end.   
+-
+-            end.
+-            else 
+-            do:
+-               message return-value
+-                  view-as alert-box question buttons yes-no update v-ok .
+-               if v-ok then apply "choose" to b-repeate-block in frame {&frame-name} .
+-               else                   message "Сообщите в службу поддержки о неуспешной попытке разблокировки пистолетов"
+-                     view-as alert-box.
+-   
+-            end.
+-            apply "choose" to b-exit in frame {&frame-name}.
+-
+-
++            run repeate-unblock.
+          end.   
+       end.
+ 
+@@ -1069,7 +854,6 @@ PROCEDURE enable_UI :
+          WITH FRAME Dialog-Frame.
+    end.
+    VIEW FRAME Dialog-Frame.
+-   hide b-repeate-block b-repeate-unblock in frame {&frame-name} .
+    {&OPEN-BROWSERS-IN-QUERY-Dialog-Frame}
+ END PROCEDURE.
+ 
+@@ -1197,3 +981,126 @@ end procedure.
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE sort_ Dialog-Frame 
++
++procedure repeate-block:
++   define variable quest-ok as logical   no-undo .
++   define variable ii       as integer   no-undo .
++   define variable jj       as integer   no-undo .
++   define variable list-pl  as character no-undo .
++   define variable vRetry     as logical   no-undo init yes.
++   do while vRetry:
++      vRetry = no.
++      run str/diallog.w ( input parparentproc
++         ,input this-procedure
++         ,input 'str/get-block-nozzle.p':U
++         ,input (v-cntxt-obj-type + {&delim-par} +
++         string(v-cntxt-obj-code) + {&delim-par} +
++         string(0) + {&delim-par} +  /*p-remote */
++         string(0) + {&delim-par} + /*p-shft-close*/
++         {&delim-par} +
++         {&delim-par} +
++         {&delim-par} +
++         substitute("&1,&2"
++         ,"block"
++         ,pl-list))
++         ,input yes
++         ,input ''
++         ,input 'Блокировка выбранных пистолетов') .
++      if not error-status:error then 
++      do:
++         if return-value begins "Для кассы" then 
++         do:
++            message return-value
++               view-as alert-box question buttons yes-no update vRetry  .
++            if vRetry ne yes 
++            then  
++               message "Сообщите в службу поддержки о неуспешной попытке блокировки пистолетов"
++                  view-as alert-box.
++               
++         end.
++         else 
++         do:
++            message "Блокировка пистолетов прошла успешно"
++               view-as alert-box.
++         end.   
++   
++      end.
++      else 
++      do:
++         message return-value
++            view-as alert-box question buttons yes-no update v-ok .
++         if vRetry ne yes 
++         then 
++             message "Сообщите в службу поддержки о неуспешной попытке блокировки пистолетов"
++               view-as alert-box.
++   
++      end.
++   end.
++end.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE sort_ Dialog-Frame 
++
++procedure repeate-unblock :
++   define variable quest-ok as logical   no-undo .
++   define variable ii       as integer   no-undo .
++   define variable jj       as integer   no-undo .
++   define variable list-pl  as character no-undo .
++
++   define variable vRetry     as logical   no-undo init yes.
++   do while vRetry:
++      vRetry = no.
++      run str/diallog.w ( input parparentproc
++         ,input this-procedure
++         ,input 'str/get-block-nozzle.p':U
++         ,input (v-cntxt-obj-type + {&delim-par} +
++         string(v-cntxt-obj-code) + {&delim-par} +
++         string(0) + {&delim-par} +  /*p-remote */
++         string(0) + {&delim-par} + /*p-shft-close*/
++         {&delim-par} +
++         {&delim-par} +
++         {&delim-par} +
++         substitute("&1,&2"
++         ,"unblock"
++         ,pl-list))
++         ,input yes
++         ,input ''
++         ,input 'Разблокировка пистолетов') .
++      if not error-status:error then 
++      do:
++         if return-value begins "Для кассы" then 
++         do:
++            message return-value
++               view-as alert-box question buttons yes-no update vRetry  .
++            if vRetry ne yes  
++            then  
++               message "Сообщите в службу поддержки о неуспешной попытке разблокировки пистолетов"
++                  view-as alert-box.
++               
++         end.
++         else 
++         do:
++            message "Разблокировка пистолетов прошла успешно"
++               view-as alert-box.
++         end.   
++   
++      end.
++      else 
++      do:
++         message return-value
++            view-as alert-box question buttons yes-no update v-ok .
++         if vRetry ne yes 
++         then 
++            message "Сообщите в службу поддержки о неуспешной попытке разблокировки пистолетов"
++               view-as alert-box.
++   
++      end.
++   end.
++end.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++   
+\ No newline at end of file
+diff --git a/str/get-block-nozzle.p b/str/get-block-nozzle.p
+--- a/str/get-block-nozzle.p
++++ b/str/get-block-nozzle.p
+@@ -84,6 +84,7 @@ define variable p-ok                 as 
+ define variable v-FuelPump           as integer   no-undo .
+ define variable v-ctrl               as character no-undo .
+ define variable existPlCode          as logical   no-undo .
++define variable vReturnValue         as character no-undo.
+ 
+ define buffer buf_cash-desk   for cash-desk.
+ define buffer bf_cash-desk    for cash-desk.
+@@ -430,19 +431,18 @@ FOR EACH buf_cash-desk WHERE
+             end.
+          when "unblock" then 
+             do:
+-               for each tt_place,
+-                  each tt_nozzle where tt_nozzle.pump-code = tt_place.pump-code:
+-                  v-string = v-string + {&new-line} + "ТРК № " + string(tt_nozzle.pump-code) + " Пистолет № " + string (tt_nozzle.nozzle-code) .
+-               end.
+-               if v-string <> "" then 
+-               do:
+-                  return "Для кассы: " + string (buf_cash-desk.cash-num) + {&new-line} +
+-                     v-string + "," + {&new-line} +
+-                     "для которых не прошла разблокировка" + {&new-line} + {&new-line} +
+-                     "ПОВТОРИТЬ?" .
++/*               for each tt_place,                                                                                                               */
++/*                  each tt_nozzle where tt_nozzle.pump-code = tt_place.pump-code:                                                                */
++/*                  v-string = v-string + {&new-line} + "ТРК № " + string(tt_nozzle.pump-code) + " Пистолет № " + string (tt_nozzle.nozzle-code) .*/
++/*               end.                                                                                                                             */
++/*               if v-string <> "" then                                                                                                           */
++/*               do:                                                                                                                              */
++                  return "Для кассы: " + string (buf_cash-desk.cash-num) + 
++                     " Для всех ТРК и Пистолетов не прошла разблокировка" + {&new-line} + vReturnValue
++                      .
+                /*                  view-as alert-box question buttons yes-no update v-unblock-ok-error as logical  .*/
+                /*               if v-unblock-ok-error then next _cash-desk-update .                                 */
+-               end. 
++/*               end.*/
+             end.          
+       end case .         
+    end.
+@@ -456,100 +456,68 @@ FOR EACH buf_cash-desk WHERE
+          mSocetEndTime
+          )
+          ).
+-   end.
+-
+-   assign
+-      v-index = index(p-other, buf_cash-desk.pos-type + '=').
+-   if v-index > 0 then 
+-   do:
+-      /*извлечем спец команду*/
++   
+ 
+       assign
+-         v-spec-command = substring(p-other, v-index)
+-         v-index        = index(v-spec-command , {&delim-par})
+-         v-spec-command = if v-index > 0
+-                        then substring(v-spec-command , 1, v-index - 1)
+-                        else v-spec-command
+-         v-spec-command = replace(v-spec-command, buf_cash-desk.pos-type + '=', '':U)
+-         .
+-   end.
+-        
+-   run str/getxibmf.p (
+-      input parparentproc
+-      ,input p-log-handle
+-      ,input p-obj-type
+-      ,input p-obj-code
+-      ,input v-host-code
+-      ,input in_
+-      ,input spl
+-      ,input (in_ + sav)
+-      ,input buf_cash-desk.pos-type
+-      ,input "utf-8":U
+-      ,input log-file-name
+-      ,input "readbuffer_config":U + {&delim-par} + v-spec-command
+-      ,input mWebResp
+-      ,input-output v-view-log
+-      ) no-error .
+-   v-string = "" .
+-
+-   empty temp-table tt_answer .
+-   case p-comand:
+-      when "block" then 
+-         do:
+-            run SaxReader no-error.
+-            for each tt_answer where tt_answer.ctrl = "READ" and (tt_answer.FPFBlockStaff = 1 or tt_answer.FPFBlockStaff = 3):
+-               for each buf_pl-pump-nozzle where               
+-                  buf_pl-pump-nozzle.obj-type = p-obj-type            
+-                  AND buf_pl-pump-nozzle.obj-code = p-obj-code        
+-                  and buf_pl-pump-nozzle.pump-code = tt_answer.FuelPump
+-                  and buf_pl-pump-nozzle.nozzle-code = tt_answer.FPFNzl 
+-                  and (if existPlCode then 
+-                      can-find(first tt_place where tt_place.pump-code = buf_pl-pump-nozzle.pump-code 
+-                                                and tt_place.pl-code = buf_pl-pump-nozzle.pl-code)
+-                      else true) no-lock,
+-                  each buf_pl-gds-pump exclusive-lock where buf_pl-gds-pump.obj-code = buf_pl-pump-nozzle.obj-code and
+-                  buf_pl-gds-pump.obj-type = buf_pl-pump-nozzle.obj-type and
+-                  buf_pl-gds-pump.pump-code = buf_pl-pump-nozzle.pump-code and
+-                  buf_pl-gds-pump.pl-code = buf_pl-pump-nozzle.pl-code
+-                  :
+-                  buf_pl-gds-pump.status_ = {&blocked-status} .
+-               end.
+-            end.
+-            for each tt_place,
+-               each tt_nozzle where tt_nozzle.pump-code = tt_place.pump-code:
+-               for each buf_pl-pump-nozzle where               
+-                  buf_pl-pump-nozzle.obj-type = p-obj-type            
+-                  AND buf_pl-pump-nozzle.obj-code = p-obj-code        
+-                  and buf_pl-pump-nozzle.pump-code = tt_nozzle.pump-code
+-                  and buf_pl-pump-nozzle.nozzle-code = tt_nozzle.nozzle-code
+-                  and (if existPlCode then buf_pl-pump-nozzle.pl-code = tt_place.pl-code else true) no-lock,
+-                  each buf_pl-gds-pump exclusive-lock where buf_pl-gds-pump.obj-code = buf_pl-pump-nozzle.obj-code and
+-                  buf_pl-gds-pump.obj-type = buf_pl-pump-nozzle.obj-type and
+-                  buf_pl-gds-pump.pump-code = buf_pl-pump-nozzle.pump-code and
+-                  buf_pl-gds-pump.pl-code = buf_pl-pump-nozzle.pl-code
+-                  :
+-                  if buf_pl-gds-pump.status_ <> {&blocked-status} then 
+-                  do:
+-                     v-string = v-string + {&new-line} + "ТРК № " + string(tt_nozzle.pump-code) + " Пистолет № " + string (tt_nozzle.nozzle-code) .
++         v-index = index(p-other, buf_cash-desk.pos-type + '=').
++      if v-index > 0 then 
++      do:
++         /*извлечем спец команду*/
++   
++         assign
++            v-spec-command = substring(p-other, v-index)
++            v-index        = index(v-spec-command , {&delim-par})
++            v-spec-command = if v-index > 0
++                           then substring(v-spec-command , 1, v-index - 1)
++                           else v-spec-command
++            v-spec-command = replace(v-spec-command, buf_cash-desk.pos-type + '=', '':U)
++            .
++      end.
++           
++      run str/getxibmf.p (
++         input parparentproc
++         ,input p-log-handle
++         ,input p-obj-type
++         ,input p-obj-code
++         ,input v-host-code
++         ,input in_
++         ,input spl
++         ,input (in_ + sav)
++         ,input buf_cash-desk.pos-type
++         ,input "utf-8":U
++         ,input log-file-name
++         ,input "readbuffer_config":U + {&delim-par} + v-spec-command
++         ,input mWebResp
++         ,input-output v-view-log
++         ) no-error .
++      v-string = "" .
++   
++      empty temp-table tt_answer .
++      
++      case p-comand:
++         when "block" then 
++            do:
++               run SaxReader no-error.
++               for each tt_answer where tt_answer.ctrl = "READ" and (tt_answer.FPFBlockStaff = 1 or tt_answer.FPFBlockStaff = 3):
++                  for each buf_pl-pump-nozzle where               
++                     buf_pl-pump-nozzle.obj-type = p-obj-type            
++                     AND buf_pl-pump-nozzle.obj-code = p-obj-code        
++                     and buf_pl-pump-nozzle.pump-code = tt_answer.FuelPump
++                     and buf_pl-pump-nozzle.nozzle-code = tt_answer.FPFNzl 
++                     and (if existPlCode then 
++                         can-find(first tt_place where tt_place.pump-code = buf_pl-pump-nozzle.pump-code 
++                                                   and tt_place.pl-code = buf_pl-pump-nozzle.pl-code)
++                         else true) no-lock,
++                     each buf_pl-gds-pump exclusive-lock where buf_pl-gds-pump.obj-code = buf_pl-pump-nozzle.obj-code and
++                     buf_pl-gds-pump.obj-type = buf_pl-pump-nozzle.obj-type and
++                     buf_pl-gds-pump.pump-code = buf_pl-pump-nozzle.pump-code and
++                     buf_pl-gds-pump.pl-code = buf_pl-pump-nozzle.pl-code
++                     :
++                     buf_pl-gds-pump.status_ = {&blocked-status} .
+                   end.
+                end.
+-            end.
+-            if v-string <> "" then 
+-            do:
+-               return "Для кассы: " + string (buf_cash-desk.cash-num) + {&new-line} +
+-                  v-string + "," + {&new-line} +
+-                  "для которых не прошла блокировка" + {&new-line} + {&new-line} +
+-                  "ПОВТОРИТЬ?" .
+-            end.
+-         end.
+-      when "unblock" then 
+-         do:
+-            run SaxReader no-error.
+-
+-            for each tt_place,
+-               each tt_nozzle where tt_nozzle.pump-code = tt_place.pump-code:
+-               if not can-find (tt_answer where (tt_answer.FPFBlockStaff = 1 or tt_answer.FPFBlockStaff = 3) and tt_answer.ctrl = "READ") then 
+-               do:
++               for each tt_place,
++                  each tt_nozzle where tt_nozzle.pump-code = tt_place.pump-code:
+                   for each buf_pl-pump-nozzle where               
+                      buf_pl-pump-nozzle.obj-type = p-obj-type            
+                      AND buf_pl-pump-nozzle.obj-code = p-obj-code        
+@@ -559,47 +527,83 @@ FOR EACH buf_cash-desk WHERE
+                      each buf_pl-gds-pump exclusive-lock where buf_pl-gds-pump.obj-code = buf_pl-pump-nozzle.obj-code and
+                      buf_pl-gds-pump.obj-type = buf_pl-pump-nozzle.obj-type and
+                      buf_pl-gds-pump.pump-code = buf_pl-pump-nozzle.pump-code and
+-                     buf_pl-gds-pump.pl-code = buf_pl-pump-nozzle.pl-code and 
+-                     buf_pl-gds-pump.status_ <> {&current-status}
++                     buf_pl-gds-pump.pl-code = buf_pl-pump-nozzle.pl-code
+                      :
+-                     run cplgdspm in this-procedure
+-                      ( input buf_pl-gds-pump.obj-type
+-                       ,input buf_pl-gds-pump.obj-code
+-                       ,input buf_pl-gds-pump.pl-code
+-                       ,input buf_pl-gds-pump.gds-code
+-                       ,input buf_pl-gds-pump.pump-code
+-                       ,input {&current-status}
+-                      ) no-error.
+-                     if error-status:error then 
++                     if buf_pl-gds-pump.status_ <> {&blocked-status} then 
+                      do:
+-                        errorUnblock = errorUnblock + {&new-line} + {&new-line} + return-value.
+-                     end.
+-                     else
+-                     do:
+-                        buf_pl-gds-pump.status_ = {&current-status} .
++                        v-string = v-string + {&new-line} + "ТРК № " + string(tt_nozzle.pump-code) + " Пистолет № " + string (tt_nozzle.nozzle-code) .
+                      end.
+                   end.
+                end.
+-               else 
++               if v-string <> "" then 
+                do:
+-                  v-string = v-string + {&new-line} + "ТРК № " + string(tt_nozzle.pump-code) + " Пистолет № " + string (tt_nozzle.nozzle-code) .
++                  vReturnValue = vReturnValue + "Для кассы: " + string (buf_cash-desk.cash-num) + {&new-line} +
++                     v-string + "," + {&new-line} +
++                     "для которых не прошла блокировка" + {&new-line} .
++                  
+                end.
+             end.
+-            if v-string <> "" then 
++         when "unblock" then 
+             do:
+-               return "Для кассы: " + string (buf_cash-desk.cash-num) + {&new-line} +
+-                  v-string + "," + {&new-line} +
+-                  "для которых не прошла разблокировка" + {&new-line} + {&new-line} +
+-                  "ПОВТОРИТЬ?".
+-            end. 
+-            else 
+-            do:
+-               return if errorUnblock = "" then "Разблокировка пистолетов прошла успешно" 
+-                                            else "Ошибка при разблокировке:" + errorUnblock.
+-            end.
+-         end.          
+-   end case .
+-end.  
++               run SaxReader no-error.
++   
++               for each tt_place,
++                  each tt_nozzle where tt_nozzle.pump-code = tt_place.pump-code:
++                  if not can-find (tt_answer where (tt_answer.FPFBlockStaff = 1 or tt_answer.FPFBlockStaff = 3) and tt_answer.ctrl = "READ") then 
++                  do:
++                     for each buf_pl-pump-nozzle where               
++                        buf_pl-pump-nozzle.obj-type = p-obj-type            
++                        AND buf_pl-pump-nozzle.obj-code = p-obj-code        
++                        and buf_pl-pump-nozzle.pump-code = tt_nozzle.pump-code
++                        and buf_pl-pump-nozzle.nozzle-code = tt_nozzle.nozzle-code
++                        and (if existPlCode then buf_pl-pump-nozzle.pl-code = tt_place.pl-code else true) no-lock,
++                        each buf_pl-gds-pump exclusive-lock where buf_pl-gds-pump.obj-code = buf_pl-pump-nozzle.obj-code and
++                        buf_pl-gds-pump.obj-type = buf_pl-pump-nozzle.obj-type and
++                        buf_pl-gds-pump.pump-code = buf_pl-pump-nozzle.pump-code and
++                        buf_pl-gds-pump.pl-code = buf_pl-pump-nozzle.pl-code and 
++                        buf_pl-gds-pump.status_ <> {&current-status}
++                        :
++                        run cplgdspm in this-procedure
++                         ( input buf_pl-gds-pump.obj-type
++                          ,input buf_pl-gds-pump.obj-code
++                          ,input buf_pl-gds-pump.pl-code
++                          ,input buf_pl-gds-pump.gds-code
++                          ,input buf_pl-gds-pump.pump-code
++                          ,input {&current-status}
++                         ) no-error.
++                        if error-status:error then 
++                        do:
++                           errorUnblock = errorUnblock + {&new-line} + {&new-line} + return-value.
++                        end.
++                        else
++                        do:
++                           buf_pl-gds-pump.status_ = {&current-status} .
++                        end.
++                     end.
++                  end.
++                  else 
++                  do:
++                     v-string = v-string + {&new-line} + "ТРК № " + string(tt_nozzle.pump-code) + " Пистолет № " + string (tt_nozzle.nozzle-code) .
++                  end.
++               end.
++               if v-string <> "" then 
++               do:
++                  vReturnValue = "Для кассы: " + string (buf_cash-desk.cash-num) + {&new-line} +
++                     v-string + "," + {&new-line} +
++                     "для которых не прошла разблокировка" + {&new-line} + vReturnValue.
++                  
++               end. 
++               else 
++               do:
++                  vReturnValue = vReturnValue + (if errorUnblock = "" 
++                          then "Разблокировка пистолетов прошла успешно " 
++                          else "Ошибка при разблокировке:" + errorUnblock) + " для кассы: " + string (buf_cash-desk.cash-num) + {&new-line}.
++               end.
++            end.          
++      end case .
++   end.
++end.
++return vReturnValue + if vReturnValue begins "Для кассы:" then ({&new-line} + " Повторить?") else "". 
+ 
+ 
+ procedure SaxReader:

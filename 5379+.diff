@@ -1,0 +1,52 @@
+# HG changeset patch
+# User ASMorozov
+# Parent  eb460a13c291d5621c9e6c463efcf42bc35c1fba
+refs #5379 На ркодах версии 18.10.19, при приемке НП ошибка
+
+http://exp-rm1.expertek.local/issues/5379
+
+http://exp-jira.expertek.local:8080/browse/EXPSD-1271
+
+diff -r eb460a13c291 ibs/th/str/InfoSection.cls
+--- a/ibs/th/str/InfoSection.cls	Tue Oct 22 17:48:54 2019 +0300
++++ b/ibs/th/str/InfoSection.cls	Wed Oct 23 15:15:30 2019 +0300
+@@ -430,14 +430,14 @@
+         do:
+           assign
+             FactQnty = decimal (inAttrValue) 
+-            CliQnty = DocDensity * FactQnty 
++            CliQnty = DocDensity * DocQnty 
+             FactKgQnty = FactQnty * FactDensity no-error.
+         end.
+       when 'doc-dens' then 
+         do:
+           assign
+             DocDensity = decimal (inAttrValue) 
+-            CliQnty = DocDensity * FactQnty no-error.
++            CliQnty = DocDensity * DocQnty no-error.
+         end.
+       when 'fact-dens' then 
+         do:
+diff -r eb460a13c291 ibs/th/str/InfoSectionsTotal.cls
+--- a/ibs/th/str/InfoSectionsTotal.cls	Tue Oct 22 17:48:54 2019 +0300
++++ b/ibs/th/str/InfoSectionsTotal.cls	Wed Oct 23 15:15:30 2019 +0300
+@@ -503,7 +503,7 @@
+         InfoSectionCurr:CliQnty = InfoSectionCurr:DocDensity * InfoSectionCurr:DocQnty.
+       end.
+       else do:
+-        InfoSectionCurr:DocDensity = InfoSectionCurr:DocQnty / InfoSectionCurr:CliQnty.
++        InfoSectionCurr:DocDensity = InfoSectionCurr:CliQnty / InfoSectionCurr:DocQnty.
+       end.
+       assign
+         CarVolTotal = InfoSectionCurr:CarVol + CarVolTotal
+diff -r eb460a13c291 str/in-line.w
+--- a/str/in-line.w	Tue Oct 22 17:48:54 2019 +0300
++++ b/str/in-line.w	Wed Oct 23 15:15:30 2019 +0300
+@@ -1529,6 +1529,7 @@
+     v-new-density       = tt-fr-doc-line.fact-density
+     v-new-cli-fact-qnty = tt-fr-doc-line.fact-qnty-kg
+   .
++  if parline-mode <> {&add-def} then infoSectionsTotal:GetDBAllAttr().
+   tanksForm = new ibs.th.str.ptrl.forms.tanksections(infoSectionsTotal).
+   wait-for tanksForm:ShowDialog().
+ 

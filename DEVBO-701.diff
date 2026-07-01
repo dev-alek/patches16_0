@@ -1,0 +1,28 @@
+# HG changeset patch
+# User SSlivenko
+# Parent  2722a75added3773f944e24176243986736c75f6
+refs #DEVBO-701 Синхронизация справочника кассиров между TH и 1C ERP. Башнефть-розница #BTS-2339
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-701
+https://msk-exp-jira.expertek.local/browse/BTS-2339
+
+diff --git a/ref/imp-cashiers-1c-RN.p b/ref/imp-cashiers-1c-RN.p
+--- a/ref/imp-cashiers-1c-RN.p
++++ b/ref/imp-cashiers-1c-RN.p
+@@ -96,7 +96,15 @@ do:
+     undo, return error "Нет группы клиентов с кодом: 4".
+   end. /*if not AVAILABLE buf_cli-grp then*/
+   else 
+-  do:  
++  do: 
++    
++    find first buf_staff no-lock where buf_staff.staff-code = integer(p-Cashiers:code_)
++                                   and buf_staff.role       = {&role-cashier}
++    no-error .
++    if available buf_staff
++    then do :
++      return substitute("Уже существует Кассир с кодом &1. Физ лицо - код &2. Пропускаем...", buf_staff.staff-code, buf_staff.psn-code) .
++    end .
+ 
+     find first buf_clients EXCLUSIVE-LOCK where buf_clients.obj-code = integer(p-Cashiers:code_) 
+       and buf_clients.obj-type = {&prs} no-error .

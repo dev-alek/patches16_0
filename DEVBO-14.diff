@@ -1,0 +1,72 @@
+# HG changeset patch
+# User EShklyar
+# Parent  e4655a3af6cfcbe68c301d668587b5df1ddb0d5a
+DEVBO-14 Выгрузка новых атрибутов ручных чеков в 1С
+
+http://exp-jira.expertek.local:8080/browse/DEVBO-14
+
+diff -r e4655a3af6cf ibs/th/bge/1crn/subjects/check.cls
+--- a/ibs/th/bge/1crn/subjects/check.cls	Пт ноя 15 18:29:05 2019 +0300
++++ b/ibs/th/bge/1crn/subjects/check.cls	Ср ноя 20 11:09:54 2019 +0300
+@@ -345,7 +345,51 @@
+       insw:write-data-element (  "prdoc-num":U,  p-buf_chk-doc.out-code     ). /* Номер документа продажи в GC (Строка) */
+     if p-inkas-dtime = ? then . else
+       insw:write-data-element (  "prdoc-date":U, iso-date(p-inkas-dtime)    ). /* Дата документа продажи в GC со временем в формате ISO (Дата) */ 
+-
++        for first buf_chk-doc-attr no-lock
++             where buf_chk-doc-attr.doc-code  = p-buf_chk-doc.doc-code
++               and buf_chk-doc-attr.attr-code = "corr-osnov":U :
++          insw:write-data-element (  "doc-bas-code",  buf_chk-doc-attr.attr-value  ) . /* Код документа-основания */
++        end .
++        for first buf_chk-doc-attr no-lock
++             where buf_chk-doc-attr.doc-code  = p-buf_chk-doc.doc-code
++               and buf_chk-doc-attr.attr-code = "corr-date":U :
++          insw:write-data-element (  "doc-bas-date",  buf_chk-doc-attr.attr-value  ) . /* Код документа-основания */
++        end . 
++        for first buf_chk-doc-attr no-lock
++             where buf_chk-doc-attr.doc-code  = p-buf_chk-doc.doc-code
++               and buf_chk-doc-attr.attr-code = "corr-num":U :
++          insw:write-data-element (  "doc-bas-num",  buf_chk-doc-attr.attr-value  ) . /* Код документа-основания */
++        end .                       
++        for first buf_chk-doc-attr no-lock
++             where buf_chk-doc-attr.doc-code  = p-buf_chk-doc.doc-code
++               and buf_chk-doc-attr.attr-code = "corr-cause":U :
++          insw:write-data-element (  "change-descr",  buf_chk-doc-attr.attr-value  ) . /* Код документа-основания */
++        end .
++        for first buf_chk-doc-attr no-lock
++             where buf_chk-doc-attr.doc-code  = p-buf_chk-doc.doc-code
++               and buf_chk-doc-attr.attr-code = "create-shift-date":U :
++          insw:write-data-element (  "create-shift-date",  buf_chk-doc-attr.attr-value  ) . /* Код документа-основания */
++        end .    
++        for first buf_chk-doc-attr no-lock
++             where buf_chk-doc-attr.doc-code  = p-buf_chk-doc.doc-code
++               and buf_chk-doc-attr.attr-code = "create-shift-num":U :
++          insw:write-data-element (  "create-shift-num",  buf_chk-doc-attr.attr-value  ) . /* Код документа-основания */
++        end .    
++        for first buf_chk-doc-attr no-lock
++             where buf_chk-doc-attr.doc-code  = p-buf_chk-doc.doc-code
++               and buf_chk-doc-attr.attr-code = "create-date":U :
++          insw:write-data-element (  "create-date",  buf_chk-doc-attr.attr-value  ) . /* Код документа-основания */
++        end .  
++        for first buf_chk-doc-attr no-lock
++             where buf_chk-doc-attr.doc-code  = p-buf_chk-doc.doc-code
++               and buf_chk-doc-attr.attr-code = "create-time":U :
++          insw:write-data-element (  "create-time",  buf_chk-doc-attr.attr-value  ) . /* Код документа-основания */
++        end .                
++        for first buf_chk-doc-attr no-lock
++             where buf_chk-doc-attr.doc-code  = p-buf_chk-doc.doc-code
++               and buf_chk-doc-attr.attr-code = "create-type":U :
++          insw:write-data-element (  "create-type",  buf_chk-doc-attr.attr-value  ) . /* Код документа-основания */
++        end .   
+ 
+     /* 19/II-2019  Если в чеке есть платеж, с is-nds = 1, то в товарных строках НДС выгружать,
+                    если нет, то НДС не выгружать совсем. */
+@@ -538,7 +582,7 @@
+              строка через запятую, собранная из CBCBarcode_ с кассы */
+           insw:write-data-element (  "srt-BC",  buf_chk-gds-attr.attr-value  ) . /* Полный штрих-код сертификата БП «Автопомощь» (Строка) */
+         end .
+-        
++
+         /* 17/XI-2017 Добавляем поле «price» (цена до применения скидок) в секции «chk-gd». */
+         insw:write-data-element (  "price",  left-trim(string(buf_chk-gds.src-price, "->>>>>>>>9.99"))  ) . /* Цена до применения скидок (Число 15,2) */
+ 

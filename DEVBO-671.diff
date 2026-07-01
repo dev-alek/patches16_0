@@ -1,0 +1,243 @@
+# HG changeset patch
+# User ARostovtsev
+# Parent  e5361dedf744aee2586b946d7df564e3c4667d37
+refs #DEVBO-671 Автоматизация установки модуля ЛМ ЧЗ при обновлении ПО ТН. #BTS-2286
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-671
+https://msk-exp-jira.expertek.local/browse/BTS-2286
+
+diff --git a/adm/upd-rc.p b/adm/upd-rc.p
+--- a/adm/upd-rc.p
++++ b/adm/upd-rc.p
+@@ -34,6 +34,22 @@ define variable vss-description as character no-undo init "Обновление r-кодов, обновления должны лежать передаваемом в каталоге".
+ { cmp/str-glbl.i }
+ { adm/auto-def.i }
+ define variable CheckUpd      as class ibs.th.adm.upd.CheckUpd no-undo.
++define variable mIp     as character no-undo .
++define variable mPort   as character no-undo .
++define variable mLogin  as character no-undo .
++define variable mPass   as character no-undo .
++
++
++define temp-table temp-thbj-attr no-undo like ub.thbj-attr.
++define stream sInput.
++define stream sOutput.
++
++function checkCommand returns logical
++    (input iFile    as character ,
++     input iCommand  as character) forward.
++
++function change_gisMT_OflineAdress return logical
++    (input iNewAdress as character) forward.
+ 
+ procedure write-log:
+    define input  parameter iTabPosition as integer   no-undo.
+@@ -450,8 +466,25 @@ mRunFile = SearchFile ("!upd-rc-after.ba
+ if mRunFile ne ?
+ then do:
+    run waitfram-show in this-procedure ("Выполнение " + mRunFile ).
+-   os-command value (substitute ("&2 &1 exit" ,{&ampersand}, mRunFile)).
+-   mIsError = os-error <> 0.
++   if checkCommand(mRunFile, "regime,/I") then
++   do:
++     run waitfram-show in this-procedure ("Подготовка " + mRunFile + " для установки ЛМ ЧЗ").
++     run getSettingsGisMt in this-procedure.
++     if mLogin = "" or mPass = "" 
++     then do:
++         run write-to-log (substitute(
++                             "&1Подготовка !upd-rc-after.bat – &2", 
++                             {&PREFIX_LOG},
++                             "Не заполнены логин и/или пароль в ЛМ ЧЗ")
++                           ).
++     end. 
++     run runBatLmCHz in this-procedure (mRunFile, output mIsError).
++   end.
++   else
++   do:
++     os-command value (substitute ("&2 &1 exit" ,{&ampersand}, mRunFile)).
++     mIsError = os-error <> 0.
++   end.
+    os-delete value ( mRunFile ).
+    run write-to-log (substitute(
+                        "&1Запуск !upd-rc-after.bat – &2", 
+@@ -581,3 +614,180 @@ procedure upload1C:
+    g#esys = oldg#esys.
+ 
+ end procedure.
++
++procedure runBatLmCHz:
++    define input parameter iFile as character no-undo.
++    define output parameter oResult as logical no-undo.
++    
++    define variable vCommand       as character no-undo.
++    define variable vBatFile       as character no-undo.
++    define variable vOfflineAdress as character no-undo.
++    
++    vBatFile = substring(iFile, 1, r-index(iFile,".") - 1) + "1" + substring(iFile, r-index(iFile,".")). 
++    define variable vStr            as character no-undo.
++
++    define variable mask_ip    as character no-undo init "%Адрес прокси%".
++    define variable mask_port  as character no-undo init "%Порт прокси%".
++    define variable mask_login as character no-undo init "%Логин ЛМ ЧЗ%".
++    define variable mask_pass  as character no-undo init "%Пароль ЛМ ЧЗ%".
++
++    input  stream sInput  from value(iFile).
++    output stream sOutput to   value(vBatFile).
++    L_REPEAT:
++    repeat:
++        import stream sInput unformatted vStr.
++        
++        if vStr = "" or vStr begins "rem" then
++          next L_REPEAT.
++         
++        if vStr begins "rem lmchz=" then
++        do:
++          mIsError = change_gisMT_OflineAdress(entry(2,vStr,"=")).
++          run write-to-log (
++            substitute("&1Установка адреса ЛМ ЧЗ &2 - &3", 
++                       {&PREFIX_LOG}, 
++                       entry(2,vStr,"="),
++                       if mIsError 
++                          then "ошибка" 
++                          else "успешно")
++          ).
++          next L_REPEAT.  
++        end.
++        if index(vStr, "regime") > 0 and 
++           index(vStr, "/I") > 0
++        then do:
++            assign
++              vStr = replace(vStr, mask_ip,    mIp)
++              vStr = replace(vStr, mask_port,  mPort)
++              vStr = replace(vStr, mask_login, mLogin)
++              vStr = replace(vStr, mask_pass,  mPass)
++            .
++            output stream sOutput close.
++            vCommand = substitute("&1 &3 &2", "run " + vBatFile, vStr, {&ampersand}).
++            vBatFile = substring(iFile, 1, r-index(iFile,".") - 1) + "2" + substring(iFile, r-index(iFile,".")). 
++            output stream sOutput to   value(vBatFile).
++        end.
++        else do:
++          put stream sOutput unformatted vStr skip.
++        end.
++    end.
++    input  stream sInput  close.
++    output stream sOutput close.
++
++    vCommand = substitute("&1 &3 &2", vCommand, "run " + vBatFile, {&ampersand}).
++    os-command value (substitute ("&2 &1 exit" ,{&ampersand}, vCommand)).
++    mIsError = os-error <> 0.
++    os-delete value(vBatFile).
++    vBatFile = substring(iFile, 1, r-index(iFile,".") - 1) + "1" + substring(iFile, r-index(iFile,".")). 
++    os-delete value(vBatFile).
++end procedure.
++
++/* процедура получения настроек ГИС МТ */
++procedure getSettingsGisMt:
++    
++    define variable vDbNum          as integer   no-undo.
++    define variable vValueCharacter as character no-undo .
++    define variable vValueDate      as date      no-undo .
++    define variable vValueDecimal   as decimal   no-undo .
++    define variable vValueInteger   as INTEGER   no-undo .
++    define variable vValueLogical   as LOGICAL   no-undo .
++    define variable vParamType      as character no-undo .
++    define variable vBufferTT       as handle    no-undo .
++    define buffer sys-ctrl for ub.sys-ctrl.
++    
++    find first sys-ctrl no-lock no-error.
++    vDbNum = sys-ctrl.db-num.    
++
++    vBufferTT      = buffer temp-thbj-attr:table-handle .
++    run adm/shattri.p (
++          input "init":U
++        , input {&db}
++        , input vDbNum
++        , input {&attr-gisMT}
++        , input "":U
++        , output vValueCharacter
++        , output vValueDate
++        , output vValueDecimal
++        , output vValueInteger
++        , output vValueLogical
++        , output vParamType
++        , input-output TABLE-HANDLE vBufferTT
++        ) no-error .
++    for first temp-thbj-attr where 
++              temp-thbj-attr.prop-code = {&attr-gisMT_adressPort}
++    :
++      if temp-thbj-attr.property-value-character <> "" then 
++      do:
++        mIp   = entry(1,temp-thbj-attr.property-value-character,":").
++        mPort = if num-entries(temp-thbj-attr.property-value-character,":") > 1 
++                then entry(2,temp-thbj-attr.property-value-character,":") else "".
++      end.
++    end.
++    for first temp-thbj-attr where
++              temp-thbj-attr.prop-code = {&attr-gisMT_OflineLogin}
++    :
++      mLogin = temp-thbj-attr.property-value-character.
++    end.
++    for first temp-thbj-attr where
++              temp-thbj-attr.prop-code = {&attr-gisMT_OflinePswd}
++    :
++      mPass  = temp-thbj-attr.property-value-character.
++    end.
++end procedure.    
++
++/* Функция читает файл построчно и ищет в коммандной строке вхождение         */    
++/* подстрок из iCommand. Можно передавать через "," несколько подстрок.       */
++/* Функция вернет true, если все подстроки найдены хот в 1-й командной строке */    
++function checkCommand returns logical
++    (input iFile    as character ,
++     input iCommand  as character)
++: 
++    define variable vStr   as character no-undo.
++    define variable vRes   as logical   no-undo init no.
++    define variable vCount as integer   no-undo.
++    
++    input stream sInput from value(iFile).
++    L_REPEAT:
++    repeat:
++        import stream sInput unformatted vStr.
++        
++        if vStr = "" or vStr begins "rem" or vStr = "echo" then
++          next L_REPEAT.
++        
++        do vCount = 1 to num-entries(iCommand):
++          if index(vStr, entry(vCount,iCommand)) = 0 then
++          do:
++            vRes = no.
++            next L_REPEAT.
++          end.
++          vRes = yes.
++        end.
++        if vRes then leave L_REPEAT.
++    end.
++    input stream sInput close.
++    return vRes.
++end function.
++
++function change_gisMT_OflineAdress return logical
++    (input iNewAdress as character):
++     
++    define variable vOk as logical no-undo.    
++    define buffer thbj-attr for ub.thbj-attr.         
++    define buffer sys-ctrl  for ub.sys-ctrl.
++
++    find first sys-ctrl no-lock no-error.
++    do trans:  
++        vOk = true.
++        find first thbj-attr where thbj-attr.upper-prop-code eq {&attr-gisMT}
++                             and thbj-attr.obj-type        eq {&db}
++                             and thbj-attr.obj-code        eq sys-ctrl.db-num
++                             and thbj-attr.prop-code       eq {&attr-gisMT_OflineAdress}                           
++        exclusive-lock no-wait no-error.
++        if available thbj-attr then do:
++          thbj-attr.property-value-character = iNewAdress .
++        end.
++        else if locked thbj-attr then vOk = false.
++        
++    end.
++    return not vOk.
++end.

@@ -1,0 +1,1539 @@
+# HG changeset patch
+# User SSlivenko
+# Parent  5d2b4801de64355746adabaec9e5a34fb3fe56a4
+refs #DEVBO-434 !!!ОТЛАДКА!!! Атрибут "опломбирован СЭП" #ZI-562
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-434
+https://msk-exp-jira.expertek.local/browse/ZI-562
+
+diff --git a/cmp/str-glb4.p b/cmp/str-glb4.p
+--- a/cmp/str-glb4.p
++++ b/cmp/str-glb4.p
+@@ -375,6 +375,9 @@ run filwrlib_append-new-line in this-pro
+ /* Атрибут клиента - Является поставщиком для   */
+ { cmp/cr-prep.i 1 attr-owner-code owner-code " " owner-code }
+ 
++/* Атрибут клиента - Наличие СЭП  */
++{ cmp/cr-prep.i 1 attr-have-SEP have-SEP " " have-SEP }
++
+ /* сюда добавлять новые названия атрибутов клиентов */
+ 
+ /* список атрибутов клиентов */
+@@ -1439,6 +1442,9 @@ run filwrlib_append-new-line in this-pro
+ /* Ф.И.О. водителя-экспедитора */
+ { cmp/cr-prep.i 1 trdcattr-fio-driver "fio-driver" " " "fio-driver" }
+ 
++/* АЦ Опломбирована СЭП */
++{ cmp/cr-prep.i 1 trdcattr-sealed "sealed" " " "sealed" }
++
+ /* Дата прибытия на АЗС */
+ { cmp/cr-prep.i 1 trdcattr-date-income "date-income" " " "date-income" }
+ 
+@@ -1559,6 +1565,9 @@ run filwrlib_append-new-line in this-pro
+ /* Должность участника комиссии */
+ { cmp/cr-prep.i 1 trdcattr-pos-player3 "trdcattr-pos-player3" " " "trdcattr-pos-player3" }
+ 
++/* Накладная НП, созданная сканированием QR-кода DataMatrix */
++{ cmp/cr-prep.i 1 trdcattr-is-scanqr-trn "is-scanqr-trn" " " "is-scanqr-trn" }
++
+ /* Масса слитого СУГ на промежуточных станциях АГЗС */
+ { cmp/cr-prep.i 1 sugtpattr-massa-sug "sugtpattr-massa-sug" " " "sugtpattr-massa-sug" }
+ 
+@@ -1652,6 +1661,7 @@ run filwrlib_append-new-line in this-pro
+ ,{&bef-trdcattr-autoent}~
+ ,{&bef-trdcattr-car-num}~
+ ,{&bef-trdcattr-fio-driver}~
++,{&bef-trdcattr-sealed}~
+ ,{&bef-trdcattr-date-income}~
+ ,{&bef-trdcattr-hour-income}~
+ ,{&bef-trdcattr-inspection-cert}~
+diff --git a/gbl/attr-lib.p b/gbl/attr-lib.p
+--- a/gbl/attr-lib.p
++++ b/gbl/attr-lib.p
+@@ -1027,6 +1027,18 @@ end.
+ &scop manual-edit-attr-exp-isPM-last-date 1
+ &scop batch-edit-attr-exp-isPM-last-date 1
+ 
++/* Атрибут клиента - Наличие СЭП   */
++&scop type-attr-have-SEP  {&type-log}
++&scop format-attr-have-SEP  "+/"
++&scop label-attr-have-SEP  "Наличие СЭП"
++&scop tooltip-attr-have-SEP  "Наличие СЭП"
++&scop user-can-edit-attr-have-SEP   false
++&scop output-display-attr-have-SEP  true
++&scop other-attr-have-SEP  '':u
++&scop news-attr-have-SEP  true
++&scop manual-edit-attr-have-SEP   0
++&scop batch-edit-attr-have-SEP   1
++
+ /* сюда добавлять новые атрибуты клиентов */
+ 
+ /* ------------------------------------------------------------------- */
+@@ -1228,6 +1240,8 @@ procedure clntattr-code :
+       {&attr-temp-full-code}
+       &scop attr-code attr-exp-isPM-last-date
+       {&attr-temp-full-code}
++      &scop attr-code attr-have-SEP
++      {&attr-temp-full-code}
+ 
+       /* сюда добавлять новые параметры атрибутов клиентов */
+       otherwise do:
+@@ -1392,6 +1406,8 @@ procedure clntattr-tooltip :
+       {&attr-temp-code}
+       &scop attr-code attr-exp-isPM-last-date
+       {&attr-temp-code}
++      &scop attr-code attr-have-SEP
++      {&attr-temp-code}
+ 
+       /* сюда добавлять новые параметры атрибутов клиентов */
+       otherwise do:
+@@ -1764,6 +1780,8 @@ procedure clntattr-news :
+       {&attr-news-code}
+       &scop attr-code attr-exp-isPM-last-date
+       {&attr-news-code}
++      &scop attr-code attr-have-SEP
++      {&attr-news-code}
+ 
+       /* сюда добавлять новые параметры атрибутов клиентов */
+       otherwise do:
+@@ -2374,6 +2392,8 @@ procedure clntattr-manual-edit :
+       {&attr-manual-edit-code}
+       &scop attr-code attr-exp-isPM-last-date
+       {&attr-manual-edit-code}
++      &scop attr-code attr-have-SEP
++      {&attr-manual-edit-code}
+ 
+       /* сюда добавлять новые параметры атрибутов клиентов */
+       otherwise do:
+@@ -2453,6 +2473,8 @@ procedure clntattr-batch-edit :
+       {&attr-batch-edit-code}
+       &scop attr-code attr-exp-isPM-last-date
+       {&attr-batch-edit-code}
++      &scop attr-code attr-have-SEP
++      {&attr-batch-edit-code}
+ 
+       /* сюда добавлять новые параметры атрибутво клиентов */
+       otherwise do:
+diff --git a/ibs/th/bge/1crn/import/impclients.cls b/ibs/th/bge/1crn/import/impclients.cls
+--- a/ibs/th/bge/1crn/import/impclients.cls
++++ b/ibs/th/bge/1crn/import/impclients.cls
+@@ -481,7 +481,30 @@ class ibs.th.bge.1crn.import.impclients 
+          delete clients-attr.
+       end .
+       
+-      
++      find first clients-attr where clients-attr.obj-type  eq bf_clients.obj-type
++                                and clients-attr.obj-code  eq bf_clients.obj-code
++                                and clients-attr.attr-code eq {&attr-have-SEP}
++      exclusive-lock no-error.
++      if avail clients-attr 
++      then do:
++         if objImp:sealing eq 1
++         then
++            clients-attr.attr-value = "yes".
++         else 
++            delete clients-attr.
++      end.
++      else do:
++         if objImp:sealing eq 1
++         then do:
++            create clients-attr.
++            assign 
++               clients-attr.obj-type  = bf_clients.obj-type
++               clients-attr.obj-code  = bf_clients.obj-code
++               clients-attr.attr-code = {&attr-have-SEP}
++               clients-attr.attr-value = "yes"
++            .
++         end.
++      end.
+       
+     end.
+     if valid-object (v_carrier) then 
+diff --git a/ibs/th/bge/1crn/subjects/clients.cls b/ibs/th/bge/1crn/subjects/clients.cls
+--- a/ibs/th/bge/1crn/subjects/clients.cls
++++ b/ibs/th/bge/1crn/subjects/clients.cls
+@@ -103,6 +103,9 @@ class ibs.th.bge.1crn.subjects.clients i
+   define property org-code as character no-undo
+     get. 
+     private set.
++  define property sealing     as integer    no-undo
++    get. 
++    private set.  
+   define override property InitTag as character no-undo init "contractor"
+     get. 
+     
+@@ -156,6 +159,8 @@ class ibs.th.bge.1crn.subjects.clients i
+         code-AIS      = if inValue >= "" then inValue else "" .
+       when "org-code"      then 
+         org-code      = if inValue >= "" then inValue else "" .
++      when "sealing"      then 
++        sealing      = if inValue >= "" then int(inValue) else 0 .
+ 
+     end case.
+   end method.
+@@ -221,7 +226,8 @@ class ibs.th.bge.1crn.subjects.clients i
+       code-KSK  = ?
+       code-AIS  = ?
+       org-code  = ?
+-      .
++      sealing   = ?
++    .
+   end method.
+   
+ 
+diff --git a/ibs/th/bge/1crn/subjects/trn-gd-doc.cls b/ibs/th/bge/1crn/subjects/trn-gd-doc.cls
+--- a/ibs/th/bge/1crn/subjects/trn-gd-doc.cls
++++ b/ibs/th/bge/1crn/subjects/trn-gd-doc.cls
+@@ -539,21 +539,23 @@ class ibs.th.bge.1crn.subjects.trn-gd-do
+       write-data-element ('seales-condition', entry (2, buf_doc-attr.attr-value, {&delim-par})) no-error.
+     end.
+     
+-    find first buf_doc-attr no-lock where buf_doc-attr.doc-code = DocCode and buf_doc-attr.attr-code = {&trdcattr-car-num} no-error .
++/*    find first buf_doc-attr no-lock where buf_doc-attr.doc-code = DocCode and buf_doc-attr.attr-code = {&trdcattr-car-num} no-error .*/
++/*    if available buf_doc-attr                                                                                                        */
++/*    then do :                                                                                                                        */
++/*      find first sep_auto-tank-attr no-lock where sep_auto-tank-attr.auto-num = buf_doc-attr.attr-value                              */
++/*                                              and sep_auto-tank-attr.attr-code = "auto-sep"                                          */
++/*                                              no-error.                                                                              */
++/*      if available sep_auto-tank-attr                                                                                                */
++/*      and logical(sep_auto-tank-attr.attr-value)                                                                                     */
++/*      then do :                                                                                                                      */
++/*        vIsSGDKK = yes .                                                                                                             */
++/*      end .                                                                                                                          */
++/*    end .                                                                                                                            */
++    find first buf_doc-attr no-lock where buf_doc-attr.doc-code = DocCode and buf_doc-attr.attr-code = {&trdcattr-sealed} no-error .
+     if available buf_doc-attr
+     then do :
+-      find first sep_auto-tank-attr no-lock where sep_auto-tank-attr.auto-num = buf_doc-attr.attr-value
+-                                              and sep_auto-tank-attr.attr-code = "auto-sep"
+-                                              no-error.
+-      if available sep_auto-tank-attr
+-      and logical(sep_auto-tank-attr.attr-value)
+-      then do :
+-        vIsSGDKK = yes .
+-      end .
+-    end .
+-    if vIsSGDKK = yes
+-    then do :
+-      write-data-element ('ess', string(1)) no-error.
++      vIsSGDKK = (buf_doc-attr.attr-value = "1") .
++      write-data-element ('ess', buf_doc-attr.attr-value) no-error.
+     end .
+     else do :
+       write-data-element ('ess', string(0)) no-error.
+diff --git a/rep/akt-petrol.p b/rep/akt-petrol.p
+--- a/rep/akt-petrol.p
++++ b/rep/akt-petrol.p
+@@ -178,10 +178,14 @@ do
+   run doc-attr-write(INPUT buf_trn-doc.doc-code,INPUT {&trdcattr-car-num},OUTPUT v-car-num) no-error .
+     
+   /*Наличие СЭП*/
+-  find first ub.auto-tank-attr no-lock where ub.auto-tank-attr.auto-num = v-car-num and
+-    ub.auto-tank-attr.attr-code = "auto-sep" and
+-    logical(ub.auto-tank-attr.attr-value) = true no-error .
+-  if available ub.auto-tank-attr then sgdkk = true .
++/*  find first ub.auto-tank-attr no-lock where ub.auto-tank-attr.auto-num = v-car-num and*/
++/*    ub.auto-tank-attr.attr-code = "auto-sep" and                                       */
++/*    logical(ub.auto-tank-attr.attr-value) = true no-error .                            */
++/*  if available ub.auto-tank-attr then sgdkk = true .                                   */
++  find first buf_doc-attr no-lock where buf_doc-attr.doc-code = buf_trn-doc.doc-code and buf_doc-attr.attr-code = {&trdcattr-sealed} no-error .
++  if available buf_doc-attr
++  and buf_doc-attr.attr-value = "1"
++  then sgdkk = true .
+   
+   v-InfoSectionsTotal = new InfoSectionsTotal().
+   
+diff --git a/rep/r-sum-fuel-supp.p b/rep/r-sum-fuel-supp.p
+--- a/rep/r-sum-fuel-supp.p
++++ b/rep/r-sum-fuel-supp.p
+@@ -523,7 +523,6 @@ procedure processTrn :
+   define variable v-user-name           as character no-undo .
+   define variable v-car-num             as character no-undo .
+   define variable v-driver-name         as character no-undo .
+-/*  define variable v-sep                 as character no-undo init "АЦ без СЭП" .*/
+   define variable v-sep                 as character no-undo init "" .
+   define variable v-place-num           as character no-undo .
+   define variable v-hour-pour           as integer   no-undo .
+@@ -542,6 +541,7 @@ procedure processTrn :
+   define variable v-delta-mass-qnty-ac  as decimal   no-undo .
+   define variable v-avrg-dens           as decimal   no-undo .
+   define variable v-tmp-time            as integer   no-undo .
++  define variable v-sealing             as character no-undo .
+ /*  define variable v-pl-sum-col24        as decimal   no-undo .*/
+ /*  define variable v-pl-sum-col25        as decimal   no-undo .*/
+ /*  define variable v-pl-sum-col41        as decimal   no-undo .*/
+@@ -686,6 +686,22 @@ procedure processTrn :
+   
+   { str/tdat-val.i
+     p-doc-code
++    {&trdcattr-sealed}
++    v-sealing
++    vartype
++    no-error
++  }
++  if v-sealing = "1"
++  then do :
++    v-sep = "АЦ с СЭП" .
++  end .
++  if v-sealing = "0"
++  then do :
++    v-sep = "АЦ без СЭП" .
++  end .
++  
++  { str/tdat-val.i
++    p-doc-code
+     {&trdcattr-fio-driver}
+     v-driver-name
+     vartype
+diff --git a/str/in-doc.w b/str/in-doc.w
+--- a/str/in-doc.w
++++ b/str/in-doc.w
+@@ -4395,6 +4395,8 @@ end.
+ {&create-record-fuel}
+ &scop attr-code trdcattr-num-pasport
+ {&create-record-fuel}
++&scop attr-code trdcattr-sealed
++{&create-record-fuel}
+ 
+ end.
+ end procedure.
+diff --git a/str/in-laddtrn.w b/str/in-laddtrn.w
+--- a/str/in-laddtrn.w
++++ b/str/in-laddtrn.w
+@@ -60,12 +60,16 @@ define variable v-dop-info as character 
+ define variable varvalue as character no-undo.
+ define variable vartype  as character no-undo.
+ define variable v-is-lgas as logical no-undo.
++define variable v-is-scanqr-trn as logical no-undo.
++
++define variable enable-cb-sealing as logical no-undo init no .
+ 
+ define buffer buf_trn-doc for ub.trn-doc .
+ /* Local Variable Definitions ---                                       */
+ { str/valddnst.i def }
+ 
+ define buffer buf_goods for ub.goods .
++define buffer buf_clients-attr for ub.clients-attr.
+ 
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+@@ -83,16 +87,16 @@ define buffer buf_goods for ub.goods .
+ 
+ /* Standard List Definitions                                            */
+ &Scoped-Define ENABLED-OBJECTS b-save b-quit b-help f-autoent-obj-code ~
+-f-autoent-obj-type b-clients f-car-num b-auto-tank f-condition ~
++f-autoent-obj-type b-clients f-car-num cb-sealing b-auto-tank f-condition ~
+ f-seals-condition f-insp-cert f-seals-condition-2 f-date-cert f-num-pasport ~
+ f-date-pasport f-fio f-ptbocode f-ptbotype b-ptb f-date-pour f-hour-pour ~
+ f-min-pour f-date-income f-hour-income f-min-income f-item-pour f-acc-ship ~
+ b-doc t-clear f-date-start f-date-end f-hour-start f-min-start f-hour-end ~
+ f-min-end 
+ &Scoped-Define DISPLAYED-OBJECTS f-autoent f-autoent-obj-code ~
+-f-autoent-obj-type f-autoent-obj-name f-car f-car-num f-condition-name ~
+-f-condition f-seals-1 f-seals-condition f-insp f-insp-cert f-seals-2 ~
+-f-seals-condition-2 f-insp-2 f-date-cert f-pasport f-num-pasport ~
++f-autoent-obj-type f-autoent-obj-name f-car f-car-num cb-sealing ~
++f-condition-name f-condition f-seals-1 f-seals-condition f-insp f-insp-cert ~
++f-seals-2 f-seals-condition-2 f-insp-2 f-date-cert f-pasport f-num-pasport ~
+ f-pasport-num f-date-pasport f-fio-name f-fio f-ptbocode-1 f-ptbocode ~
+ f-ptbotype f-ptboname f-date-pour-1 f-date-pour f-hour-pour-2 f-hour-pour ~
+ f-min-pour f-date-income-2 f-date-income f-hour-income-2 f-hour-income ~
+@@ -118,14 +122,14 @@ DEFINE BUTTON b-auto-tank
+      IMAGE-DOWN FILE "btn-down-arrow":U
+      IMAGE-INSENSITIVE FILE "btn-down-arrow":U
+      LABEL "" 
+-     SIZE 3 BY .88.
++     SIZE 3 BY .86.
+ 
+ DEFINE BUTTON b-clients 
+      IMAGE-UP FILE "btn-down-arrow":U
+      IMAGE-DOWN FILE "btn-down-arrow":U
+      IMAGE-INSENSITIVE FILE "btn-down-arrow":U
+      LABEL "b-clients" 
+-     SIZE 3 BY .88.
++     SIZE 3 BY .86.
+ 
+ DEFINE BUTTON b-help 
+      LABEL "&Помощь" 
+@@ -137,7 +141,7 @@ DEFINE BUTTON b-ptb
+      IMAGE-DOWN FILE "btn-down-arrow":U
+      IMAGE-INSENSITIVE FILE "btn-down-arrow":U
+      LABEL "b-ptb" 
+-     SIZE 3 BY .88.
++     SIZE 3 BY .86.
+ 
+ DEFINE BUTTON b-quit AUTO-END-KEY 
+      LABEL "&Отмена" 
+@@ -149,17 +153,29 @@ DEFINE BUTTON b-save AUTO-GO
+      SIZE 10 BY 1
+      BGCOLOR 8 .
+ 
++DEFINE VARIABLE f-sealing AS CHARACTER FORMAT "X(256)":U INITIAL "Пломбировка:" 
++     VIEW-AS FILL-IN 
++     SIZE 13 BY 1 NO-UNDO.
++
++DEFINE VARIABLE cb-sealing AS INTEGER FORMAT "-9" INITIAL -1 
++     VIEW-AS COMBO-BOX INNER-LINES 3
++     LIST-ITEM-PAIRS "",-1,
++                     "Не опломбирован СЭП",0,
++                     "Опломбирован СЭП",1
++     DROP-DOWN-LIST
++     SIZE 22.6 BY 1 NO-UNDO.
++
+ DEFINE VARIABLE f-acc-ship AS DECIMAL FORMAT ">>,>>9.99":U INITIAL 0 
+      VIEW-AS FILL-IN 
+-     SIZE 7.25 BY 1 NO-UNDO.
++     SIZE 7.2 BY 1 NO-UNDO.
+ 
+ DEFINE VARIABLE f-acc-ship-2 AS CHARACTER FORMAT "X(256)":U INITIAL "Допустимый % погрешности поставщика:" 
+      VIEW-AS FILL-IN 
+-     SIZE 36.5 BY 1 NO-UNDO.
++     SIZE 36.6 BY 1 NO-UNDO.
+ 
+ DEFINE VARIABLE f-autoent AS CHARACTER FORMAT "X(256)":U INITIAL "Автопредприятие:" 
+      VIEW-AS FILL-IN 
+-     SIZE 16.5 BY 1 NO-UNDO.
++     SIZE 16.6 BY 1 NO-UNDO.
+ 
+ DEFINE VARIABLE f-autoent-obj-code AS INTEGER FORMAT ">>>>>>>>9":U INITIAL ? 
+      VIEW-AS FILL-IN 
+@@ -167,7 +183,7 @@ DEFINE VARIABLE f-autoent-obj-code AS IN
+ 
+ DEFINE VARIABLE f-autoent-obj-name AS CHARACTER FORMAT "X(256)":U 
+      VIEW-AS FILL-IN 
+-     SIZE 45.5 BY 1.04 NO-UNDO.
++     SIZE 45.6 BY 1.05 NO-UNDO.
+ 
+ DEFINE VARIABLE f-autoent-obj-type AS CHARACTER FORMAT "X(3)":U 
+      VIEW-AS FILL-IN 
+@@ -175,7 +191,7 @@ DEFINE VARIABLE f-autoent-obj-type AS CH
+ 
+ DEFINE VARIABLE f-car AS CHARACTER FORMAT "X(256)":U INITIAL "Гос. N автоцистерны:" 
+      VIEW-AS FILL-IN 
+-     SIZE 20.5 BY 1 NO-UNDO.
++     SIZE 20.6 BY 1 NO-UNDO.
+ 
+ DEFINE VARIABLE f-car-num AS CHARACTER FORMAT "X(256)":U INITIAL "?" 
+      VIEW-AS FILL-IN 
+@@ -183,15 +199,15 @@ DEFINE VARIABLE f-car-num AS CHARACTER F
+ 
+ DEFINE VARIABLE f-condition AS CHARACTER FORMAT "X(256)":U 
+      VIEW-AS FILL-IN 
+-     SIZE 59.38 BY 1 NO-UNDO.
++     SIZE 59.4 BY 1 NO-UNDO.
+ 
+ DEFINE VARIABLE f-condition-name AS CHARACTER FORMAT "X(256)":U INITIAL "Техническое состояние:" 
+      VIEW-AS FILL-IN 
+-     SIZE 22.5 BY 1 NO-UNDO.
++     SIZE 22.6 BY 1 NO-UNDO.
+ 
+ DEFINE VARIABLE f-date-cert AS DATE FORMAT "99/99/99":U 
+      VIEW-AS FILL-IN 
+-     SIZE 13.5 BY 1 NO-UNDO.
++     SIZE 13.6 BY 1 NO-UNDO.
+ 
+ DEFINE VARIABLE f-date-end AS DATE FORMAT "99/99/99":U 
+      LABEL "Дата конца слива" 
+@@ -204,11 +220,11 @@ DEFINE VARIABLE f-date-income AS DATE FO
+ 
+ DEFINE VARIABLE f-date-income-2 AS CHARACTER FORMAT "X(256)":U INITIAL "Дата прибытия на АЗС:" 
+      VIEW-AS FILL-IN 
+-     SIZE 21.5 BY 1 NO-UNDO.
++     SIZE 21.6 BY 1 NO-UNDO.
+ 
+ DEFINE VARIABLE f-date-pasport AS DATE FORMAT "99/99/99":U 
+      VIEW-AS FILL-IN 
+-     SIZE 13.5 BY 1 NO-UNDO.
++     SIZE 13.6 BY 1 NO-UNDO.
+ 
+ DEFINE VARIABLE f-date-pour AS DATE FORMAT "99/99/99":U 
+      VIEW-AS FILL-IN 
+@@ -216,7 +232,7 @@ DEFINE VARIABLE f-date-pour AS DATE FORM
+ 
+ DEFINE VARIABLE f-date-pour-1 AS CHARACTER FORMAT "X(256)":U INITIAL "Дата налива:" 
+      VIEW-AS FILL-IN 
+-     SIZE 21.63 BY 1 NO-UNDO.
++     SIZE 21.6 BY 1 NO-UNDO.
+ 
+ DEFINE VARIABLE f-date-start AS DATE FORMAT "99/99/99":U 
+      LABEL "Дата начала слива" 
+@@ -225,7 +241,7 @@ DEFINE VARIABLE f-date-start AS DATE FOR
+ 
+ DEFINE VARIABLE f-doc AS CHARACTER FORMAT "X(256)":U INITIAL "Документы НЕ предоставлены" 
+      VIEW-AS FILL-IN 
+-     SIZE 36.5 BY 1 NO-UNDO.
++     SIZE 36.6 BY 1 NO-UNDO.
+ 
+ DEFINE VARIABLE f-fio AS CHARACTER FORMAT "X(256)":U INITIAL "?" 
+      VIEW-AS FILL-IN 
+@@ -254,7 +270,7 @@ DEFINE VARIABLE f-hour-pour AS INTEGER F
+ 
+ DEFINE VARIABLE f-hour-pour-2 AS CHARACTER FORMAT "X(256)":U INITIAL "Время налива:" 
+      VIEW-AS FILL-IN 
+-     SIZE 14.13 BY 1 NO-UNDO.
++     SIZE 14.2 BY 1 NO-UNDO.
+ 
+ DEFINE VARIABLE f-hour-start AS INTEGER FORMAT "99":U INITIAL 0 
+      LABEL "Время начала слива" 
+@@ -263,15 +279,15 @@ DEFINE VARIABLE f-hour-start AS INTEGER 
+ 
+ DEFINE VARIABLE f-insp AS CHARACTER FORMAT "X(256)":U INITIAL "Свидетельство о поверке:" 
+      VIEW-AS FILL-IN 
+-     SIZE 24.5 BY 1 NO-UNDO.
++     SIZE 24.6 BY 1 NO-UNDO.
+ 
+ DEFINE VARIABLE f-insp-2 AS CHARACTER FORMAT "X(256)":U INITIAL "Дата свидет. о поверке:" 
+      VIEW-AS FILL-IN 
+-     SIZE 24.5 BY 1 NO-UNDO.
++     SIZE 24.6 BY 1 NO-UNDO.
+ 
+ DEFINE VARIABLE f-insp-cert AS CHARACTER FORMAT "X(256)":U 
+      VIEW-AS FILL-IN 
+-     SIZE 13.5 BY 1 NO-UNDO.
++     SIZE 13.6 BY 1 NO-UNDO.
+ 
+ DEFINE VARIABLE f-item-doc AS CHARACTER FORMAT "X(256)":U 
+      VIEW-AS FILL-IN 
+@@ -307,7 +323,7 @@ DEFINE VARIABLE f-num-pasport AS CHARACT
+ 
+ DEFINE VARIABLE f-pasport AS CHARACTER FORMAT "X(256)":U INITIAL "Паспорт качества №, дата:" 
+      VIEW-AS FILL-IN 
+-     SIZE 25.5 BY 1 NO-UNDO.
++     SIZE 25.6 BY 1 NO-UNDO.
+ 
+ DEFINE VARIABLE f-pasport-num AS CHARACTER FORMAT "X(256)":U INITIAL " от" 
+      VIEW-AS FILL-IN 
+@@ -319,11 +335,11 @@ DEFINE VARIABLE f-ptbocode AS INTEGER FO
+ 
+ DEFINE VARIABLE f-ptbocode-1 AS CHARACTER FORMAT "X(256)":U INITIAL "Нефтебаза:" 
+      VIEW-AS FILL-IN 
+-     SIZE 16.5 BY 1 NO-UNDO.
++     SIZE 16.6 BY 1 NO-UNDO.
+ 
+ DEFINE VARIABLE f-ptboname AS CHARACTER FORMAT "X(256)":U 
+      VIEW-AS FILL-IN 
+-     SIZE 45.38 BY 1 NO-UNDO.
++     SIZE 45.4 BY 1 NO-UNDO.
+ 
+ DEFINE VARIABLE f-ptbotype AS CHARACTER FORMAT "X(3)":U 
+      VIEW-AS FILL-IN 
+@@ -331,99 +347,101 @@ DEFINE VARIABLE f-ptbotype AS CHARACTER 
+ 
+ DEFINE VARIABLE f-seals-1 AS CHARACTER FORMAT "X(256)":U INITIAL "Пломбы:" 
+      VIEW-AS FILL-IN 
+-     SIZE 7.5 BY 1 NO-UNDO.
++     SIZE 7.6 BY 1 NO-UNDO.
+ 
+ DEFINE VARIABLE f-seals-2 AS CHARACTER FORMAT "X(256)":U INITIAL "Состояние пломб:" 
+      VIEW-AS FILL-IN 
+-     SIZE 16.5 BY 1 NO-UNDO.
++     SIZE 16.6 BY 1 NO-UNDO.
+ 
+ DEFINE VARIABLE f-seals-condition AS CHARACTER FORMAT "X(256)":U 
+      VIEW-AS FILL-IN 
+-     SIZE 33.5 BY 1 NO-UNDO.
++     SIZE 33.6 BY 1 NO-UNDO.
+ 
+ DEFINE VARIABLE f-seals-condition-2 AS CHARACTER FORMAT "X(256)":U 
+      VIEW-AS FILL-IN 
+-     SIZE 24.5 BY 1 NO-UNDO.
++     SIZE 24.6 BY 1 NO-UNDO.
+ 
+ DEFINE VARIABLE b-doc AS LOGICAL INITIAL no 
+      LABEL "" 
+      VIEW-AS TOGGLE-BOX
+-     SIZE 2.5 BY .83 NO-UNDO.
++     SIZE 2.6 BY .81 NO-UNDO.
+ 
+ DEFINE VARIABLE t-clear AS LOGICAL INITIAL no 
+      LABEL "Произведена зачистка АЦ перед наполнением на ГНС" 
+      VIEW-AS TOGGLE-BOX
+-     SIZE 50 BY .83 NO-UNDO.
++     SIZE 50 BY .81 NO-UNDO.
+ 
+ 
+ /* ************************  Frame Definitions  *********************** */
+ 
+ DEFINE FRAME Dialog-Frame
+-     b-save AT ROW 1 COL 2.13
+-     b-quit AT ROW 1 COL 12.13
+-     b-help AT ROW 1 COL 73.63
+-     f-autoent AT ROW 2.46 COL 1.5 NO-LABEL WIDGET-ID 80
+-     f-autoent-obj-code AT ROW 2.46 COL 16.13 COLON-ALIGNED NO-LABEL
+-     f-autoent-obj-type AT ROW 2.46 COL 27.88 COLON-ALIGNED NO-LABEL
+-     f-autoent-obj-name AT ROW 2.46 COL 36 COLON-ALIGNED NO-LABEL
+-     b-clients AT ROW 2.58 COL 34.63
+-     f-car AT ROW 3.75 COL 1.5 NO-LABEL WIDGET-ID 82
+-     f-car-num AT ROW 3.75 COL 20 COLON-ALIGNED NO-LABEL
+-     b-auto-tank AT ROW 3.79 COL 36.75
+-     f-condition-name AT ROW 5 COL 1.5 NO-LABEL WIDGET-ID 84
+-     f-condition AT ROW 5 COL 82.51 RIGHT-ALIGNED NO-LABEL WIDGET-ID 30
+-     f-seals-1 AT ROW 6.25 COL 1.5 NO-LABEL WIDGET-ID 86
+-     f-seals-condition AT ROW 6.25 COL 7 COLON-ALIGNED NO-LABEL
+-     f-insp AT ROW 6.25 COL 45.5 NO-LABEL WIDGET-ID 88
+-     f-insp-cert AT ROW 6.25 COL 82.5 RIGHT-ALIGNED NO-LABEL WIDGET-ID 26
+-     f-seals-2 AT ROW 7.38 COL 1.5 NO-LABEL WIDGET-ID 90
++     b-save AT ROW 1 COL 2.2
++     b-quit AT ROW 1 COL 12.2
++     b-help AT ROW 1 COL 73.6
++     f-autoent AT ROW 2.48 COL 1.6 NO-LABEL WIDGET-ID 80
++     f-autoent-obj-code AT ROW 2.48 COL 16.2 COLON-ALIGNED NO-LABEL
++     f-autoent-obj-type AT ROW 2.48 COL 27.8 COLON-ALIGNED NO-LABEL
++     f-autoent-obj-name AT ROW 2.48 COL 36 COLON-ALIGNED NO-LABEL
++     b-clients AT ROW 2.57 COL 34.6
++     f-car AT ROW 3.76 COL 1.6 NO-LABEL WIDGET-ID 82
++     f-car-num AT ROW 3.76 COL 20 COLON-ALIGNED NO-LABEL
++     f-sealing AT ROW 3.76 COL 45 NO-LABEL
++     cb-sealing AT ROW 3.76 COL 80 RIGHT-ALIGNED NO-LABEL
++     b-auto-tank AT ROW 3.81 COL 36.8
++     f-condition-name AT ROW 5 COL 1.6 NO-LABEL WIDGET-ID 84
++     f-condition AT ROW 5 COL 82.6 RIGHT-ALIGNED NO-LABEL WIDGET-ID 30
++     f-seals-1 AT ROW 6.24 COL 1.6 NO-LABEL WIDGET-ID 86
++     f-seals-condition AT ROW 6.24 COL 7 COLON-ALIGNED NO-LABEL
++     f-insp AT ROW 6.24 COL 45.6 NO-LABEL WIDGET-ID 88
++     f-insp-cert AT ROW 6.24 COL 82.6 RIGHT-ALIGNED NO-LABEL WIDGET-ID 26
++     f-seals-2 AT ROW 7.38 COL 1.6 NO-LABEL WIDGET-ID 90
+      f-seals-condition-2 AT ROW 7.38 COL 16 COLON-ALIGNED NO-LABEL WIDGET-ID 44
+-     f-insp-2 AT ROW 7.46 COL 45.5 NO-LABEL WIDGET-ID 92
+-     f-date-cert AT ROW 7.46 COL 82.5 RIGHT-ALIGNED NO-LABEL WIDGET-ID 34
+-     f-pasport AT ROW 8.63 COL 32.63 NO-LABEL WIDGET-ID 156
+-     f-num-pasport AT ROW 8.63 COL 64.13 RIGHT-ALIGNED NO-LABEL WIDGET-ID 154
+-     f-pasport-num AT ROW 8.63 COL 65 NO-LABEL WIDGET-ID 152
+-     f-date-pasport AT ROW 8.63 COL 82.5 RIGHT-ALIGNED NO-LABEL WIDGET-ID 150
+-     f-fio-name AT ROW 9.75 COL 1.38 NO-LABEL WIDGET-ID 94
+-     f-fio AT ROW 9.75 COL 82.38 RIGHT-ALIGNED NO-LABEL
+-     f-ptbocode-1 AT ROW 11 COL 1.38 NO-LABEL WIDGET-ID 96
++     f-insp-2 AT ROW 7.48 COL 45.6 NO-LABEL WIDGET-ID 92
++     f-date-cert AT ROW 7.48 COL 82.6 RIGHT-ALIGNED NO-LABEL WIDGET-ID 34
++     f-pasport AT ROW 8.62 COL 32.6 NO-LABEL WIDGET-ID 156
++     f-num-pasport AT ROW 8.62 COL 64.2 RIGHT-ALIGNED NO-LABEL WIDGET-ID 154
++     f-pasport-num AT ROW 8.62 COL 65 NO-LABEL WIDGET-ID 152
++     f-date-pasport AT ROW 8.62 COL 82.6 RIGHT-ALIGNED NO-LABEL WIDGET-ID 150
++     f-fio-name AT ROW 9.76 COL 1.4 NO-LABEL WIDGET-ID 94
++     f-fio AT ROW 9.76 COL 82.4 RIGHT-ALIGNED NO-LABEL
++     f-ptbocode-1 AT ROW 11 COL 1.4 NO-LABEL WIDGET-ID 96
+      f-ptbocode AT ROW 11 COL 16 COLON-ALIGNED NO-LABEL
+-     f-ptbotype AT ROW 11 COL 27.75 COLON-ALIGNED NO-LABEL
+-     f-ptboname AT ROW 11 COL 82.38 RIGHT-ALIGNED NO-LABEL
+-     b-ptb AT ROW 11.08 COL 34.5
+-     f-date-pour-1 AT ROW 12.17 COL 1.38 NO-LABEL WIDGET-ID 98
+-     f-date-pour AT ROW 12.17 COL 20.88 COLON-ALIGNED NO-LABEL WIDGET-ID 40
+-     f-hour-pour-2 AT ROW 12.25 COL 38.13 NO-LABEL WIDGET-ID 100
+-     f-hour-pour AT ROW 12.25 COL 59.63 COLON-ALIGNED NO-LABEL WIDGET-ID 38
+-     f-min-pour AT ROW 12.25 COL 63.13 COLON-ALIGNED NO-LABEL WIDGET-ID 36
+-     f-date-income-2 AT ROW 13.5 COL 1.5 NO-LABEL WIDGET-ID 160
+-     f-date-income AT ROW 13.5 COL 21 COLON-ALIGNED NO-LABEL WIDGET-ID 158
+-     f-hour-income-2 AT ROW 13.5 COL 38.13 NO-LABEL WIDGET-ID 102
+-     f-hour-income AT ROW 13.5 COL 59.75 COLON-ALIGNED NO-LABEL
+-     f-min-income AT ROW 13.5 COL 67.13 RIGHT-ALIGNED NO-LABEL
+-     f-item-pour-2 AT ROW 15.5 COL 1.38 NO-LABEL WIDGET-ID 104
+-     f-item-pour AT ROW 16.63 COL 82.38 RIGHT-ALIGNED NO-LABEL
+-     f-acc-ship-2 AT ROW 17.79 COL 1.38 NO-LABEL WIDGET-ID 106
+-     f-acc-ship AT ROW 17.79 COL 38 NO-LABEL WIDGET-ID 42
+-     f-doc AT ROW 18 COL 4.38 NO-LABEL WIDGET-ID 108
+-     b-doc AT ROW 18.08 COL 1.88 WIDGET-ID 48
+-     t-clear AT ROW 18.08 COL 31.88 WIDGET-ID 148
+-     f-item-doc AT ROW 19.17 COL 82.38 RIGHT-ALIGNED NO-LABEL WIDGET-ID 46
+-     f-date-start AT ROW 20.33 COL 19.13 COLON-ALIGNED WIDGET-ID 60
+-     f-date-end AT ROW 20.33 COL 59.38 COLON-ALIGNED WIDGET-ID 58
+-     f-hour-start AT ROW 21.5 COL 19 COLON-ALIGNED WIDGET-ID 50
+-     f-min-start AT ROW 21.5 COL 23.5 COLON-ALIGNED NO-LABEL WIDGET-ID 54
++     f-ptbotype AT ROW 11 COL 27.8 COLON-ALIGNED NO-LABEL
++     f-ptboname AT ROW 11 COL 82.4 RIGHT-ALIGNED NO-LABEL
++     b-ptb AT ROW 11.1 COL 34.6
++     f-date-pour-1 AT ROW 12.19 COL 1.4 NO-LABEL WIDGET-ID 98
++     f-date-pour AT ROW 12.19 COL 20.8 COLON-ALIGNED NO-LABEL WIDGET-ID 40
++     f-hour-pour-2 AT ROW 12.24 COL 38.2 NO-LABEL WIDGET-ID 100
++     f-hour-pour AT ROW 12.24 COL 59.6 COLON-ALIGNED NO-LABEL WIDGET-ID 38
++     f-min-pour AT ROW 12.24 COL 63.2 COLON-ALIGNED NO-LABEL WIDGET-ID 36
++     f-date-income-2 AT ROW 13.52 COL 1.6 NO-LABEL WIDGET-ID 160
++     f-date-income AT ROW 13.52 COL 21 COLON-ALIGNED NO-LABEL WIDGET-ID 158
++     f-hour-income-2 AT ROW 13.52 COL 38.2 NO-LABEL WIDGET-ID 102
++     f-hour-income AT ROW 13.52 COL 59.8 COLON-ALIGNED NO-LABEL
++     f-min-income AT ROW 13.52 COL 67.2 RIGHT-ALIGNED NO-LABEL
++     f-item-pour-2 AT ROW 15.52 COL 1.4 NO-LABEL WIDGET-ID 104
++     f-item-pour AT ROW 16.62 COL 82.4 RIGHT-ALIGNED NO-LABEL
++     f-acc-ship-2 AT ROW 17.81 COL 1.4 NO-LABEL WIDGET-ID 106
++     f-acc-ship AT ROW 17.81 COL 38 NO-LABEL WIDGET-ID 42
++     f-doc AT ROW 18 COL 4.4 NO-LABEL WIDGET-ID 108
++     b-doc AT ROW 18.1 COL 1.8 WIDGET-ID 48
++     t-clear AT ROW 18.1 COL 31.8 WIDGET-ID 148
++     f-item-doc AT ROW 19.19 COL 82.4 RIGHT-ALIGNED NO-LABEL WIDGET-ID 46
++     f-date-start AT ROW 20.33 COL 19.6 COLON-ALIGNED WIDGET-ID 60
++     f-date-end AT ROW 20.33 COL 59.4 COLON-ALIGNED WIDGET-ID 58
++     f-hour-start AT ROW 21.52 COL 21 COLON-ALIGNED WIDGET-ID 50
+     WITH VIEW-AS DIALOG-BOX KEEP-TAB-ORDER 
+          SIDE-LABELS NO-UNDERLINE THREE-D  SCROLLABLE 
+          DEFAULT-BUTTON b-save CANCEL-BUTTON b-quit.
+ 
+ /* DEFINE FRAME statement is approaching 4K Bytes.  Breaking it up   */
+ DEFINE FRAME Dialog-Frame
+-     f-hour-end AT ROW 21.5 COL 59.5 COLON-ALIGNED WIDGET-ID 52
+-     f-min-end AT ROW 21.5 COL 64.13 COLON-ALIGNED NO-LABEL WIDGET-ID 56
++     f-min-start AT ROW 21.52 COL 23.6 COLON-ALIGNED NO-LABEL WIDGET-ID 54
++     f-hour-end AT ROW 21.52 COL 59.6 COLON-ALIGNED WIDGET-ID 52
++     f-min-end AT ROW 21.52 COL 64.2 COLON-ALIGNED NO-LABEL WIDGET-ID 56
+      "Примечание к нефтебазе" VIEW-AS TEXT
+-          SIZE 25.5 BY 1 AT ROW 15.5 COL 1
+-     SPACE(57.12) SKIP(7.03)
++          SIZE 25.6 BY 1 AT ROW 15.52 COL 1
++     SPACE(57.03) SKIP(7.01)
+     WITH VIEW-AS DIALOG-BOX KEEP-TAB-ORDER 
+          SIDE-LABELS NO-UNDERLINE THREE-D  SCROLLABLE 
+          TITLE "Дополнительная информация по приемке топлива"
+@@ -570,6 +588,7 @@ DO:
+                               f-date-start
+                               f-date-end
+                               t-clear
++                              cb-sealing
+   .
+  
+   if input frame {&frame-name} f-hour-income <> ?
+@@ -675,6 +694,16 @@ DO:
+     .
+   end.
+   
++  if cb-sealing:visible in frame {&frame-name}
++  then do :
++    if cb-sealing = -1
++    then do :
++      message "Не заполнено обязательное поле «Пломбировка:»!" view-as alert-box .
++      apply "entry" to cb-sealing in frame {&frame-name} .
++      return no-apply .
++    end .
++  end .
++  
+   run save-attr.
+ 
+ 
+@@ -774,9 +803,63 @@ DO:
+ /*    then do:                                                                                                                         */
+     assign
+       f-autoent-obj-type = auto-tank.firm-type
+-      f-autoent-obj-code = integer (auto-tank.firm-code).
+-      f-autoent-obj-type:screen-value = f-autoent-obj-type.
+-      f-autoent-obj-code:screen-value = string (f-autoent-obj-code).
++      f-autoent-obj-code = integer (auto-tank.firm-code)
++      f-autoent-obj-type:screen-value = f-autoent-obj-type
++      f-autoent-obj-code:screen-value = string (f-autoent-obj-code)
++    .
++    if f-autoent-obj-code <> v-autoent-obj-code
++    then do :
++      assign enable-cb-sealing = false .
++      for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = buf_trn-doc.cli-type
++                                           and buf_clients-attr.obj-code  = buf_trn-doc.cli-code
++                                           and buf_clients-attr.attr-code = {&attr-own-supp}
++                                           :
++        if lookup(buf_clients-attr.attr-value, 'true,yes':u) > 0 then enable-cb-sealing = true .
++      end .
++      for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = buf_trn-doc.cli-type
++                                           and buf_clients-attr.obj-code  = buf_trn-doc.cli-code
++                                           and buf_clients-attr.attr-code = {&attr-owner-code}
++                                           :
++        if (buf_clients-attr.attr-value = {&cmp} + string(buf_trn-doc.host-code)) then enable-cb-sealing = true .
++      end .
++      if input frame {&frame-name} f-ptbocode > 0
++      then do :
++        for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = input frame {&frame-name} f-ptbotype
++                                             and buf_clients-attr.obj-code  = input frame {&frame-name} f-ptbocode
++                                             and buf_clients-attr.attr-code = {&attr-owner-code}
++                                             :
++          if (buf_clients-attr.attr-value = {&cmp} + string(buf_trn-doc.host-code)) then enable-cb-sealing = true .
++        end .
++      end .
++      if f-autoent-obj-code > 0
++      then do :
++        for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = f-autoent-obj-type
++                                             and buf_clients-attr.obj-code  = f-autoent-obj-code
++                                             and buf_clients-attr.attr-code = {&attr-have-SEP}
++                                             :
++          if lookup(buf_clients-attr.attr-value, 'true,yes':u) > 0 then enable-cb-sealing = true .
++        end .
++      end .
++      if v-is-scanqr-trn then enable-cb-sealing = true .
++      if enable-cb-sealing
++      then do :
++        assign
++          cb-sealing = -1
++          f-sealing:fgcolor  = 12
++          cb-sealing:fgcolor  = 12
++        .
++        display f-sealing cb-sealing with frame {&frame-name} .
++        if buf_trn-doc.status_ = {&wayb}
++        and buf_trn-doc.flag_ = false
++        then do :
++          enable cb-sealing with frame {&frame-name} .
++        end .
++      end .
++      else do :
++        assign cb-sealing = -1 .
++        hide f-sealing cb-sealing in frame {&frame-name} .
++      end .
++    end .
+     assign
+       v-autoent-obj-type = f-autoent-obj-type
+       v-autoent-obj-code =  f-autoent-obj-code
+@@ -784,8 +867,10 @@ DO:
+ /*    end.*/
+           
+     display f-car-num with frame {&frame-name}.
++    
++    apply "leave" to f-car-num in frame {&frame-name}.
+   end.
+-  apply "leave" to f-car-num in frame {&frame-name}.
++  
+ END.
+ 
+ /* _UIB-CODE-BLOCK-END */
+@@ -815,6 +900,59 @@ if ref-list <> "" then do:
+   disp ub.clients.obj-code @ f-autoent-obj-code
+        ub.clients.obj-type @ f-autoent-obj-type
+        ub.clients.obj-name @ f-autoent-obj-name with frame {&frame-name}.
++  if f-autoent-obj-code:screen-value <> string(v-autoent-obj-code)
++  then do :
++    assign enable-cb-sealing = false .
++    for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = buf_trn-doc.cli-type
++                                         and buf_clients-attr.obj-code  = buf_trn-doc.cli-code
++                                         and buf_clients-attr.attr-code = {&attr-own-supp}
++                                         :
++      if lookup(buf_clients-attr.attr-value, 'true,yes':u) > 0 then enable-cb-sealing = true .
++    end .
++    for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = buf_trn-doc.cli-type
++                                         and buf_clients-attr.obj-code  = buf_trn-doc.cli-code
++                                         and buf_clients-attr.attr-code = {&attr-owner-code}
++                                         :
++      if (buf_clients-attr.attr-value = {&cmp} + string(buf_trn-doc.host-code)) then enable-cb-sealing = true .
++    end .
++    if input frame {&frame-name} f-ptbocode > 0
++    then do :
++      for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = input frame {&frame-name} f-ptbotype
++                                           and buf_clients-attr.obj-code  = input frame {&frame-name} f-ptbocode
++                                           and buf_clients-attr.attr-code = {&attr-owner-code}
++                                           :
++        if (buf_clients-attr.attr-value = {&cmp} + string(buf_trn-doc.host-code)) then enable-cb-sealing = true .
++      end .
++    end .
++    if ub.clients.obj-code > 0
++    then do :
++      for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = ub.clients.obj-type
++                                           and buf_clients-attr.obj-code  = ub.clients.obj-code
++                                           and buf_clients-attr.attr-code = {&attr-have-SEP}
++                                           :
++        if lookup(buf_clients-attr.attr-value, 'true,yes':u) > 0 then enable-cb-sealing = true .
++      end .
++    end .
++    if v-is-scanqr-trn then enable-cb-sealing = true .
++    if enable-cb-sealing
++    then do :
++      assign
++        cb-sealing = -1
++        f-sealing:fgcolor  = 12
++        cb-sealing:fgcolor  = 12
++      .
++      display f-sealing cb-sealing with frame {&frame-name} .
++      if buf_trn-doc.status_ = {&wayb}
++      and buf_trn-doc.flag_ = false
++      then do :
++        enable cb-sealing with frame {&frame-name} .
++      end .
++    end .
++    else do :
++      assign cb-sealing = -1 .
++      hide f-sealing cb-sealing in frame {&frame-name} .
++    end .
++  end .
+   assign
+     v-autoent-obj-type = ub.clients.obj-type
+     v-autoent-obj-code = ub.clients.obj-code
+@@ -852,6 +990,7 @@ ON CHOOSE OF b-ptb IN FRAME Dialog-Frame
+ DO:
+ define variable ref-list as character no-undo.
+ define variable ref-rec  as recid     no-undo.
++define variable v-old-code as integer no-undo .
+ 
+   find first ub.trn-doc no-lock where ub.trn-doc.doc-code = p-doc-code no-error.
+      run ref/cli-all.w (parparentproc
+@@ -865,10 +1004,63 @@ define variable ref-rec  as recid     no
+                   , output ref-list) .
+   if ref-list <> "" then do:
+     ref-rec = integer (ref-list).
++    v-old-code = integer(f-ptbocode:screen-value) no-error .
+     find ub.clients where recid ( ub.clients ) = ref-rec no-lock.
+     disp ub.clients.obj-code @ f-ptbocode
+          ub.clients.obj-type @ f-ptbotype
+          ub.clients.obj-name @ f-ptboname with frame {&frame-name}.
++    if ub.clients.obj-code <> v-old-code
++    then do :
++      assign enable-cb-sealing = false .
++      for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = buf_trn-doc.cli-type
++                                           and buf_clients-attr.obj-code  = buf_trn-doc.cli-code
++                                           and buf_clients-attr.attr-code = {&attr-own-supp}
++                                           :
++        if lookup(buf_clients-attr.attr-value, 'true,yes':u) > 0 then enable-cb-sealing = true .
++      end .
++      for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = buf_trn-doc.cli-type
++                                           and buf_clients-attr.obj-code  = buf_trn-doc.cli-code
++                                           and buf_clients-attr.attr-code = {&attr-owner-code}
++                                           :
++        if (buf_clients-attr.attr-value = {&cmp} + string(buf_trn-doc.host-code)) then enable-cb-sealing = true .
++      end .
++      if ub.clients.obj-code > 0
++      then do :
++        for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = ub.clients.obj-type
++                                             and buf_clients-attr.obj-code  = ub.clients.obj-code
++                                             and buf_clients-attr.attr-code = {&attr-owner-code}
++                                             :
++          if (buf_clients-attr.attr-value = {&cmp} + string(buf_trn-doc.host-code)) then enable-cb-sealing = true .
++        end .
++      end .
++      if input frame {&frame-name} f-autoent-obj-code > 0
++      then do :
++        for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = input frame {&frame-name} f-autoent-obj-type
++                                             and buf_clients-attr.obj-code  = input frame {&frame-name} f-autoent-obj-code
++                                             and buf_clients-attr.attr-code = {&attr-have-SEP}
++                                             :
++          if lookup(buf_clients-attr.attr-value, 'true,yes':u) > 0 then enable-cb-sealing = true .
++        end .
++      end .
++      if enable-cb-sealing
++      then do :
++        assign
++          cb-sealing = -1
++          f-sealing:fgcolor  = 12
++          cb-sealing:fgcolor  = 12
++        .
++        display f-sealing cb-sealing with frame {&frame-name} .
++        if buf_trn-doc.status_ = {&wayb}
++        and buf_trn-doc.flag_ = false
++        then do :
++          enable cb-sealing with frame {&frame-name} .
++        end .
++      end .
++      else do :
++        assign cb-sealing = -1 .
++        hide f-sealing cb-sealing in frame {&frame-name} .
++      end .
++    end .
+   end.
+ END.
+ 
+@@ -1340,7 +1532,6 @@ DO ON ERROR   UNDO MAIN-BLOCK, LEAVE MAI
+    ON END-KEY UNDO MAIN-BLOCK, LEAVE MAIN-BLOCK:
+   
+   define buffer buf_doc-attr for ub.doc-attr.
+-  
+ 
+   
+   { str/tdat-val.i
+@@ -1362,19 +1553,18 @@ DO ON ERROR   UNDO MAIN-BLOCK, LEAVE MAI
+      no-error
+    }
+    
+-   if varvalue = "yes" then do:
+-     assign
+-       v-is-lgas = true.
+-
+-   end.
++  if varvalue = "yes" then do:
++    assign
++      v-is-lgas = true.
++  end.
+    
+-   { str/tdat-val.i
++  { str/tdat-val.i
+      p-doc-code
+      {&trdcattr-is-lgas-corr}
+      varvalue
+      vartype
+      no-error
+-   }
++  }
+ 
+   if varvalue = "yes" then do:
+      assign
+@@ -1382,6 +1572,21 @@ DO ON ERROR   UNDO MAIN-BLOCK, LEAVE MAI
+ 
+   end.
+   
++  { str/tdat-val.i
++     p-doc-code
++     {&trdcattr-is-scanqr-trn}
++     varvalue
++     vartype
++     no-error
++  }
++   
++  if varvalue = "yes" then do:
++     assign
++       v-is-scanqr-trn = true.
++
++  end.
++  
++  
+   for each tt-upd-attr-fuel no-lock:
+ 
+     find first buf_doc-attr no-lock
+@@ -1587,6 +1792,10 @@ DO ON ERROR   UNDO MAIN-BLOCK, LEAVE MAI
+             assign
+               f-date-end = date(buf_doc-attr.attr-value).
+         end.
++        when {&trdcattr-sealed} then do:
++            assign
++              cb-sealing =  integer(buf_doc-attr.attr-value) no-error.
++        end. 
+       end case.
+     end.
+ 
+@@ -1738,7 +1947,61 @@ DO ON ERROR   UNDO MAIN-BLOCK, LEAVE MAI
+ /*    f-hour-income:fgcolor = 12*/
+ /*  .                           */
+ 
+-find first buf_trn-doc no-lock where buf_trn-doc.doc-code = p-doc-code .
++  hide f-sealing cb-sealing in frame {&frame-name} .
++  
++  find first buf_trn-doc no-lock where buf_trn-doc.doc-code = p-doc-code .
++  
++  for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = buf_trn-doc.cli-type
++                                       and buf_clients-attr.obj-code  = buf_trn-doc.cli-code
++                                       and buf_clients-attr.attr-code = {&attr-own-supp}
++                                       :
++    if lookup(buf_clients-attr.attr-value, 'true,yes':u) > 0 then enable-cb-sealing = true .
++  end .
++  for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = buf_trn-doc.cli-type
++                                       and buf_clients-attr.obj-code  = buf_trn-doc.cli-code
++                                       and buf_clients-attr.attr-code = {&attr-owner-code}
++                                       :
++    if (buf_clients-attr.attr-value = {&cmp} + string(buf_trn-doc.host-code)) then enable-cb-sealing = true .
++  end .
++  if f-ptbocode > 0
++  then do :
++    for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = f-ptbotype
++                                         and buf_clients-attr.obj-code  = f-ptbocode
++                                         and buf_clients-attr.attr-code = {&attr-owner-code}
++                                         :
++      if (buf_clients-attr.attr-value = {&cmp} + string(buf_trn-doc.host-code)) then enable-cb-sealing = true .
++    end .
++  end .
++  if f-autoent-obj-code > 0
++  then do :
++    for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = f-autoent-obj-type
++                                         and buf_clients-attr.obj-code  = f-autoent-obj-code
++                                         and buf_clients-attr.attr-code = {&attr-have-SEP}
++                                         :
++      if lookup(buf_clients-attr.attr-value, 'true,yes':u) > 0 then enable-cb-sealing = true .
++    end .
++  end .
++  
++  if v-is-scanqr-trn then enable-cb-sealing = true .
++  
++  if enable-cb-sealing
++  then do :
++    assign
++      f-sealing:fgcolor  = 12
++      cb-sealing:fgcolor  = 12
++    .
++    display f-sealing cb-sealing with frame {&frame-name} .
++    if p-mode = {&update}
++    or p-mode = {&add-def}
++    then do :
++      if buf_trn-doc.status_ = {&wayb}
++      and buf_trn-doc.flag_ = false
++      then do :
++        enable cb-sealing with frame {&frame-name} .
++      end .
++    end .
++  end .
++  
+   v-dop-info = "".
+         { gbl/getsect.i run buf_trn-doc.obj-type buf_trn-doc.obj-code {&attr-petrol} }
+         for each thbjattr_thbj-attr :
+@@ -1906,6 +2169,58 @@ PROCEDURE disp-f-ptboname :
+       display ? @ f-ptboname with frame {&frame-name}.
+       apply "choose" to b-ptb in frame {&frame-name}.
+   end.
++  
++  assign enable-cb-sealing = false .
++  for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = buf_trn-doc.cli-type
++                                       and buf_clients-attr.obj-code  = buf_trn-doc.cli-code
++                                       and buf_clients-attr.attr-code = {&attr-own-supp}
++                                       :
++    if lookup(buf_clients-attr.attr-value, 'true,yes':u) > 0 then enable-cb-sealing = true .
++  end .
++  for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = buf_trn-doc.cli-type
++                                       and buf_clients-attr.obj-code  = buf_trn-doc.cli-code
++                                       and buf_clients-attr.attr-code = {&attr-owner-code}
++                                       :
++    if (buf_clients-attr.attr-value = {&cmp} + string(buf_trn-doc.host-code)) then enable-cb-sealing = true .
++  end .
++  if available ub.clients
++  and ub.clients.obj-code > 0
++  then do :
++    for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = ub.clients.obj-type
++                                         and buf_clients-attr.obj-code  = ub.clients.obj-code
++                                         and buf_clients-attr.attr-code = {&attr-owner-code}
++                                         :
++      if (buf_clients-attr.attr-value = {&cmp} + string(buf_trn-doc.host-code)) then enable-cb-sealing = true .
++    end .
++  end .
++  if input frame {&frame-name} f-autoent-obj-code > 0
++  then do :
++    for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = input frame {&frame-name} f-autoent-obj-type
++                                         and buf_clients-attr.obj-code  = input frame {&frame-name} f-autoent-obj-code
++                                         and buf_clients-attr.attr-code = {&attr-have-SEP}
++                                         :
++      if lookup(buf_clients-attr.attr-value, 'true,yes':u) > 0 then enable-cb-sealing = true .
++    end .
++  end .
++  if v-is-scanqr-trn then enable-cb-sealing = true .
++  if enable-cb-sealing
++  then do :
++    assign
++      cb-sealing = -1
++      f-sealing:fgcolor  = 12
++      cb-sealing:fgcolor  = 12
++    .
++    display f-sealing cb-sealing with frame {&frame-name} .
++    if buf_trn-doc.status_ = {&wayb}
++    and buf_trn-doc.flag_ = false
++    then do :
++      enable cb-sealing with frame {&frame-name} .
++    end .
++  end .
++  else do :
++    assign cb-sealing = -1 .
++    hide f-sealing cb-sealing in frame {&frame-name} .
++  end .
+ END PROCEDURE.
+ 
+ /* _UIB-CODE-BLOCK-END */
+@@ -1932,6 +2247,58 @@ PROCEDURE disp-obj-name :
+       display ? @ f-autoent-obj-name with frame {&frame-name}.
+ /*      apply "choose" to b-clients in frame {&frame-name}.*/
+   end.
++  
++  assign enable-cb-sealing = false .
++  for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = buf_trn-doc.cli-type
++                                       and buf_clients-attr.obj-code  = buf_trn-doc.cli-code
++                                       and buf_clients-attr.attr-code = {&attr-own-supp}
++                                       :
++    if lookup(buf_clients-attr.attr-value, 'true,yes':u) > 0 then enable-cb-sealing = true .
++  end .
++  for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = buf_trn-doc.cli-type
++                                       and buf_clients-attr.obj-code  = buf_trn-doc.cli-code
++                                       and buf_clients-attr.attr-code = {&attr-owner-code}
++                                       :
++    if (buf_clients-attr.attr-value = {&cmp} + string(buf_trn-doc.host-code)) then enable-cb-sealing = true .
++  end .
++  if input frame {&frame-name} f-ptbocode > 0
++  then do :
++    for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = input frame {&frame-name} f-ptbotype
++                                         and buf_clients-attr.obj-code  = input frame {&frame-name} f-ptbocode
++                                         and buf_clients-attr.attr-code = {&attr-owner-code}
++                                         :
++      if (buf_clients-attr.attr-value = {&cmp} + string(buf_trn-doc.host-code)) then enable-cb-sealing = true .
++    end .
++  end .
++  if available ub.clients
++  and ub.clients.obj-code > 0
++  then do :
++    for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = ub.clients.obj-type
++                                         and buf_clients-attr.obj-code  = ub.clients.obj-code
++                                         and buf_clients-attr.attr-code = {&attr-have-SEP}
++                                         :
++      if lookup(buf_clients-attr.attr-value, 'true,yes':u) > 0 then enable-cb-sealing = true .
++    end .
++  end .
++  if v-is-scanqr-trn then enable-cb-sealing = true .
++  if enable-cb-sealing
++  then do :
++    assign
++      cb-sealing = -1
++      f-sealing:fgcolor  = 12
++      cb-sealing:fgcolor  = 12
++    .
++    display f-sealing cb-sealing with frame {&frame-name} .
++    if buf_trn-doc.status_ = {&wayb}
++    and buf_trn-doc.flag_ = false
++    then do :
++      enable cb-sealing with frame {&frame-name} .
++    end .
++  end .
++  else do :
++    assign cb-sealing = -1 .
++    hide f-sealing cb-sealing in frame {&frame-name} .
++  end .
+ 
+ END PROCEDURE.
+ 
+@@ -1961,12 +2328,12 @@ PROCEDURE enable_UI :
+           f-min-start f-hour-end f-min-end 
+       WITH FRAME Dialog-Frame.
+   ENABLE b-save b-quit b-help f-autoent-obj-code f-autoent-obj-type b-clients 
+-         f-car-num b-auto-tank f-condition f-seals-condition f-insp-cert 
+-         f-seals-condition-2 f-date-cert f-num-pasport f-date-pasport f-fio 
+-         f-ptbocode f-ptbotype b-ptb f-date-pour f-hour-pour f-min-pour 
+-         f-date-income f-hour-income f-min-income f-item-pour f-acc-ship b-doc 
+-         t-clear f-date-start f-date-end f-hour-start f-min-start f-hour-end 
+-         f-min-end 
++         f-car-num b-auto-tank f-condition f-seals-condition 
++         f-insp-cert f-seals-condition-2 f-date-cert f-num-pasport 
++         f-date-pasport f-fio f-ptbocode f-ptbotype b-ptb f-date-pour 
++         f-hour-pour f-min-pour f-date-income f-hour-income f-min-income 
++         f-item-pour f-acc-ship b-doc t-clear f-date-start f-date-end 
++         f-hour-start f-min-start f-hour-end f-min-end 
+       WITH FRAME Dialog-Frame.
+   VIEW FRAME Dialog-Frame.
+   {&OPEN-BROWSERS-IN-QUERY-Dialog-Frame}
+@@ -2090,6 +2457,10 @@ PROCEDURE save-attr :
+             assign
+               v-attr-value = string(f-date-end) when string(f-date-end) <> "".
+         end.
++        when {&trdcattr-sealed} then do:
++            assign
++              v-attr-value = string(cb-sealing) when cb-sealing <> -1.
++        end.
+ /*          infoSectionTotal:GetInfoSectionProp(v-page-current):TimeStart = f-hour-start * 3600 + f-min-start * 60*/
+ /*        infoSectionTotal:GetInfoSectionProp(v-page-current):TimeEnd = f-hour-end   * 3600 + f-min-end   * 60*/
+         otherwise
+diff --git a/str/in-line.w b/str/in-line.w
+--- a/str/in-line.w
++++ b/str/in-line.w
+@@ -3905,6 +3905,7 @@ define buffer bf_doc-line-ist   for ub.d
+ define buffer bf_clients        for ub.clients.
+ define buffer bf_doc-line       for ub.doc-line.
+ define buffer buf_country       for ub.country.
++define buffer buf_doc-attr      for ub.doc-attr.
+ 
+ do on error undo, return error return-value :
+ 
+@@ -4440,14 +4441,21 @@ if varrvs-place = yes then do:
+       infoSectionsTotal:in-line-handle = this-procedure
+     .
+     
+-    find first sep_auto-tank-attr no-lock where sep_auto-tank-attr.auto-num = varcar-num
+-                                            and sep_auto-tank-attr.attr-code = "auto-sep"
+-                                            no-error.
+-    if available sep_auto-tank-attr
+-    and logical(sep_auto-tank-attr.attr-value)
++    find first buf_doc-attr no-lock where buf_doc-attr.doc-code = t-doc.doc-code and buf_doc-attr.attr-code = {&trdcattr-sealed} no-error .
++    if available buf_doc-attr
++    and buf_doc-attr.attr-value = "1"
+     then do :
+       infoSectionsTotal:IsSGDKK = yes .
+     end .
++    
++/*    find first sep_auto-tank-attr no-lock where sep_auto-tank-attr.auto-num = varcar-num */
++/*                                            and sep_auto-tank-attr.attr-code = "auto-sep"*/
++/*                                            no-error.                                    */
++/*    if available sep_auto-tank-attr                                                      */
++/*    and logical(sep_auto-tank-attr.attr-value)                                           */
++/*    then do :                                                                            */
++/*      infoSectionsTotal:IsSGDKK = yes .                                                  */
++/*    end .                                                                                */
+ 
+     if parline-mode <> {&add-def} then do:
+       infoSectionsTotal:GetDBAllAttr().
+diff --git a/str/in-ptrl.i b/str/in-ptrl.i
+--- a/str/in-ptrl.i
++++ b/str/in-ptrl.i
+@@ -3252,6 +3252,7 @@ define variable vss-include-info{&vssseq
+         { gbl/getcntxt.i get }
+ 
+         define buffer buf_trn-doc    for ub.trn-doc .
++        define buffer buf_doc-attr   for ub.doc-attr .
+         define buffer buf_doc-line   for ub.doc-line .
+         define buffer buf_doc-line-attr for ub.doc-line-attr .
+         define buffer buf_goods      for ub.goods .
+@@ -3304,11 +3305,14 @@ define variable vss-include-info{&vssseq
+         
+         if trn-type = {&is-fuel}
+         then do :  
+-          find first sep_auto-tank-attr no-lock where sep_auto-tank-attr.auto-num = varcar-num
+-                                                  and sep_auto-tank-attr.attr-code = "auto-sep"
+-                                                  no-error.
+-          if available sep_auto-tank-attr
+-          and logical(sep_auto-tank-attr.attr-value)
++/*          find first sep_auto-tank-attr no-lock where sep_auto-tank-attr.auto-num = varcar-num */
++/*                                                  and sep_auto-tank-attr.attr-code = "auto-sep"*/
++/*                                                  no-error.                                    */
++/*          if available sep_auto-tank-attr                                                      */
++/*          and logical(sep_auto-tank-attr.attr-value)                                           */
++          find first buf_doc-attr no-lock where buf_doc-attr.doc-code = buf_trn-doc.doc-code and buf_doc-attr.attr-code = {&trdcattr-sealed} no-error .
++          if available buf_doc-attr
++          and buf_doc-attr.attr-value = "1"
+           then do : /* АЦ с СГДКК */
+             
+           end .
+diff --git a/str/trdcalib.i b/str/trdcalib.i
+--- a/str/trdcalib.i
++++ b/str/trdcalib.i
+@@ -1180,6 +1180,19 @@ define variable vss-include-info{&vssseq
+ &glob news-trdcattr-fio-driver true
+ &glob sort-trdcattr-fio-driver 190
+ 
++/* АЦ опломбирована СЭП */
++&glob fillin_width-trdcattr-sealed 3
++&glob fillin_height-trdcattr-sealed 1
++&glob type-trdcattr-sealed {&type-int}
++&glob format-trdcattr-sealed "-9"
++&glob label-trdcattr-sealed "Опломбирован СЭП"
++&glob tooltip-trdcattr-sealed "Опломбирован СЭП"
++&glob user-can-edit-trdcattr-sealed true
++&glob output-display-trdcattr-sealed true
++&glob other-trdcattr-sealed '':u
++&glob news-trdcattr-sealed true
++&glob sort-trdcattr-sealed 200
++
+ /* Паспорт качества дата */
+ &glob fillin_width-trdcattr-date-income 11
+ &glob fillin_height-trdcattr-date-income 1
+@@ -1429,6 +1442,19 @@ define variable vss-include-info{&vssseq
+ &glob news-trdcattr-is-auto-trn true
+ &glob sort-trdcattr-is-auto-trn 100
+ 
++/* Признак накладной НП созданной сканированием QR-кода DataMatrix */
++&glob fillin_width-trdcattr-is-scanqr-trn 3
++&glob fillin_height-trdcattr-is-scanqr-trn 1
++&glob type-trdcattr-is-scanqr-trn {&type-log}
++&glob format-trdcattr-is-scanqr-trn "yes/no"
++&glob label-trdcattr-is-scanqr-trn "Признак накладной НП созданной сканированием QR-кода DataMatrix"
++&glob tooltip-trdcattr-is-scanqr-trn " Признак накладной НП созданной сканированием QR-кода DataMatrix"
++&glob user-can-edit-trdcattr-is-scanqr-trn false
++&glob output-display-trdcattr-is-scanqr-trn false
++&glob other-trdcattr-is-scanqr-trn '':u
++&glob news-trdcattr-is-scanqr-trn true
++&glob sort-trdcattr-is-scanqr-trn 100
++
+ /* СУГ */
+ &glob fillin_width-trdcattr-is-lgas 3
+ &glob fillin_height-trdcattr-is-lgas 1
+diff --git a/str/trdcalib.p b/str/trdcalib.p
+--- a/str/trdcalib.p
++++ b/str/trdcalib.p
+@@ -557,6 +557,8 @@ procedure trdcalib_tdat-cod :
+       {&attr-temp-full-code}
+       &scop attr-code trdcattr-fio-driver
+       {&attr-temp-full-code}
++      &scop attr-code trdcattr-sealed
++      {&attr-temp-full-code}
+       &scop attr-code trdcattr-time-income
+       {&attr-temp-full-code}
+       &scop attr-code trdcattr-time-pour
+@@ -643,6 +645,8 @@ procedure trdcalib_tdat-cod :
+       {&attr-temp-full-code}
+       &scop attr-code trdcattr-num-pasport
+       {&attr-temp-full-code}
++      &scop attr-code trdcattr-is-scanqr-trn
++      {&attr-temp-full-code}
+       /* сюда добавлять новые параметры */
+       otherwise do:
+         undo, return error substitute( 'неизвестный атрибут документа "&1"', p-code ).
+diff --git a/str/trn-stat.p b/str/trn-stat.p
+--- a/str/trn-stat.p
++++ b/str/trn-stat.p
+@@ -111,6 +111,7 @@ define buffer buf_cash-pay-attr for ub.c
+ define buffer bf_utd            for ub.utd.
+ define buffer bf_utd-l          for ub.utd-lines.
+ define buffer sep_auto-tank-attr  for ub.auto-tank-attr.
++define buffer buf_clients-attr  for ub.clients-attr.
+ 
+ define variable inv-shipvalue                as   logical                     no-undo.
+ define variable par-gen-mrgn-ie              as   character                   no-undo.
+@@ -707,22 +708,29 @@ then do:
+     infoSectionsTotal = new InfoSectionsTotal().
+     infoSectionsTotal:Initialization(bf_trn-doc.doc-code, bf_doc-line-attr.gds-code).
+ /*    infoSectionsTotal:GetDBAllAttr().*/
+-    { str/tdat-val.i
+-      bf_trn-doc.doc-code
+-      {&trdcattr-car-num}
+-      v-attr-value
+-      v-attr-type
+-    }
+-    if v-attr-value > ""
++/*    { str/tdat-val.i                                                                        */
++/*      bf_trn-doc.doc-code                                                                   */
++/*      {&trdcattr-car-num}                                                                   */
++/*      v-attr-value                                                                          */
++/*      v-attr-type                                                                           */
++/*    }                                                                                       */
++/*    if v-attr-value > ""                                                                    */
++/*    then do :                                                                               */
++/*      find first sep_auto-tank-attr no-lock where sep_auto-tank-attr.auto-num = v-attr-value*/
++/*                                              and sep_auto-tank-attr.attr-code = "auto-sep" */
++/*                                              no-error.                                     */
++/*      if available sep_auto-tank-attr                                                       */
++/*      and logical(sep_auto-tank-attr.attr-value)                                            */
++/*      then do :                                                                             */
++/*        infoSectionsTotal:IsSGDKK = yes .                                                   */
++/*      end .                                                                                 */
++/*    end .                                                                                   */
++    
++    find first buf_doc-attr no-lock where buf_doc-attr.doc-code = bf_trn-doc.doc-code and buf_doc-attr.attr-code = {&trdcattr-sealed} no-error .
++    if available buf_doc-attr
++    and buf_doc-attr.attr-value = "1"
+     then do :
+-      find first sep_auto-tank-attr no-lock where sep_auto-tank-attr.auto-num = v-attr-value
+-                                              and sep_auto-tank-attr.attr-code = "auto-sep"
+-                                              no-error.
+-      if available sep_auto-tank-attr
+-      and logical(sep_auto-tank-attr.attr-value)
+-      then do :
+-        infoSectionsTotal:IsSGDKK = yes .
+-      end .
++      infoSectionsTotal:IsSGDKK = yes .
+     end .
+ /*    infoSectionsTotal:CalculateTotal().*/
+     find first bf_goods no-lock where bf_goods.gds-code = bf_doc-line-attr.gds-code. 
+@@ -1152,6 +1160,71 @@ run waitfram-show in this-procedure ( input substitute( "Переход документа в статус &1&2."
+         v-error-attr = v-error-attr + ", " + entry (ii, v-attr-dop-info).
+       end.
+     end.
++    
++    define variable enable-cb-sealing as logical no-undo .
++    define variable v-nb-obj-type as character no-undo .
++    define variable v-nb-obj-code as integer no-undo .
++    define variable v-ae-obj-type as character no-undo .
++    define variable v-ae-obj-code as integer no-undo .
++    
++    assign enable-cb-sealing = false .
++    for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = bf_trn-doc.cli-type
++                                         and buf_clients-attr.obj-code  = bf_trn-doc.cli-code
++                                         and buf_clients-attr.attr-code = {&attr-own-supp}
++                                         :
++      if lookup(buf_clients-attr.attr-value, 'true,yes':u) > 0 then enable-cb-sealing = true .
++    end .
++    for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = bf_trn-doc.cli-type
++                                         and buf_clients-attr.obj-code  = bf_trn-doc.cli-code
++                                         and buf_clients-attr.attr-code = {&attr-owner-code}
++                                         :
++      if (buf_clients-attr.attr-value = {&cmp} + string(bf_trn-doc.host-code)) then enable-cb-sealing = true .
++    end .
++    
++    for first buf_doc-attr where buf_doc-attr.doc-code  = bf_trn-doc.doc-code
++                             and buf_doc-attr.attr-code = {&trdcattr-ptbobj}
++                             :
++      assign
++        v-nb-obj-type = entry(1, buf_doc-attr.attr-value, ";")
++        v-nb-obj-code = integer(entry(2, buf_doc-attr.attr-value, ";"))
++      no-error .                         
++    end .
++    for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = v-nb-obj-type
++                                         and buf_clients-attr.obj-code  = v-nb-obj-code
++                                         and buf_clients-attr.attr-code = {&attr-owner-code}
++                                         :
++      if (buf_clients-attr.attr-value = {&cmp} + string(bf_trn-doc.host-code)) then enable-cb-sealing = true .
++    end .
++    
++    for first buf_doc-attr where buf_doc-attr.doc-code  = bf_trn-doc.doc-code
++                             and buf_doc-attr.attr-code = {&trdcattr-autoent}
++                             :
++      assign
++        v-ae-obj-type = entry(1, buf_doc-attr.attr-value, ";")
++        v-ae-obj-code = integer(entry(2, buf_doc-attr.attr-value, ";"))
++      no-error .                         
++    end .
++    for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = v-ae-obj-type
++                                         and buf_clients-attr.obj-code  = v-ae-obj-code
++                                         and buf_clients-attr.attr-code = {&attr-have-SEP}
++                                         :
++      if lookup(buf_clients-attr.attr-value, 'true,yes':u) > 0 then enable-cb-sealing = true .
++    end .
++    if enable-cb-sealing
++    then do :
++      find first buf_doc-attr no-lock 
++        where buf_doc-attr.doc-code = pardoc-code 
++          and buf_doc-attr.attr-code = {&trdcattr-sealed} no-error. 
++      
++      if not available (buf_doc-attr) or (available (buf_doc-attr) and 
++        (buf_doc-attr.attr-value = "" 
++        or buf_doc-attr.attr-value = "" or buf_doc-attr.attr-value = ? or buf_doc-attr.attr-value = "?" or buf_doc-attr.attr-value = "-1")
++        )
++      then do:
++        v-error-attr = v-error-attr + ", sealing".
++      end.
++    end .
++    
+     if v-error-attr <> "" then do:
+       run waitfram-hide in this-procedure no-error.
+       undo, return error "Не все обязательные поля по доп. информации накладной заполнены".
+diff --git a/str/trnscanqr.w b/str/trnscanqr.w
+--- a/str/trnscanqr.w
++++ b/str/trnscanqr.w
+@@ -840,7 +840,30 @@ procedure save_update :
+     }
+   end. 
+   
+-  v-tmp-char =  (xmlhndlerObj:vbf:buffer-field("pl-num"):buffer-value) no-error.
++  v-ok = valid-handle(xmlhndlerObj:vbf:buffer-field("pl-num")) no-error .
++  if v-ok
++  then do :
++    v-tmp-char =  (xmlhndlerObj:vbf:buffer-field("pl-num"):buffer-value) no-error.
++    if error-status:error
++    then do :
++      v-mark:screen-value = "" .
++      v-scan-str = "".
++      v-mark = "".
++      message error-status:get-message (1) view-as alert-box.
++      v-sts:screen-value in frame {&frame-name} = "ожидание сканирования" .
++      undo, return error .
++    end .
++    else do:
++      { str/tdat-wrt.i
++          t_doc.doc-code
++          {&trdcattr-seals-condition}
++          v-tmp-char
++          no-error
++      }
++    end. 
++  end .
++  
++  v-tmp-int = xmlhndlerObj:vbf:buffer-field("sealed"):buffer-value no-error.
+   if error-status:error
+   then do :
+     v-mark:screen-value = "" .
+@@ -850,14 +873,14 @@ procedure save_update :
+     v-sts:screen-value in frame {&frame-name} = "ожидание сканирования" .
+     undo, return error .
+   end .
+-  else do:
++  else do :
+     { str/tdat-wrt.i
+         t_doc.doc-code
+-        {&trdcattr-seals-condition}
+-        v-tmp-char
++        {&trdcattr-sealed}
++        string(v-tmp-int)
+         no-error
+     }
+-  end. 
++  end .
+   
+   v-ok = xmlhndlerObj:GetFirst("scs") no-error.
+   if not v-ok
+@@ -1022,6 +1045,13 @@ procedure save_update :
+   
+   delete object infoSecsObj no-error .
+   
++  { str/tdat-wrt.i
++      t_doc.doc-code
++      {&trdcattr-is-scanqr-trn}
++      string(yes)
++      no-error
++  }
++  
+   apply "choose" to b-exit in frame {&frame-name}.
+   
+ 
+@@ -1150,6 +1180,12 @@ procedure checkJson :
+     return .
+   end .
+   
++  if index(p-str, '"sealed"') = 0
++  then do :
++    p-ok = no .
++    return .
++  end .
++  
+   if index(p-str, '"scs"') = 0
+   then do :
+     p-ok = no .

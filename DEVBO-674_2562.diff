@@ -1,0 +1,22 @@
+# HG changeset patch
+# User BelovaMM
+# Parent  cc4eec53e1d60f754bd39ce484e55bfba62c992c
+refs #DEVBO-674 ТС ПИоТ ГИС МТ. Отладка. #BTS-2562
+
+BTS-2562 Не происходит удаление архивов лог файлов ТС ПИоТ через 3 месяца
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-674
+https://msk-exp-jira.expertek.local/browse/BTS-2562
+
+diff --git a/utl/gismt-arh.p b/utl/gismt-arh.p
+--- a/utl/gismt-arh.p
++++ b/utl/gismt-arh.p
+@@ -177,7 +177,7 @@ if vPathFolder <> ? then do:
+           vFolderCash = substitute("&1/&2",vFolder,for-cash-desk.cash-num).
+           vPathFolder = objExists(vFolderCash,"D").   
+        if vPathFolder <> ? then       
+-          run DelOldArch (vPathFolder,"GisMTreq-").           
++          run DelOldArch (vPathFolder,"GisMTreq").           
+     end.         
+ end.    
+ else run write-to-log( substitute("Не найден каталог архивов проверки марок &1", vFolder) ).

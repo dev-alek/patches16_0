@@ -1,0 +1,46 @@
+# HG changeset patch
+# User SSlivenko
+# Parent  8bdba5add722fd5ac40bbf6096f9173b5f5295cb
+refs #DEVBO-352 Автозаполнение линий чека по заблокированным маркам
+
+http://exp-jira.expertek.local:8080/browse/DEVBO-352
+
+diff --git a/str/superchk.w b/str/superchk.w
+--- a/str/superchk.w
++++ b/str/superchk.w
+@@ -603,7 +603,7 @@ DEFINE VARIABLE Cb-chk-type AS CHARACTER
+      VIEW-AS COMBO-BOX INNER-LINES 10
+      LIST-ITEMS "Item 1" 
+      DROP-DOWN-LIST
+-     SIZE 27 BY 1
++     SIZE 20 BY 1
+      BGCOLOR 15  NO-UNDO.
+ 
+ DEFINE VARIABLE corr-date AS DATE FORMAT "99/99/9999":U 
+@@ -850,7 +850,7 @@ DEFINE FRAME Dialog-Frame
+      B-print AT ROW 1 COL 93.75
+      B-hist AT ROW 1 COL 96.75
+      B-help AT ROW 1 COL 99.75
+-     tt-chk-doc.src-tot-doc AT ROW 1.04 COL 75.63 COLON-ALIGNED WIDGET-ID 2
++     tt-chk-doc.src-tot-doc AT ROW 1.04 COL 68.63 COLON-ALIGNED WIDGET-ID 2
+           LABEL "Брутто-чек" FORMAT "->>>,>>>,>>9.99"
+           VIEW-AS FILL-IN 
+           SIZE 11.88 BY 1 TOOLTIP "Брутто-чек"
+@@ -6631,7 +6631,7 @@ FIND LAST lng_chk-gds No-LOCK WHERE
+         else do :
+           delete tt-chk-gds .
+           ii = ii + 1 .
+-          undo _ii, next _ii.
++          return error .
+         end .
+       end .
+       
+@@ -7261,7 +7261,7 @@ PROCEDURE add-blocked-marks :
+     if error-status:error then do:
+       undo _ii, next _ii.
+     end.
+-    if shop.doc-prt and gds-prt.node-name <> {&empty-scale} then do:
++    if get-chkc_context.doc-prt and gds-prt.node-name <> {&empty-scale} then do:
+         run setprts in this-procedure ( input recid(loc_goods), input recid(loc_bar-code), input loc_goods.prt-root, input yes) no-error.
+         if error-status:error then do:
+           undo _ii, next _ii.

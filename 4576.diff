@@ -1,0 +1,74 @@
+# HG changeset patch
+# User EShklyar
+# Parent  4d85fe382a1aa816dc198ab4502082eb7708a198
+refs #4576 Новая схема работы через EDI
+
+http://exp-rm/redmine/issues/4576
+
+diff -r 4d85fe382a1a -r cb7632d8a4cd cus/exiteedi.w
+--- a/cus/exiteedi.w	Tue Jun 05 12:03:10 2018 +0300
++++ b/cus/exiteedi.w	Tue Jun 05 12:10:34 2018 +0300
+@@ -232,7 +232,7 @@
+ X_ext-system.esys-name COLUMN-LABEL "Внешняя система" FORMAT "X(30)"
+ X_ext-system.esys-db-num-exp COLUMN-LABEL "Для!БД" FORMAT ">>>>9"
+ get-gln( INPUT X_ext-classif.uniq-key-rec) COLUMN-LABEL "GLN" FORMAT "X(13)"
+-get-schema(X_ext-classif.charkey_one) COLUMN-LABEL "Схема!работы" FORMAT "X(14)"
++get-schema(X_ext-classif.charkey_one) COLUMN-LABEL "Схема!работы" FORMAT "X(16)"
+ X_clients.obj-type COLUMN-LABEL "Тип!кл." FORMAT "X(3)"
+ X_clients.obj-code COLUMN-LABEL "Код!кл." FORMAT ">>>>>>>>9"
+ /* _UIB-CODE-BLOCK-END */
+@@ -887,8 +887,8 @@
+       run gbl/d-list.w (
+                   INPUT "b-sel":U
+                   ,INPUT "Выберите схему работы"
+-                  ,INPUT {&exite-edi-without-ordrsp} + {&comma-char} + {&exite-edi-with-ordrsp}
+-                  ,INPUT {&exite-edi-without-ordrsp-full} + {&comma-char} + {&exite-edi-with-ordrsp-full}
++                  ,INPUT {&exite-edi-without-ordrsp} + {&comma-char} + {&exite-edi-with-ordrsp} + {&comma-char} + {&exite-edi-only-nakl}
++                  ,INPUT {&exite-edi-without-ordrsp-full} + {&comma-char} + {&exite-edi-with-ordrsp-full} + {&comma-char} + {&exite-edi-only-nakl-full}
+                   ,INPUT {&comma-char}
+                   ,INPUT "":U
+                   ,output v-ordrsp-option).
+@@ -969,8 +969,8 @@
+   run gbl/d-list.w (
+               INPUT "b-sel":U
+               ,INPUT "Выберите схему работы"
+-              ,INPUT {&exite-edi-without-ordrsp} + {&comma-char} + {&exite-edi-with-ordrsp}
+-              ,INPUT {&exite-edi-without-ordrsp-full} + {&comma-char} + {&exite-edi-with-ordrsp-full}
++              ,INPUT {&exite-edi-without-ordrsp} + {&comma-char} + {&exite-edi-with-ordrsp} + {&comma-char} + {&exite-edi-only-nakl}
++              ,INPUT {&exite-edi-without-ordrsp-full} + {&comma-char} + {&exite-edi-with-ordrsp-full} + {&comma-char} + {&exite-edi-only-nakl-full}
+               ,INPUT {&comma-char}
+               ,INPUT X_ext-classif.charkey_one
+               ,output v-ordrsp-option).
+@@ -1251,7 +1251,7 @@
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION get-gln Dialog-Frame
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION get-gln Dialog-Frame 
+ FUNCTION get-gln RETURNS CHARACTER
+   ( INPUT p-cli-uniq-key-rec AS CHARACTER ) :
+ DEFINE BUFFER buf_ext-classif FOR ub.ext-classif.
+@@ -1277,6 +1277,9 @@
+   WHEN {&exite-edi-with-ordrsp} THEN DO:
+     RETURN {&exite-edi-with-ordrsp-full}.
+   END.
++  WHEN {&exite-edi-only-nakl} THEN DO:
++    RETURN {&exite-edi-only-nakl-full}.
++  END.
+   OTHERWISE DO:
+     RETURN "".   /* Function return value. */
+   END.
+diff -r 4d85fe382a1a -r cb7632d8a4cd ref/extclas1.p
+--- a/ref/extclas1.p	Tue Jun 05 12:03:10 2018 +0300
++++ b/ref/extclas1.p	Tue Jun 05 12:10:34 2018 +0300
+@@ -294,7 +294,9 @@
+           or v-obj-type = {&prs} )
+           and  not (p-charkey_one = {&exite-edi-without-ordrsp}
+                   or
+-                  p-charkey_one = {&exite-edi-with-ordrsp} ) then do:
++                  p-charkey_one = {&exite-edi-with-ordrsp}
++                  or
++                  p-charkey_one = {&exite-edi-only-nakl} ) then do:
+             v-mess = substitute("Неверное значение Параметра работы через EDI (&1)"
+                                , p-charkey_one
+                                , 0).

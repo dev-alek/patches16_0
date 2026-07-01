@@ -1,0 +1,22 @@
+# HG changeset patch
+# User VSpiridonov
+# Parent  16b59861faf4ef7aadd5bafd520b4d5161b834a2
+refs #DEVBO-514  ќшибка при повторной выгрузке смен в 1— ERP. TH16.0 BTS-1848
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-514
+https://msk-exp-jira.expertek.local/browse/BTS-1848
+
+diff --git a/ibs/th/bge/1crn/subjects/check.cls b/ibs/th/bge/1crn/subjects/check.cls
+--- a/ibs/th/bge/1crn/subjects/check.cls
++++ b/ibs/th/bge/1crn/subjects/check.cls
+@@ -1307,8 +1307,8 @@ END. /*   if BufHandle:table = "chk-doc"
+                and buf_chk-gds-attr.attr-code = "CSPromoSum"
+             no-error.
+       v-sum-promo = if avail buf_chk-gds-attr then dec(buf_chk-gds-attr.attr-value) else 0 no-error. 
+-        
+-      insw:write-data-element (  "discntValueAbs",  left-trim(string((buf_chk-gds-pay.discnt + (v-sum-promo / buf_chk-gds-pay.eff-doc-qnty)), "->>>>>>>>>9.9<<<<<<<<<"))  ) . /* јбсолютное значение скидки Ц сумма („исло) */
++         /*      if buf_chk-gds-pay.eff-doc-qnty =  0 then  message {&tag-section6} view-as alert-box.     */
++      if buf_chk-gds-pay.eff-doc-qnty <> 0 then insw:write-data-element (  "discntValueAbs",  left-trim(string((buf_chk-gds-pay.discnt + (v-sum-promo / buf_chk-gds-pay.eff-doc-qnty)), "->>>>>>>>>9.9<<<<<<<<<"))  ) . /* в chk-pays-r об€зательность 0-1  јбсолютное значение скидки Ц сумма („исло) */
+       
+       insw:end-element ({&tag-item6}) .
+       if last-of(buf_chk-gds-pay.doc-code) then insw:end-element ({&tag-section6}) .

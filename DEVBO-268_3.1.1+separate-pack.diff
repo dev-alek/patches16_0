@@ -1,0 +1,550 @@
+# HG changeset patch
+# User SSlivenko
+# Parent  5526bb3ea04fe277214688112c488deafd90298f
+refs #DEVBO-268 !!!РАЗРАБОТКА. Помарачная инвентаризация
+п. 3.1.1. Требования к документу «Сбор марок»
+Параметр Максимальное количество марок в пакете «Сбор марок». Разделение выгрузки одного документа на несколько пакетов.
+https://msk-exp-jira.expertek.local/browse/DEVBO-268
+
+diff --git a/adm/shattrat.w b/adm/shattrat.w
+--- a/adm/shattrat.w
++++ b/adm/shattrat.w
+@@ -75,9 +75,9 @@ define variable v-to-create     as logic
+ 
+ /* Standard List Definitions                                            */
+ &Scoped-Define ENABLED-OBJECTS B-exit b-quit B-Help f-email-list ~
+-f-user-list maxColMarks 
++f-user-list maxColMarks MaxMarkCollectQntySend 
+ &Scoped-Define DISPLAYED-OBJECTS f-email-list f-user-list maxColMarks ~
+-label-email-list label-user-list 
++MaxMarkCollectQntySend label-email-list label-user-list 
+ 
+ /* Custom List Definitions                                              */
+ /* List-1,List-2,List-3,List-4,List-5,List-6                            */
+@@ -117,7 +117,7 @@ DEFINE VARIABLE f-user-list AS CHARACTER
+ 
+ DEFINE VARIABLE label-email-list AS CHARACTER FORMAT "X(256)":U INITIAL "Список email для отправки сообщений" 
+       VIEW-AS TEXT 
+-     SIZE 47.5 BY .67 NO-UNDO.
++     SIZE 47.6 BY .67 NO-UNDO.
+ 
+ DEFINE VARIABLE label-user-list AS CHARACTER FORMAT "X(256)":U INITIAL "Список логинов исключенных из проверки подключений при обновление системы" 
+       VIEW-AS TEXT 
+@@ -128,6 +128,11 @@ DEFINE VARIABLE maxColMarks AS INTEGER F
+      VIEW-AS FILL-IN 
+      SIZE 14 BY 1 NO-UNDO.
+ 
++DEFINE VARIABLE MaxMarkCollectQntySend AS INTEGER FORMAT ">>>>,>>>,>>9":U INITIAL 1000 
++     LABEL "Максимальное количество марок в пакете «Сбор марок»" 
++     VIEW-AS FILL-IN 
++     SIZE 14 BY 1 NO-UNDO.
++
+ 
+ /* ************************  Frame Definitions  *********************** */
+ 
+@@ -135,12 +140,13 @@ DEFINE FRAME shattrat
+      B-exit AT ROW 1 COL 1 WIDGET-ID 2
+      b-quit AT ROW 1 COL 11 WIDGET-ID 6
+      B-Help AT ROW 1 COL 50 WIDGET-ID 4
+-     f-email-list AT ROW 3.74 COL 4.5 NO-LABEL WIDGET-ID 22
+-     f-user-list AT ROW 10.74 COL 2.5 COLON-ALIGNED NO-LABEL WIDGET-ID 22
+-     maxColMarks AT ROW 11.89 COL 43.38 COLON-ALIGNED WIDGET-ID 30
+-     label-email-list AT ROW 2.74 COL 2.5 NO-LABEL WIDGET-ID 28
+-     label-user-list AT ROW 9.74 COL 2.5 NO-LABEL WIDGET-ID 28
+-     SPACE(0.99) SKIP(3.54)
++     f-email-list AT ROW 3.76 COL 4.6 NO-LABEL WIDGET-ID 22
++     f-user-list AT ROW 10.76 COL 2.6 COLON-ALIGNED NO-LABEL WIDGET-ID 22
++     maxColMarks AT ROW 11.91 COL 47.2 COLON-ALIGNED WIDGET-ID 30
++     MaxMarkCollectQntySend AT ROW 13.05 COL 59.2 COLON-ALIGNED WIDGET-ID 32
++     label-email-list AT ROW 2.76 COL 2.6 NO-LABEL WIDGET-ID 28
++     label-user-list AT ROW 9.76 COL 2.6 NO-LABEL WIDGET-ID 28
++     SPACE(1.39) SKIP(4.04)
+     WITH VIEW-AS DIALOG-BOX KEEP-TAB-ORDER 
+          SIDE-LABELS NO-UNDERLINE THREE-D  SCROLLABLE 
+          TITLE "Настройки АВТОПРОЦЕССОВ" WIDGET-ID 100.
+@@ -367,9 +373,11 @@ PROCEDURE enable_UI :
+                These statements here are based on the "Other 
+                Settings" section of the widget Property Sheets.
+ ------------------------------------------------------------------------------*/
+-  DISPLAY f-email-list f-user-list maxColMarks label-email-list label-user-list 
++  DISPLAY f-email-list f-user-list maxColMarks MaxMarkCollectQntySend 
++          label-email-list label-user-list 
+       WITH FRAME shattrat.
+   ENABLE B-exit b-quit B-Help f-email-list f-user-list maxColMarks 
++         MaxMarkCollectQntySend 
+       WITH FRAME shattrat.
+   {&OPEN-BROWSERS-IN-QUERY-shattrat}
+ END PROCEDURE.
+@@ -452,6 +460,12 @@ on error undo, return error return-value
+           maxColMarks  :private-data in frame {&frame-name} = "recid=" + string(recid(thbjattr_thbj-attr))
+         .
+       end.      
++      when {&attr-auto-task_MaxMarkCollectQntySend} then do:
++        assign
++          MaxMarkCollectQntySend  = thbjattr_thbj-attr.property-value-integer
++          MaxMarkCollectQntySend  :private-data in frame {&frame-name} = "recid=" + string(recid(thbjattr_thbj-attr))
++        .
++      end. 
+ 
+     end case.
+ 
+diff --git a/adm/shattri.p b/adm/shattri.p
+--- a/adm/shattri.p
++++ b/adm/shattri.p
+@@ -2839,25 +2839,33 @@ end.
+ &scop ptype character
+ &scop prop-value '':U
+ &scop prop-code entry(v-ii, v-prop-code)
+-
+       do v-ii = 1 to num-entries(v-prop-code):
+         {&create-thbj-attr}.
+       end.
+-       v-prop-code = "{&bef-attr-auto-task_user-list}".
++      
++      v-prop-code = "{&bef-attr-auto-task_user-list}".
+ &scop ptype character
+ &scop prop-value 'nws':U
+ &scop prop-code entry(v-ii, v-prop-code)
+-
+       do v-ii = 1 to num-entries(v-prop-code):
+         {&create-thbj-attr}.
+       end.
+-            v-prop-code = "{&bef-attr-auto-task_maxColMarks}".
++      
++      v-prop-code = "{&bef-attr-auto-task_maxColMarks}".
+ &scop ptype integer
+ &scop prop-value 1000
+ &scop prop-code  entry(v-ii,v-prop-code)
+       do v-ii = 1 to num-entries(v-prop-code):
+         {&create-thbj-attr}.
+-      end.            
++      end.   
++      
++      v-prop-code = "{&bef-attr-auto-task_MaxMarkCollectQntySend}".
++&scop ptype integer
++&scop prop-value 1000
++&scop prop-code  entry(v-ii,v-prop-code)
++      do v-ii = 1 to num-entries(v-prop-code):
++        {&create-thbj-attr}.
++      end.          
+     end.
+     when {&attr-wnd-size} then do:
+       v-prop-code = "{&bef-attr-wnd-size_max},{&bef-attr-wnd-size_store}"  .
+diff --git a/bge/cre-xpck.p b/bge/cre-xpck.p
+--- a/bge/cre-xpck.p
++++ b/bge/cre-xpck.p
+@@ -501,6 +501,13 @@ on endkey undo, return error substitute(
+         assign
+           ub.esys-route.esr-last-pack = v-pack-num
+         .
++        if ub.esys-route.esr-status = -1
++        then do :
++          assign
++            ub.esys-route.esr-status = 0
++            ub.esys-route.esr-num-dump = 1
++          .
++        end .
+         if buf_esys-route.esr-action = {&nwsdochs_action_command-bush}
+         and buf_ext-system.delivery-method <> integer({&esys-dm-erp-1C-RN}) 
+         then do:
+diff --git a/cmp/str-glbt.p b/cmp/str-glbt.p
+--- a/cmp/str-glbt.p
++++ b/cmp/str-glbt.p
+@@ -505,7 +505,7 @@ attr-bge-export
+ { cmp/cr-prep.i 1 attr-auto-task             auto-task             " " auto-task }
+ 
+ { cmp/cr-prepc.i 1 prop-list-attr-auto-task
+-"send-msg-to-email,user-list,maxColMarks"
++"send-msg-to-email,user-list,maxColMarks,MaxMarkCollectQntySend"
+ attr-auto-task
+ }
+ 
+diff --git a/gbl/attr-lib.p b/gbl/attr-lib.p
+--- a/gbl/attr-lib.p
++++ b/gbl/attr-lib.p
+@@ -4687,8 +4687,8 @@ 1-ый лист сменного отчета (топливо)~
+ &scop user-can-edit-attr-auto-task   true
+ &scop output-display-attr-auto-task  true
+ &scop other-attr-auto-task 'spr-ext=adm\shattrat.w/init-ext=adm\shattri.p':U
+-&scop prop-type-list-attr-auto-task 'character,character,integer':U
+-&scop prop-label-list-attr-auto-task 'email на который отсылать сообщения,список пользователей для авто процессов,Максимальное количество очищаемых марок'
++&scop prop-type-list-attr-auto-task 'character,character,integer,integer':U
++&scop prop-label-list-attr-auto-task 'email на который отсылать сообщения,список пользователей для авто процессов,Максимальное количество очищаемых марок,Максимальное количество марок в пакете «Сбор марок»'
+ &scop global-attr-auto-task true
+ &scop host-attr-auto-task false
+ &scop shop-attr-auto-task false
+diff --git a/ibs/th/bge/1crn/export/send1cerp.cls b/ibs/th/bge/1crn/export/send1cerp.cls
+--- a/ibs/th/bge/1crn/export/send1cerp.cls
++++ b/ibs/th/bge/1crn/export/send1cerp.cls
+@@ -176,6 +176,10 @@ class ibs.th.bge.1crn.export.send1cerp
+          ObjSrv:RegObj(this-object,subOBj).
+          define variable v-custom-pack-name   as character   no-undo .
+          define variable v-dump-ord-int64     as int64       no-undo .
++         define variable vdb-num as integer no-undo.
++         define variable vdoc-id as integer no-undo.
++         define variable vEDocType as integer no-undo .
++         define variable isMarkCollect as logical no-undo init no .
+    
+          define buffer buf_sys-ctrl   for sys-ctrl.
+          define buffer buf_ext-system  for ub.ext-system.  
+@@ -199,6 +203,14 @@ class ibs.th.bge.1crn.export.send1cerp
+             setError ( "Нет внешней системы с методом доставки 1C-RN." ) .
+             return.
+          end.  
++            
++         if processType = "edi-doc"
++         then do :
++           vdb-num = int(oldbh:buffer-field( "db-num":U  ):buffer-value).
++           vdoc-id = int(oldbh:buffer-field( "doc-id":U  ):buffer-value).
++           vEDocType = int(oldbh:buffer-field( "EDocType":U  ):buffer-value).
++           isMarkCollect = (vEDocType = objSrv:Env:Utd:EDocType:Mark_Collect:KeyIntDB) .
++         end .
+    
+          subObj:setContext(parparentproc, 
+                       parent-handle, 
+@@ -229,6 +241,18 @@ class ibs.th.bge.1crn.export.send1cerp
+          then do:
+             undo _main, retry .
+          end.
++         
++         if isMarkCollect
++         then do :
++           find first utd-attr no-lock where utd-attr.db-num = vdb-num
++                                         and utd-attr.doc-id = vdoc-id
++                                         and utd-attr.attr-code = "last-exp-mark"
++                                         no-error .
++           if available utd-attr
++           then do :
++             v-custom-pack-name = "individual" .
++           end .
++         end .
+     
+          if  context_set-custom-esys-pck-name(  input v-esys-cmd-proc-handle, input v-esys-cmd-code, input v-custom-pack-name) = false  
+          then 
+@@ -241,6 +265,56 @@ class ibs.th.bge.1crn.export.send1cerp
+          if v-dump-ord-int64 = 0 
+          then 
+             undo _main, retry .
++         
++         if isMarkCollect
++         then do :
++           find first utd-attr no-lock where utd-attr.db-num = vdb-num
++                                         and utd-attr.doc-id = vdoc-id
++                                         and utd-attr.attr-code = "last-exp-mark"
++                                         no-error .
++           if available utd-attr
++           then do :
++             repeat :
++               if  context_begin-esys-command( input v-esys-id-list, input-output v-esys-cmd-proc-handle, output v-esys-cmd-code) = false  
++               then do:
++                  undo _main, retry .
++               end.
++               expObj:GetContent(subObj) no-error.
++               if error-status:error
++               then do:
++                  undo _main, retry .
++               end.
++               if ExpData:esys-add-dump-data ( input expObj:Data, 
++                                               input v-esys-cmd-proc-handle, 
++                                               input v-esys-cmd-code, 
++                                              ('+update' + {&delim-par} + expObj:InitSecTag)) = false  
++               then do:
++                  undo _main, retry .
++               end.
++          
++               if  context_set-custom-esys-pck-name(  input v-esys-cmd-proc-handle, input v-esys-cmd-code, input v-custom-pack-name) = false  
++               then 
++                  undo _main, retry .
++          
++               v-dump-ord-int64 = context_send-esys-command( input v-esys-id-list
++                                                           , input v-esys-cmd-proc-handle
++                                                           , input v-esys-cmd-code
++                                                           , input ibs.th.gbl.gbl-var:g#userid).
++               if v-dump-ord-int64 = 0 
++               then 
++                  undo _main, retry .
++               
++               find first utd-attr no-lock where utd-attr.db-num = vdb-num
++                                             and utd-attr.doc-id = vdoc-id
++                                             and utd-attr.attr-code = "last-exp-mark"
++                                             no-error .
++               if not available utd-attr
++               then
++                 leave .
++             end .
++           end .
++         end . /* isMarkCollect */
++         
+          ExpData:Route-data_clear-data ( ) .
+   
+          finally:
+diff --git a/ibs/th/bge/1crn/subjects/exp-edi-doc.cls b/ibs/th/bge/1crn/subjects/exp-edi-doc.cls
+--- a/ibs/th/bge/1crn/subjects/exp-edi-doc.cls
++++ b/ibs/th/bge/1crn/subjects/exp-edi-doc.cls
+@@ -75,9 +75,39 @@ method override public void CrContentToS
+    define variable sertif as character no-undo .
+    define variable is-initial-set as logical no-undo .
+    define variable VText as character no-undo.
++   define variable v-exp-marks-qnty as integer no-undo init 0 .
++   define variable v-max-marks-qnty as integer no-undo init 1000 .
++   define variable v-last-utd-line  as integer no-undo init 0 .
++   define variable v-last-mark      as character no-undo init "" .
+    
+-    vdb-num = int(oldbh:buffer-field( "db-num":U  ):buffer-value ).
+-    vdoc-id = int(oldbh:buffer-field( "doc-id":U  ):buffer-value).
++   define variable v-tth             as handle    no-undo .
++   define variable v-value-character as character no-undo .
++   define variable v-value-date      as date      no-undo .
++   define variable v-value-decimal   as decimal   no-undo .
++   define variable v-value-integer   as integer   no-undo .
++   define variable v-value-logical   as logical   no-undo .
++   define variable v-param-type      as character no-undo .
++   delete object v-tth no-error.
++
++   run adm/shattri.p
++      ( input "get":U
++       ,input  "":U
++       ,input  0
++       ,input  {&attr-auto-task}
++       ,input  {&attr-auto-task_MaxMarkCollectQntySend}
++       ,output v-value-character
++       ,output v-value-date
++       ,output v-value-decimal
++       ,output v-value-integer
++       ,output v-value-logical
++       ,output v-param-type
++       ,input-output table-handle v-tth
++      ) no-error .
++   v-max-marks-qnty = if not error-status :error then v-value-integer else 1000.
++   delete object v-tth no-error.
++   
++   vdb-num = int(oldbh:buffer-field( "db-num":U  ):buffer-value).
++   vdoc-id = int(oldbh:buffer-field( "doc-id":U  ):buffer-value).
+    find first utd where utd.db-num eq vdb-num
+                     and utd.doc-id eq vdoc-id
+    no-lock no-error.
+@@ -91,6 +121,17 @@ method override public void CrContentToS
+       then do :
+         find first utd-attr no-lock where utd-attr.db-num = utd.db-num
+                                       and utd-attr.doc-id = utd.doc-id
++                                      and utd-attr.attr-code = "last-exp-mark"
++                                      no-error .
++        if available utd-attr
++        then do :
++          assign
++            v-last-utd-line = integer(entry(1, utd-attr.attr-value, {&delim-par}))
++            v-last-mark = entry(2, utd-attr.attr-value, {&delim-par})
++          no-error .
++        end .
++        find first utd-attr no-lock where utd-attr.db-num = utd.db-num
++                                      and utd-attr.doc-id = utd.doc-id
+                                       and utd-attr.attr-code = "is-initial-set"
+                                       no-error .
+         if available utd-attr
+@@ -141,20 +182,20 @@ method override public void CrContentToS
+          insw:start-element ({&tag-section1}) .
+          for each utd-lines  where utd-lines.db-num = utd.db-num
+                               and utd-lines.doc-id = utd.doc-id 
+-         no-lock:
++         no-lock break by utd-lines.LineNum :
+             if utd.EDocType = objSrv:Env:Utd:EDocType:Mark_Collect:KeyIntDB
+-            and not is-initial-set
+             then do :
+-              find first utd-marking-lines no-lock where utd-marking-lines.db-num  = utd-lines.db-num
+-                                                     and utd-marking-lines.doc-id  = utd-lines.doc-id
+-                                                     and utd-marking-lines.LineNum = utd-lines.LineNum
+-                                                     and utd-marking-lines.doc-level = 1 
+-                                                     and (utd-marking-lines.sts = 0
+-                                                       or utd-marking-lines.site = "only-send")
+-                                                     no-error .
+-              if not available utd-marking-lines
++              if utd-lines.LineNum < v-last-utd-line then next .
++              if not is-initial-set
+               then do :
+-                next .
++                find first utd-marking-lines no-lock where utd-marking-lines.db-num  = utd-lines.db-num
++                                                       and utd-marking-lines.doc-id  = utd-lines.doc-id
++                                                       and utd-marking-lines.LineNum = utd-lines.LineNum
++                                                       and utd-marking-lines.doc-level = 1 
++                                                       and (utd-marking-lines.sts = 0
++                                                         or utd-marking-lines.site = "only-send")
++                                                       no-error .
++                if not available utd-marking-lines then next .
+               end .
+             end .
+             insw:start-element ({&tag-item1}) .
+@@ -201,7 +242,16 @@ method override public void CrContentToS
+                                                and utd-marking-lines.doc-level = 1 
+                                                and (utd-marking-lines.sts = 0
+                                                  or utd-marking-lines.site = "only-send")
+-                 no-lock:
++                 no-lock break by utd-marking-lines.mark :
++                    if v-last-mark > ""
++                    and v-last-mark <> "new"
++                    then do :
++                      if utd-marking-lines.mark = v-last-mark
++                      then do :
++                        assign v-last-mark = "" .
++                      end .
++                      next .
++                    end .
+                     insw:start-element ({&tag-item2}) .
+                     insw:write-data-element (  "mark-code",        repSpecSimbforXlm( addBracketForCode(utd-marking-lines.mark) )         ) . 
+                     if VFlagStsMark
+@@ -218,6 +268,37 @@ method override public void CrContentToS
+                        insw:write-data-element (  "stts",         ObjSrv:Env:marking:Sts:mark:GetNameProp(utd-marking-lines.sts)        ) . 
+             
+                     insw:end-element ({&tag-item2}) .
++                    v-exp-marks-qnty = v-exp-marks-qnty + 1 .
++                    if v-exp-marks-qnty >= v-max-marks-qnty
++                    then do :
++                      find first utd-attr exclusive-lock where utd-attr.db-num = utd.db-num
++                                                           and utd-attr.doc-id = utd.doc-id
++                                                           and utd-attr.attr-code = "last-exp-mark"
++                                                           no-error .
++                      if not available utd-attr
++                      then do :
++                        create utd-attr .
++                        assign
++                          utd-attr.db-num = utd.db-num
++                          utd-attr.doc-id = utd.doc-id
++                          utd-attr.attr-code = "last-exp-mark"
++                        .
++                      end .
++                      assign utd-attr.attr-value = string(utd-lines.LineNum) + {&delim-par} + utd-marking-lines.mark .
++                      if last(utd-marking-lines.mark)
++                      then do :
++                        assign utd-attr.attr-value = string(utd-lines.LineNum + 1) + {&delim-par} + "new" .
++                        if last(utd-lines.LineNum)
++                        then do :
++                          delete utd-attr .
++                        end .
++                      end .
++                      insw:end-element ({&tag-section2}) .
++                      insw:end-element ({&tag-item1}) .
++                      insw:end-element ({&tag-section1}) .
++                      insw:end-element ({&tag-edi-doc}) .
++                      return .
++                    end .
+                  end.
+                end .
+                else do :
+@@ -225,8 +306,20 @@ method override public void CrContentToS
+                                                and utd-marking-lines.doc-id  = utd-lines.doc-id
+                                                and utd-marking-lines.LineNum = utd-lines.LineNum
+                                                and utd-marking-lines.doc-level = 1 
+-                 no-lock:
+-                    if utd-marking-lines.site = "only-send" then next .
++                 no-lock break by utd-marking-lines.mark :
++                    if utd.EDocType = objSrv:Env:Utd:EDocType:Mark_Collect:KeyIntDB
++                    then do :
++                      if utd-marking-lines.site = "only-send" then next .
++                      if v-last-mark > ""
++                      and v-last-mark <> "new"
++                      then do :
++                        if utd-marking-lines.mark = v-last-mark
++                        then do :
++                          assign v-last-mark = "" .
++                        end .
++                        next .
++                      end .
++                    end .
+                     insw:start-element ({&tag-item2}) .
+                     insw:write-data-element (  "mark-code",        repSpecSimbforXlm( addBracketForCode(utd-marking-lines.mark) )         ) . 
+                     if VFlagStsMark
+@@ -243,6 +336,38 @@ method override public void CrContentToS
+                        insw:write-data-element (  "stts",         ObjSrv:Env:marking:Sts:mark:GetNameProp(utd-marking-lines.sts)        ) . 
+             
+                     insw:end-element ({&tag-item2}) .
++                    v-exp-marks-qnty = v-exp-marks-qnty + 1 .
++                    if v-exp-marks-qnty >= v-max-marks-qnty
++                    and utd.EDocType = objSrv:Env:Utd:EDocType:Mark_Collect:KeyIntDB
++                    then do :
++                      find first utd-attr exclusive-lock where utd-attr.db-num = utd.db-num
++                                                           and utd-attr.doc-id = utd.doc-id
++                                                           and utd-attr.attr-code = "last-exp-mark"
++                                                           no-error .
++                      if not available utd-attr
++                      then do :
++                        create utd-attr .
++                        assign
++                          utd-attr.db-num = utd.db-num
++                          utd-attr.doc-id = utd.doc-id
++                          utd-attr.attr-code = "last-exp-mark"
++                        .
++                      end .
++                      assign utd-attr.attr-value = string(utd-lines.LineNum) + {&delim-par} + utd-marking-lines.mark .
++                      if last(utd-marking-lines.mark)
++                      then do :
++                        assign utd-attr.attr-value = string(utd-lines.LineNum + 1) + {&delim-par} + "new" .
++                        if last(utd-lines.LineNum)
++                        then do :
++                          delete utd-attr .
++                        end .
++                      end .
++                      insw:end-element ({&tag-section2}) .
++                      insw:end-element ({&tag-item1}) .
++                      insw:end-element ({&tag-section1}) .
++                      insw:end-element ({&tag-edi-doc}) .
++                      return .
++                    end .
+                  end.
+                end .
+                insw:end-element ({&tag-section2}) .
+@@ -260,6 +385,14 @@ method override public void CrContentToS
+       end.
+       insw:end-element ({&tag-edi-doc}) .
+ /*      insw:end-element ({&tag-edi-docs}) .*/
++      find first utd-attr exclusive-lock where utd-attr.db-num = utd.db-num
++                                           and utd-attr.doc-id = utd.doc-id
++                                           and utd-attr.attr-code = "last-exp-mark"
++                                           no-error .
++      if available utd-attr
++      then do :
++        delete utd-attr .
++      end .
+    end.
+ 
+   end method . /* end_of CrContentToSW */
+diff --git a/nws/cmd-bush.p b/nws/cmd-bush.p
+--- a/nws/cmd-bush.p
++++ b/nws/cmd-bush.p
+@@ -592,16 +592,28 @@ procedure send-command-esys :
+           &esr-oper=v-oper
+         }
+         if for-route.custom-pck-name > '' then do:
+-          create buf_esys-all-attr.
+-          assign
+-          buf_esys-all-attr.attr-code = {&attr-route-custom-pack-name}
+-          buf_esys-all-attr.table-name = {&table_esys-route}
+-          buf_esys-all-attr.key1 = v-dmp-ord
+-          buf_esys-all-attr.key2 = integer(entry(v-ind,p-esys-id-list,{&delim-nws}))
+-          buf_esys-all-attr.key5 = 0
+-          buf_esys-all-attr.attr-value  = for-route.custom-pck-name
+-          buf_esys-all-attr.key6 = buf_sys-ctrl.db-num
+-          .
++          if for-route.custom-pck-name = "individual"
++          then do :
++            if available esys-route
++            then do :
++              assign
++                esys-route.esr-num-dump = 10000 /* максимум в пакете */
++                esys-route.esr-status = -1
++              .
++            end .
++          end .
++          else do :
++            create buf_esys-all-attr.
++            assign
++            buf_esys-all-attr.attr-code = {&attr-route-custom-pack-name}
++            buf_esys-all-attr.table-name = {&table_esys-route}
++            buf_esys-all-attr.key1 = v-dmp-ord
++            buf_esys-all-attr.key2 = integer(entry(v-ind,p-esys-id-list,{&delim-nws}))
++            buf_esys-all-attr.key5 = 0
++            buf_esys-all-attr.attr-value  = for-route.custom-pck-name
++            buf_esys-all-attr.key6 = buf_sys-ctrl.db-num
++            .
++          end .
+         end.
+       end.
+     end. /* transaction */

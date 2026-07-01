@@ -1,0 +1,19 @@
+# HG changeset patch
+# User VSpiridonov
+# Parent  bd9ac33d888ead960090856bbf0a6edb787a53ef
+refs #DEVBO-667+1  !!! Отладка !!! Ограничение оплаты подарочного товара ЗИ7700299223
+изменено ref\imp-goods-1C-RN.p (loyalty-gift=1 - уст.атр., 0,отсутсвие,пустой тег - удал.атр.)
+
+diff --git a/ref/imp-goods-1C-RN.p b/ref/imp-goods-1C-RN.p
+--- a/ref/imp-goods-1C-RN.p
++++ b/ref/imp-goods-1C-RN.p
+@@ -515,7 +515,8 @@ end.
+      run fill-g-list in mImp2CdH ( input v-nbc, input ?, input ?).
+   end.  
+ 
+-  else do:
++  if p-GdsObj:loyalty-gift = 0 or p-GdsObj:loyalty-gift = ? 
++   then do:
+     RUN gds-attr-delete (v-nbc, {&attr-loyalty-gift}, output v-attr-del).
+     run fill-g-list in mImp2CdH ( input v-nbc, input ?, input ?).
+   end.  

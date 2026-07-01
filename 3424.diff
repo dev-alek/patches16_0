@@ -1,0 +1,657 @@
+# HG changeset patch
+# User EShklyar
+# Parent  08c9e0430807be191ff1574e4da8713ee368dc96
+refs#3424 Потоковое изменение зачений кодируемых параметров
+
+http://exp-rm/redmine/issues/3424
+
+diff -r 08c9e0430807 adm/b-config.w
+--- a/adm/b-config.w	Thu Apr 02 11:57:14 2015 +0300
++++ b/adm/b-config.w	Fri Apr 03 12:51:27 2015 +0300
+@@ -1,10 +1,10 @@
+ &ANALYZE-SUSPEND _VERSION-NUMBER AB_v10r12 GUI
+ &ANALYZE-RESUME
+-/* Connected Databases
++/* Connected Databases 
+ */
+ &Scoped-define WINDOW-NAME CURRENT-WINDOW
+ &Scoped-define FRAME-NAME fr-config
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CUSTOM _DEFINITIONS fr-config
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CUSTOM _DEFINITIONS fr-config 
+ /*
+ 
+ $Revision$
+@@ -89,6 +89,28 @@
+ define variable v-filter-point0    as character no-undo init "b-config" .
+ define variable v-filter-point     as character no-undo .
+ 
++  define temp-table tt-copy-db no-undo
++  field db-num     like ub.db.db-num
++  field db-key     like ub.db.db-key
++  index pi as unique primary
++    db-num
++.
++  
++  define temp-table tt-copy-cnf no-undo
++  field db-num         like cnf.db-num
++  field param-code     like cnf.param-code
++  field param-value    like cnf.param-value
++  field beg-date       like cnf.beg-date
++  field end-date       like cnf.end-date
++  field conf-type      like cnf.conf-type
++  field param-name     like cnf.param-name
++  field db-key         like cnf.db-key
++  field param-encoded  like cnf.param-encoded
++  index pi as unique primary
++    param-code
++    db-num
++.
++
+ define temp-table tt_cnf no-undo like cnf .
+ 
+ 
+@@ -131,7 +153,7 @@
+ &ANALYZE-RESUME
+ 
+ 
+-&ANALYZE-SUSPEND _UIB-PREPROCESSOR-BLOCK
++&ANALYZE-SUSPEND _UIB-PREPROCESSOR-BLOCK 
+ 
+ /* ********************  Preprocessor Definitions  ******************** */
+ 
+@@ -146,8 +168,8 @@
+ &Scoped-define INTERNAL-TABLES <record-phrase>
+ 
+ /* Definitions for BROWSE br-config                                     */
+-&Scoped-define FIELDS-IN-QUERY-br-config {&sort-clmn_1-br-dtl} {&sort-clmn_2-br-dtl} {&sort-clmn_3-br-dtl} {&sort-clmn_4-br-dtl} {&sort-clmn_5-br-dtl} {&sort-clmn_6-br-dtl} {&sort-clmn_7-br-dtl} {&sort-clmn_8-br-dtl} {&sort-clmn_9-br-dtl} {&sort-clmn_10-br-dtl} {&sort-clmn_11-br-dtl} {&sort-clmn_12-br-dtl} {&sort-clmn_13-br-dtl} {&sort-clmn_14-br-dtl} {&sort-clmn_15-br-dtl} {&sort-clmn_16-br-dtl} {&sort-clmn_17-br-dtl}
+-&Scoped-define ENABLED-FIELDS-IN-QUERY-br-config
++&Scoped-define FIELDS-IN-QUERY-br-config {&sort-clmn_1-br-dtl} {&sort-clmn_2-br-dtl} {&sort-clmn_3-br-dtl} {&sort-clmn_4-br-dtl} {&sort-clmn_5-br-dtl} {&sort-clmn_6-br-dtl} {&sort-clmn_7-br-dtl} {&sort-clmn_8-br-dtl} {&sort-clmn_9-br-dtl} {&sort-clmn_10-br-dtl} {&sort-clmn_11-br-dtl} {&sort-clmn_12-br-dtl} {&sort-clmn_13-br-dtl} {&sort-clmn_14-br-dtl} {&sort-clmn_15-br-dtl} {&sort-clmn_16-br-dtl} {&sort-clmn_17-br-dtl}   
++&Scoped-define ENABLED-FIELDS-IN-QUERY-br-config   
+ &Scoped-define SELF-NAME br-config
+ &Scoped-define QUERY-STRING-br-config FOR EACH <record-phrase>
+ &Scoped-define OPEN-QUERY-br-config OPEN QUERY {&SELF-NAME} FOR EACH <record-phrase>.
+@@ -160,9 +182,9 @@
+ /* Standard List Definitions                                            */
+ &Scoped-Define ENABLED-OBJECTS b-exit b-mark b-lkp b-chg b-Tgle b-Exp b-Imp ~
+ b-Log b-sch b-hist b-help r-show-cnf r-cnf-encoded r-cnf-db r-find-in-br ~
+-sch-param br-config f-param-name
++b-copy sch-param br-config f-param-name 
+ &Scoped-Define DISPLAYED-OBJECTS r-show-cnf r-cnf-encoded r-cnf-db ~
+-r-find-in-br sch-param f-param-name
++r-find-in-br sch-param f-param-name 
+ 
+ /* Custom List Definitions                                              */
+ /* List-1,List-2,List-3,List-4,List-5,List-6                            */
+@@ -173,21 +195,21 @@
+ 
+ /* ************************  Function Prototypes ********************** */
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION-FORWARD attach-ext fr-config
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION-FORWARD attach-ext fr-config 
+ FUNCTION attach-ext RETURNS CHARACTER
+   ()  FORWARD.
+ 
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION-FORWARD attach-short fr-config
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION-FORWARD attach-short fr-config 
+ FUNCTION attach-short RETURNS CHARACTER
+   () FORWARD.
+ 
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION-FORWARD can-process fr-config
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION-FORWARD can-process fr-config 
+ FUNCTION can-process RETURNS LOGICAL
+   ( input mes as character, input param-type as character) FORWARD.
+ 
+@@ -200,116 +222,120 @@
+ /* Define a dialog box                                                  */
+ 
+ /* Definitions of the field level widgets                               */
+-DEFINE BUTTON b-chg
+-     LABEL "&Изменить":L
++DEFINE BUTTON b-chg 
++     LABEL "&Изменить":L 
+      SIZE 10 BY 1 TOOLTIP "Изменить значение и/или привязку параметра".
+ 
+-DEFINE BUTTON b-exit AUTO-GO
+-     LABEL "&Выход":L
++DEFINE BUTTON b-copy 
++     LABEL "&Копировать":L 
++     SIZE 12 BY 1 TOOLTIP "Копирование значения параметра в другие БД".
++
++DEFINE BUTTON b-exit AUTO-GO 
++     LABEL "&Выход":L 
+      SIZE 10 BY 1 TOOLTIP "Сохранить изменения и выйти из режима".
+ 
+-DEFINE BUTTON b-Exp
+-     LABEL "&Экспорт":L
++DEFINE BUTTON b-Exp 
++     LABEL "&Экспорт":L 
+      SIZE 10 BY 1 TOOLTIP "Вывести в файл набор парметров".
+ 
+-DEFINE BUTTON b-help
+-     LABEL "Помо&щь":L
++DEFINE BUTTON b-help 
++     LABEL "Помо&щь":L 
+      SIZE 3 BY 1.
+ 
+-DEFINE BUTTON b-hist
+-     LABEL "Ис&тория":L
++DEFINE BUTTON b-hist 
++     LABEL "Ис&тория":L 
+      SIZE 3 BY 1.
+ 
+-DEFINE BUTTON b-Imp
+-     LABEL "И&мпорт":L
++DEFINE BUTTON b-Imp 
++     LABEL "И&мпорт":L 
+      SIZE 10 BY 1 TOOLTIP "Считать из файла набор параметров".
+ 
+-DEFINE BUTTON b-lkp
+-     LABEL "&Просмотр":L
++DEFINE BUTTON b-lkp 
++     LABEL "&Просмотр":L 
+      SIZE 10 BY 1 TOOLTIP "Просмотр параметра".
+ 
+-DEFINE BUTTON b-Log
+-     LABEL "&Протокол":L
++DEFINE BUTTON b-Log 
++     LABEL "&Протокол":L 
+      SIZE 10 BY 1 TOOLTIP "Посмотреть протокол работы".
+ 
+-DEFINE BUTTON b-mark
+-     LABEL "&*":L
++DEFINE BUTTON b-mark 
++     LABEL "&*":L 
+      SIZE 3 BY 1 TOOLTIP "Поставить/снять отметку записи".
+ 
+-DEFINE BUTTON b-save
+-     LABEL "&Сохранить":L
++DEFINE BUTTON b-save 
++     LABEL "&Сохранить":L 
+      SIZE 10 BY 1 TOOLTIP "Сохранить сделанные изменения".
+ 
+-DEFINE BUTTON b-sch
+-     LABEL "&Фильтр"
++DEFINE BUTTON b-sch 
++     LABEL "&Фильтр" 
+      SIZE 3 BY 1.
+ 
+-DEFINE BUTTON b-Tgle
+-     LABEL "В&кл/выкл":L
++DEFINE BUTTON b-Tgle 
++     LABEL "В&кл/выкл":L 
+      SIZE 10 BY 1 TOOLTIP "Поставить/снять отметку работы с параметром".
+ 
+-DEFINE VARIABLE f-db-num AS INTEGER FORMAT ">>>>9" INITIAL ?
+-     VIEW-AS FILL-IN
++DEFINE VARIABLE f-db-num AS INTEGER FORMAT ">>>>9" INITIAL ? 
++     VIEW-AS FILL-IN 
+      SIZE 6 BY .83 NO-UNDO.
+ 
+-DEFINE VARIABLE f-param-name AS CHARACTER FORMAT "X(85)"
+-     LABEL "Параметр"
+-      VIEW-AS TEXT
++DEFINE VARIABLE f-param-name AS CHARACTER FORMAT "X(85)" 
++     LABEL "Параметр" 
++      VIEW-AS TEXT 
+      SIZE 86 BY .67 NO-UNDO.
+ 
+-DEFINE VARIABLE sch-param AS CHARACTER FORMAT "X(80)":U
+-     VIEW-AS FILL-IN
+-     SIZE 46.5 BY .83 NO-UNDO.
++DEFINE VARIABLE sch-param AS CHARACTER FORMAT "X(80)":U 
++     VIEW-AS FILL-IN 
++     SIZE 53 BY .83 NO-UNDO.
+ 
+-DEFINE VARIABLE r-cnf-db AS CHARACTER INITIAL "all"
++DEFINE VARIABLE r-cnf-db AS CHARACTER INITIAL "all" 
+      VIEW-AS RADIO-SET HORIZONTAL
+-     RADIO-BUTTONS
++     RADIO-BUTTONS 
+           "Все", "all",
+ "Текущая", "curr-db",
+ "Выбранная", "sel-db"
+      SIZE 31 BY .83 NO-UNDO.
+ 
+-DEFINE VARIABLE r-cnf-encoded AS CHARACTER INITIAL "all"
++DEFINE VARIABLE r-cnf-encoded AS CHARACTER INITIAL "all" 
+      VIEW-AS RADIO-SET HORIZONTAL
+-     RADIO-BUTTONS
++     RADIO-BUTTONS 
+           "Все", "all",
+ "Выборочно", "sel-type"
+      SIZE 20 BY .83 NO-UNDO.
+ 
+-DEFINE VARIABLE r-find-in-br AS CHARACTER
++DEFINE VARIABLE r-find-in-br AS CHARACTER 
+      VIEW-AS RADIO-SET HORIZONTAL
+-     RADIO-BUTTONS
++     RADIO-BUTTONS 
+           "По коду", "param-code",
+ "По названию", "param-name",
+ "По значению", "param-value"
+      SIZE 42 BY .83 NO-UNDO.
+ 
+-DEFINE VARIABLE r-show-cnf AS CHARACTER INITIAL "used"
++DEFINE VARIABLE r-show-cnf AS CHARACTER INITIAL "used" 
+      VIEW-AS RADIO-SET HORIZONTAL
+-     RADIO-BUTTONS
++     RADIO-BUTTONS 
+           "Все", "all",
+ "Включенные", "used",
+ "Выключенные", "notused",
+ "Только с ошибками", "onlyerror"
+      SIZE 57 BY .83 NO-UNDO.
+ 
+-DEFINE VARIABLE t-cnf-type-k AS LOGICAL INITIAL no
+-     LABEL "К"
++DEFINE VARIABLE t-cnf-type-k AS LOGICAL INITIAL no 
++     LABEL "К" 
+      VIEW-AS TOGGLE-BOX
+      SIZE 4 BY .83 NO-UNDO.
+ 
+-DEFINE VARIABLE t-cnf-type-notenc AS LOGICAL INITIAL no
+-     LABEL "Без кодировки"
++DEFINE VARIABLE t-cnf-type-notenc AS LOGICAL INITIAL no 
++     LABEL "Без кодировки" 
+      VIEW-AS TOGGLE-BOX
+      SIZE 16 BY .83 NO-UNDO.
+ 
+-DEFINE VARIABLE t-cnf-type-o AS LOGICAL INITIAL no
+-     LABEL "О"
++DEFINE VARIABLE t-cnf-type-o AS LOGICAL INITIAL no 
++     LABEL "О" 
+      VIEW-AS TOGGLE-BOX
+      SIZE 4 BY .83 NO-UNDO.
+ 
+-DEFINE VARIABLE t-cnf-type-s AS LOGICAL INITIAL no
+-     LABEL "П"
++DEFINE VARIABLE t-cnf-type-s AS LOGICAL INITIAL no 
++     LABEL "П" 
+      VIEW-AS TOGGLE-BOX
+      SIZE 4 BY .83 NO-UNDO.
+ 
+@@ -342,7 +368,7 @@
+       {&sort-clmn_17-br-dtl} COLUMN-LABEL {&label-clmn_17-br-dtl} FORMAT "X(12)"
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+-    WITH SEPARATORS SIZE 97 BY 15.75 ROW-HEIGHT-CHARS .63.
++    WITH SEPARATORS SIZE 103.5 BY 15.75 ROW-HEIGHT-CHARS .63.
+ 
+ 
+ /* ************************  Frame Definitions  *********************** */
+@@ -357,9 +383,10 @@
+      b-Exp AT ROW 1 COL 55 WIDGET-ID 6
+      b-Imp AT ROW 1 COL 65 WIDGET-ID 12
+      b-Log AT ROW 1 COL 75 WIDGET-ID 16
+-     b-sch AT ROW 1 COL 90 WIDGET-ID 40
+-     b-hist AT ROW 1 COL 93 WIDGET-ID 10
+-     b-help AT ROW 1 COL 96 WIDGET-ID 8
++     b-copy AT ROW 1 COL 85 WIDGET-ID 74
++     b-sch AT ROW 1 COL 97 WIDGET-ID 40
++     b-hist AT ROW 1 COL 100 WIDGET-ID 10
++     b-help AT ROW 1 COL 103 WIDGET-ID 8
+      r-show-cnf AT ROW 2.5 COL 14.5 NO-LABEL WIDGET-ID 34
+      r-cnf-encoded AT ROW 3.5 COL 14.5 NO-LABEL WIDGET-ID 50
+      t-cnf-type-k AT ROW 3.5 COL 46 WIDGET-ID 56
+@@ -374,15 +401,15 @@
+      f-param-name AT ROW 22.75 COL 2 WIDGET-ID 32
+      "Параметры:" VIEW-AS TEXT
+           SIZE 12 BY .83 AT ROW 2.5 COL 2 WIDGET-ID 46
++     "БД:" VIEW-AS TEXT
++          SIZE 5 BY .83 AT ROW 4.5 COL 9 WIDGET-ID 48
++     "Кодировка:" VIEW-AS TEXT
++          SIZE 12 BY .83 AT ROW 3.5 COL 2 WIDGET-ID 64
+      "Поиск:" VIEW-AS TEXT
+           SIZE 7 BY .83 AT ROW 5.75 COL 2 WIDGET-ID 68
+-     "Кодировка:" VIEW-AS TEXT
+-          SIZE 12 BY .83 AT ROW 3.5 COL 2 WIDGET-ID 64
+-     "БД:" VIEW-AS TEXT
+-          SIZE 5 BY .83 AT ROW 4.5 COL 9 WIDGET-ID 48
+-     SPACE(85.87) SKIP(18.29)
+-    WITH VIEW-AS DIALOG-BOX KEEP-TAB-ORDER
+-         SIDE-LABELS NO-UNDERLINE THREE-D  SCROLLABLE
++     SPACE(97.12) SKIP(17.04)
++    WITH VIEW-AS DIALOG-BOX KEEP-TAB-ORDER 
++         SIDE-LABELS NO-UNDERLINE THREE-D  SCROLLABLE 
+          TITLE "" WIDGET-ID 100.
+ 
+ 
+@@ -403,39 +430,41 @@
+ /* SETTINGS FOR DIALOG-BOX fr-config
+    FRAME-NAME                                                           */
+ /* BROWSE-TAB br-config sch-param fr-config */
+-ASSIGN
++ASSIGN 
+        FRAME fr-config:SCROLLABLE       = FALSE.
+ 
++/* SETTINGS FOR BUTTON b-copy IN FRAME fr-config
++   NO-ENABLE                                                            */
+ /* SETTINGS FOR BUTTON b-save IN FRAME fr-config
+    NO-ENABLE                                                            */
+ /* SETTINGS FOR FILL-IN f-db-num IN FRAME fr-config
+    NO-DISPLAY NO-ENABLE                                                 */
+-ASSIGN
++ASSIGN 
+        f-db-num:HIDDEN IN FRAME fr-config           = TRUE.
+ 
+ /* SETTINGS FOR FILL-IN f-param-name IN FRAME fr-config
+    ALIGN-L                                                              */
+-ASSIGN
++ASSIGN 
+        f-param-name:READ-ONLY IN FRAME fr-config        = TRUE.
+ 
+ /* SETTINGS FOR TOGGLE-BOX t-cnf-type-k IN FRAME fr-config
+    NO-DISPLAY NO-ENABLE                                                 */
+-ASSIGN
++ASSIGN 
+        t-cnf-type-k:HIDDEN IN FRAME fr-config           = TRUE.
+ 
+ /* SETTINGS FOR TOGGLE-BOX t-cnf-type-notenc IN FRAME fr-config
+    NO-DISPLAY NO-ENABLE                                                 */
+-ASSIGN
++ASSIGN 
+        t-cnf-type-notenc:HIDDEN IN FRAME fr-config           = TRUE.
+ 
+ /* SETTINGS FOR TOGGLE-BOX t-cnf-type-o IN FRAME fr-config
+    NO-DISPLAY NO-ENABLE                                                 */
+-ASSIGN
++ASSIGN 
+        t-cnf-type-o:HIDDEN IN FRAME fr-config           = TRUE.
+ 
+ /* SETTINGS FOR TOGGLE-BOX t-cnf-type-s IN FRAME fr-config
+    NO-DISPLAY NO-ENABLE                                                 */
+-ASSIGN
++ASSIGN 
+        t-cnf-type-s:HIDDEN IN FRAME fr-config           = TRUE.
+ 
+ /* _RUN-TIME-ATTRIBUTES-END */
+@@ -463,7 +492,7 @@
+ */  /* DIALOG-BOX fr-config */
+ &ANALYZE-RESUME
+ 
+-
++ 
+ 
+ 
+ 
+@@ -502,6 +531,44 @@
+ &ANALYZE-RESUME
+ 
+ 
++&Scoped-define SELF-NAME b-copy
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL b-copy fr-config
++ON CHOOSE OF b-copy IN FRAME fr-config /* Копировать */
++DO:
++   &if defined (stand-alone) = 0 &then                           /* неавтономная работа */
++      MESSAGE "Копирование не допускается"
++      VIEW-AS ALERT-BOX.  
++  &endif
++  &if defined (stand-alone) <> 0 &then                          
++          if not AVAILABLE cnf then do:
++              MESSAGE "Параметр не выбран"
++              VIEW-AS ALERT-BOX.
++          end.
++          else do:
++              if cnf.conf-Type = "п" or cnf.conf-Type = "к" then do:
++                run copy-param in this-procedure
++                    ( input cnf.conf-type
++                    , input cnf.param-code
++                    , input cnf.param-value
++                    , input cnf.beg-date
++                    , input cnf.end-date
++                    , input cnf.param-name
++                    ).
++              end.
++              else do:
++                MESSAGE "Параметр не является кодированным и не подлежит копированию"
++                VIEW-AS ALERT-BOX.
++              end.
++          
++          end.    
++  &endif
++
++END.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
+ &Scoped-define SELF-NAME b-exit
+ &ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL b-exit fr-config
+ ON CHOOSE OF b-exit IN FRAME fr-config /* Выход */
+@@ -1326,7 +1393,7 @@
+ 
+ &UNDEFINE SELF-NAME
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CUSTOM _MAIN-BLOCK fr-config
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CUSTOM _MAIN-BLOCK fr-config 
+ 
+ 
+ /* ***************************  Main Block  *************************** */
+@@ -1691,7 +1758,7 @@
+ 
+ /* **********************  Internal Procedures  *********************** */
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE chg-param fr-config
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE chg-param fr-config 
+ PROCEDURE chg-param :
+ /*------------------------------------------------------------------------------
+   Purpose:
+@@ -1946,7 +2013,119 @@
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE chk-param fr-config
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE copy-param fr-config 
++PROCEDURE copy-param :
++/*------------------------------------------------------------------------------
++  Purpose:
++  Parameters:  <none>
++  Notes:
++------------------------------------------------------------------------------*/
++  define input parameter p-conf-type    as character          no-undo .
++  define input parameter p-param-code   as character          no-undo .
++  define input parameter p-param-value  like cnf.param-value  no-undo .
++  define input parameter p-beg-date     like cnf.beg-date     no-undo .
++  define input parameter p-end-date     like cnf.end-date     no-undo .
++  define input parameter p-param-name   like cnf.param-name   no-undo .
++  define variable v-param-encoded like cnf.param-encoded      no-undo .
++/*  define VARIABLE        v-ok     as logical     no-undo .*/
++
++  define buffer buf_copy-cnf for cnf.
++
++/*run gbl/inidebug.p .*/
++/*  buffer-copy ub.db to tt-copy-db.*/
++
++empty temp-table tt-copy-db no-error.
++empty temp-table tt-copy-cnf no-error. 
++
++  /*ищим все базы данных с номерами и ключами*/
++  for each buf_copy-cnf where (buf_copy-cnf.conf-type = "п" or buf_copy-cnf.conf-type = "к")
++    and buf_copy-cnf.db-key <> "" and buf_copy-cnf.db-num <> ? :
++    find first tt-copy-db where  tt-copy-db.db-num = buf_copy-cnf.db-num no-error.
++    if not AVAILABLE tt-copy-db then 
++    do:
++      create tt-copy-db.
++      assign
++        tt-copy-db.db-num = buf_copy-cnf.db-num
++        tt-copy-db.db-key = buf_copy-cnf.db-key.
++    end.
++  end.
++  MESSAGE substitute("вы действительно хотите скопировать значение параметра &1 по всем базам?", p-param-code) 
++    VIEW-AS ALERT-BOX QUESTION BUTTONS YES-NO-CANCEL 
++    TITLE "" UPDATE v-ok AS LOGICAL.
++  if v-ok = yes then 
++  do:
++    for each buf_copy-cnf where buf_copy-cnf.db-num <> ?
++      and buf_copy-cnf.param-code = p-param-code:
++      for each tt-copy-db where tt-copy-db.db-num = buf_copy-cnf.db-num:
++        find first tt-copy-cnf where tt-copy-cnf.param-code = p-param-code
++          and tt-copy-cnf.db-num = buf_copy-cnf.db-num no-error.
++        if not available tt-copy-cnf then 
++        do:
++          create tt-copy-cnf.
++          assign
++            tt-copy-cnf.db-num      = tt-copy-db.db-num
++            tt-copy-cnf.param-code  = p-param-code
++            tt-copy-cnf.param-value = p-param-value
++            tt-copy-cnf.beg-date    = p-beg-date
++            tt-copy-cnf.end-date    = p-end-date
++            tt-copy-cnf.conf-type   = p-conf-type
++            tt-copy-cnf.param-name  = p-param-name
++            tt-copy-cnf.db-key      = tt-copy-db.db-key
++            .
++          assign 
++            buf_copy-cnf.Is-Changed = true
++            buf_copy-cnf.NotUsed = false.
++        end.
++          
++        /*          assign                                                    */
++        /*          tt-copy-cnf.param-value = p-param-value.                  */
++
++        run conf-enc in this-procedure
++          ( input  tt-copy-cnf.db-num
++          , input  tt-copy-cnf.db-key
++          , input  tt-copy-cnf.param-code
++          , input  tt-copy-cnf.param-value
++          , input  tt-copy-cnf.beg-date
++          , input  tt-copy-cnf.end-date
++          , output tt-copy-cnf.param-encoded
++          ) no-error.
++        if error-status :error then 
++        do:
++          message
++            vss-workfile vss-revision vss-description skip
++            substitute("Ошибка кодировки параметра &1 для БД &2", tt-copy-cnf.param-code, tt-copy-cnf.db-num ) skip
++            error-status :get-message(1) skip
++            return-value skip
++            view-as alert-box error .
++        end.
++      /*              run check-enc in this-procedure                                                                    */
++      /*                   ( input tt-copy-cnf.db-num                                                                    */
++      /*                    ,input tt-copy-cnf.db-key                                                                    */
++      /*                    ,input tt-copy-cnf.param-code                                                                */
++      /*                    ,input tt-copy-cnf.param-value                                                               */
++      /*                    ,input tt-copy-cnf.beg-date                                                                  */
++      /*                    ,input tt-copy-cnf.end-date                                                                  */
++      /*                    ,input v-param-encoded                                                                       */
++      /*                    ,output v-ok                                                                                 */
++      /*                   ) no-error.                                                                                   */
++      /*           if error-status :error                                                                                */
++      /*           or v-ok <> true                                                                                       */
++      /*           then do:                                                                                              */
++      /*                MESSAGE substitute("Параметр &1 для БД &2 - ошибка кодирования", p-param-code, tt-copy-db.db-num)*/
++      /*                VIEW-AS ALERT-BOX.                                                                               */
++      /*           end.                                                                                                  */
++      end.
++      buffer-copy tt-copy-cnf to buf_copy-cnf.
++      br-config:REFRESH() IN FRAME {&FRAME-NAME}.
++    end.
++  end.              
++END PROCEDURE.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE chk-param fr-config 
+ PROCEDURE chk-param :
+ /*------------------------------------------------------------------------------
+   Purpose:
+@@ -1966,7 +2145,7 @@
+   Purpose:     DISABLE the User Interface
+   Parameters:  <none>
+   Notes:       Here we clean-up the user-interface by deleting
+-               dynamic widgets we have created and/or hide
++               dynamic widgets we have created and/or hide 
+                frames.  This procedure is usually called when
+                we are ready to "clean-up" after running.
+ ------------------------------------------------------------------------------*/
+@@ -1985,14 +2164,14 @@
+   Notes:       Here we display/view/enable the widgets in the
+                user-interface.  In addition, OPEN all queries
+                associated with each FRAME and BROWSE.
+-               These statements here are based on the "Other
++               These statements here are based on the "Other 
+                Settings" section of the widget Property Sheets.
+ ------------------------------------------------------------------------------*/
+-  DISPLAY r-show-cnf r-cnf-encoded r-cnf-db r-find-in-br sch-param f-param-name
++  DISPLAY r-show-cnf r-cnf-encoded r-cnf-db r-find-in-br sch-param f-param-name 
+       WITH FRAME fr-config.
+-  ENABLE b-exit b-mark b-lkp b-chg b-Tgle b-Exp b-Imp b-Log b-sch b-hist b-help
+-         r-show-cnf r-cnf-encoded r-cnf-db r-find-in-br sch-param br-config
+-         f-param-name
++  ENABLE b-exit b-mark b-lkp b-chg b-Tgle b-Exp b-Imp b-copy b-Log b-sch b-hist b-help 
++         r-show-cnf r-cnf-encoded r-cnf-db r-find-in-br sch-param br-config 
++         f-param-name 
+       WITH FRAME fr-config.
+   {&OPEN-BROWSERS-IN-QUERY-fr-config}
+ END PROCEDURE.
+@@ -2000,7 +2179,7 @@
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE find-param fr-config
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE find-param fr-config 
+ PROCEDURE find-param :
+ /*------------------------------------------------------------------------------
+   Purpose:
+@@ -2046,7 +2225,7 @@
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE proc-b-sch fr-config
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE proc-b-sch fr-config 
+ PROCEDURE proc-b-sch :
+ /*------------------------------------------------------------------------------
+   Purpose:
+@@ -2098,7 +2277,7 @@
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE reopen-query fr-config
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE reopen-query fr-config 
+ PROCEDURE reopen-query :
+ /*------------------------------------------------------------------------------
+   Purpose:
+@@ -2341,7 +2520,7 @@
+ 
+ /* ************************  Function Implementations ***************** */
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION attach-ext fr-config
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION attach-ext fr-config 
+ FUNCTION attach-ext RETURNS CHARACTER
+   () :
+ 
+@@ -2375,7 +2554,7 @@
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION attach-short fr-config
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION attach-short fr-config 
+ FUNCTION attach-short RETURNS CHARACTER
+   ():
+ 
+@@ -2401,7 +2580,7 @@
+ /* _UIB-CODE-BLOCK-END */
+ &ANALYZE-RESUME
+ 
+-&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION can-process fr-config
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _FUNCTION can-process fr-config 
+ FUNCTION can-process RETURNS LOGICAL
+   ( input mes as character, input param-type as character):
+ 
+@@ -2431,4 +2610,5 @@
+ END FUNCTION.
+ 
+ /* _UIB-CODE-BLOCK-END */
+-&ANALYZE-RESUME
+\ No newline at end of file
++&ANALYZE-RESUME
++

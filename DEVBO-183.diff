@@ -1,0 +1,24 @@
+# HG changeset patch
+# User VSpiridonov
+# Parent  a349e6e6fcb497618550dba852e35a7b03ea9655
+refs #DEVBO-183 Для промоакции с механикой "Временная скидка, скидка процентом, количество по строке"  не выгружается размер скидки в 1С ERP (секция <chk-discnt>).
+
+ Исправлено: В теге <sum-discnt> в секции <chk-gd> выгружается сумма товарной и итоговой скидок по строке товара (chk-gds.doc-qnty * chk-gds.discnt + chk-gds.doc-qnty * src-discnt ).
+  До этого Выгружалась только итоговая скидка
+
+https://msk-exp-jira.expertek.local/browse/BTS-765
+https://msk-exp-jira.expertek.local/browse/DEVBO-183
+
+diff --git a/ibs/th/bge/1crn/subjects/check.cls b/ibs/th/bge/1crn/subjects/check.cls
+--- a/ibs/th/bge/1crn/subjects/check.cls
++++ b/ibs/th/bge/1crn/subjects/check.cls
+@@ -758,7 +758,8 @@ define private temp-table tt-recid-TranF
+         /* chk-gds.discnt - скидка относительно цены; чтобы получить скидку по строке - её надо умножать на количество */
+         if (buf_chk-gds.discnt > 0) or (buf_chk-gds.discnt < 0) then
+         insw:write-data-element (  "sum-discnt",
+-          left-trim( string(buf_chk-gds.doc-qnty * buf_chk-gds.discnt, "->>>>>>>>>9.9<<<<<<<<<") )
++/*          left-trim( string(buf_chk-gds.doc-qnty * buf_chk-gds.discnt, "->>>>>>>>>9.9<<<<<<<<<") ) */
++          left-trim(string((chk-gds.doc-qnty * chk-gds.discnt  + chk-gds.doc-qnty * src-discnt) , "->>>>>>>>>9.9<" ))  
+         ) . /* Скидка на строку товара - с учетом всех скидок на строку и на итог (Число) */
+         
+         if v-is-petrolium and (buf_chk-gds.density > 0) then

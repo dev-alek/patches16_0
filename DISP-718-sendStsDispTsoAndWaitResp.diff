@@ -1,0 +1,122 @@
+# HG changeset patch
+# Parent  1f170dc7415758578cb12951e82e2b05852a4d52
+refs #DISP-718 Создание скрипта для автоматического закрытия смен ТН на несколькихААЗС
+таймаут увеличен с 5 до 30 скунд
+при любой отправки сообщения ждем ответ
+после проверки статуса тсо отправляем сообщение вдиспетчерскую со статусом
+http://exp-jira.expertek.local:8080/browse/DISP-718
+
+diff --git a/ibs/th/str/CloseAndOpenShift.cls b/ibs/th/str/CloseAndOpenShift.cls
+--- a/ibs/th/str/CloseAndOpenShift.cls
++++ b/ibs/th/str/CloseAndOpenShift.cls
+@@ -350,6 +350,7 @@ class ibs.th.str.CloseAndOpenShift:
+             myPause ( {&TimeOutSend}).
+          end.
+          dynamic-invoke (mTso,iOperation).
++         mTso:waitReadSts().
+          myPause ( 1 ).
+          mTso:tso-send-Stat().
+          mTso:waitReadSts().
+@@ -573,5 +574,7 @@ class ibs.th.str.CloseAndOpenShift:
+          dispSetting = new ibs.th.bge.disp.dispSetting().
+       
+       return dispSetting.
+-  end. 
++  end.
++  
++  
+ end class.
+\ No newline at end of file
+diff --git a/ibs/th/str/tso_trg.cls b/ibs/th/str/tso_trg.cls
+--- a/ibs/th/str/tso_trg.cls
++++ b/ibs/th/str/tso_trg.cls
+@@ -94,7 +94,7 @@ class ibs.th.str.tso_trg:
+          then do:
+             run bge/socet.p persistent set tt-tso-socet.tso-socet.
+             run setParam in tt-tso-socet.tso-socet ("addtimeOut","false").
+-            run setParam in tt-tso-socet.tso-socet ("timeOut","5").
++            run setParam in tt-tso-socet.tso-socet ("timeOut","30").
+          end.
+          run IsWorkSocet in tt-tso-socet.tso-socet (output vWorkSocet).
+          if not vWorkSocet
+@@ -364,8 +364,7 @@ class ibs.th.str.tso_trg:
+       define variable vSocet as handle no-undo.
+       define variable vWiatresp as logical   no-undo.
+       define variable v-command as character no-undo.
+-      if     session:debug-alert
+-         and imethod eq "" or imethod eq ?
++      if imethod eq "" or imethod eq ?
+       then 
+           imethod = "parse-debug". 
+       vWiatresp = imethod ne "" and imethod ne ?.
+@@ -503,7 +502,7 @@ class ibs.th.str.tso_trg:
+                            and tt-tso.TRkBusy
+                         then
+                            tt-tso.ShiftState = mShiftState:StopWorkProc:nameprop.
+-            
++                     sendStatDisp(tt-tso.tso-num,tt-tso.FiscalStatus,tt-tso.PosStatus, tt-tso.ShiftState).
+                      putLog(substitute ("Статус ТСО/заправщике &4 &1: &2 &3 &5",tt-tso.tso-addr,tt-tso.FiscalStatus,tt-tso.PosStatus,tt-tso.tso-num, tt-tso.ShiftState)).
+                   end.
+                   else do:
+@@ -937,4 +936,16 @@ class ibs.th.str.tso_trg:
+    
+    return mdevice:GetProp(v-device-kind).
+ end.
++method private logical sendStatDisp( cashNum as integer,  
++      iFiscalStatus  as character ,iPosStatus as character , iShiftStatefstatus as character):
++     define variable mesjson as longchar no-undo.
++       
++       mesjson = substitute ('~{"cashNum":"&1","fiscalStatus":"&2","posStatus":"&3","shiftStatefStatus":"&4"}&5',
++       cashNum,
++       iFiscalStatus,
++       iPosStatus,
++       iShiftStatefstatus,
++       "").
++       publish "sendStatJson" from parparentproc (mesjson)  .
++  end. 
+ end class.
+\ No newline at end of file
+diff --git a/str/proc-startNewShiftTso.p b/str/proc-startNewShiftTso.p
+--- a/str/proc-startNewShiftTso.p
++++ b/str/proc-startNewShiftTso.p
+@@ -35,16 +35,22 @@ procedure sendStat:
+    dispStat = mWorkShift:getStatusObj().
+    dispStat:pMessage = mERRtest.
+    dispStat:isError = mERRflag.
++   run sendStatJson (dispStat:getjson()).
++   delete object dispStat.
++end.
++procedure sendStatJson:
++   define input  parameter ijson as longchar no-undo.
++   
+    mContentType = "application/json".
+    run ConectSocet(mWorkShift:getDispSet():hostdisp,
+                    mWorkShift:getDispSet():portdisp,
+                    "THController/message",
+-                   dispStat:getjson(),
++                   ijson,
+                    "",
+                    ?,
+                    yes,
+                    "Отправка статуса в диспетчерскую").
+-   delete object dispStat.
++   
+ end.
+ define new shared variable oxml-exch-dir as character no-undo .
+ define new shared variable oxml-heap-dir as character no-undo .
+@@ -56,6 +62,7 @@ do  on error  undo, return error:
+    if mDebug eq ?
+    then
+       mDebug = false.
++   subscribe "sendStatJson"           anywhere.
+    mWorkShift = new ibs.th.str.CloseAndOpenShift(mDebug).
+    
+    current-window:hidden = yes.
+@@ -228,5 +235,5 @@ do  on error  undo, return error:
+                           ) .
+     end.
+ end.
+-
++unsubscribe "sendStatJson".
+ { utl/proc-async.i proc_end}
+\ No newline at end of file

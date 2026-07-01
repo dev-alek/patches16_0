@@ -1,0 +1,35 @@
+# HG changeset patch
+# User EShklyar
+# Parent  02f9725fde6281449fd79bfa012c9c9d12ca945b
+refs #DEVBO-42 Причина скидки в чеках в 1С и выгрузка суммы брутто в чеках с округлением
+
+http://exp-jira:8080/browse/DEVBO-42
+
+diff --git a/ibs/th/bge/1crn/subjects/check.cls b/ibs/th/bge/1crn/subjects/check.cls
+--- a/ibs/th/bge/1crn/subjects/check.cls
++++ b/ibs/th/bge/1crn/subjects/check.cls
+@@ -49,7 +49,7 @@ class ibs.th.bge.1crn.subjects.check imp
+ index pi db-num uuid uuid-cheq
+ index si trn-start trn-end chk-date chk-time
+ .
+-
++&scop discnt-type-code string(buf_chk-discnt.discnt-type)
+   define property Msg as character no-undo
+     get:
+       return trim (Msg, {&new-line}).
+@@ -96,6 +96,7 @@ index si trn-start trn-end chk-date chk-
+   &scop tag-item6     'chk-pay-r':U
+   &scop tag-section7  'chk-promos':U
+   &scop tag-item7     'chk-promo':U
++ 
+   constructor public check ():
+   end constructor.
+   
+@@ -951,6 +952,7 @@ index si trn-start trn-end chk-date chk-
+           insw:write-data-element (  "discnt-num",       string(bf_chk-discnt.discnt-id)          ) . /* Номер строки скидки (Число) */
+           insw:write-data-element (  "line-num",         string(bf_chk-discnt.object-line-num)           ) . /* Номер строки чека на которую предоставлена скидка (Число) */
+           insw:write-data-element (  "discnt-type",      string(bf_chk-discnt.value-type)        ) . /* Тип скидки (Строка) */
++          insw:write-data-element (  "disc-reason",      string(bf_chk-discnt.discnt-type)        ) . /* Тип скидки (Строка) */
+           insw:write-data-element (  "discntValueAbs",   left-trim(string(bf_chk-discnt.discnt-value-abs,  "->>>>>>>>>9.9<<<<<<<<<"))  ) . /* Абсолютное значение скидки - сумма (Число) */
+           insw:write-data-element (  "discntValuePcnt",  left-trim(string(bf_chk-discnt.discnt-value-pcnt, "->9.9<"))                 ) . /* % скидки (Число) */
+           /* обязательность 0-1 */

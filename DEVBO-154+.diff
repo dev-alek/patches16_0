@@ -1,0 +1,60 @@
+# HG changeset patch
+# Parent  b8355287e0323d32cb61fc1c3b92037ce8bbab31
+refs #DEVBO-154+ Нарушение работы автопроцессов после обновления ТН на версию от 14-08-2024. ТН 16.0 РН-Москва #BTS-680 #bts-804
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-154
+
+diff --git a/rep/repfrm.i b/rep/repfrm.i
+--- a/rep/repfrm.i
++++ b/rep/repfrm.i
+@@ -76,16 +76,15 @@ DEFINE FRAME InfoFrame
+          TITLE "Процесс"
+          DEFAULT-BUTTON StopBtn CANCEL-BUTTON StopBtn.
+ define variable mFrameView      as logical   no-undo init yes.
+-  define variable mFramHandle as handle no-undo.      
+-  mFramHandle = frame InfoFrame:handle.
++  {gbl/batchmode.i InfoFrame}
+ 
+   if  log-manager:logfile-name ne ?
+   then DO:
+       log-manager:write-message("Logname=" + log-manager:logfile-name , "frameRepError").
+       log-manager:write-message("Batch-mod=" + string(session:batch-mode) , "frameRepError"). 
+-      log-manager:write-message("visible-frame-mod=" + string(mFramHandle:visible), "frameRepError"). 
++      log-manager:write-message("visible-frame-mod=" + string(mFramBachModHandle:visible), "frameRepError"). 
+   end.
+-  mFrameView = not session:batch-mode and mFramHandle:visible.
++  mFrameView = not mBatchMode.
+   if mFrameView
+   then do:
+     ASSIGN
+diff --git a/str/diallog.w b/str/diallog.w
+--- a/str/diallog.w
++++ b/str/diallog.w
+@@ -332,19 +332,17 @@ DO ON ERROR   UNDO MAIN-BLOCK, LEAVE MAI
+    define variable mSilent as logical no-undo.
+    
+   define variable mFrameView      as logical   no-undo init yes.
+-  define variable mFramHandle as handle no-undo.      
+-  mFramHandle = frame {&frame-name}:handle.
+-
+-  mFrameView = not session:batch-mode and mFramHandle:visible.
++  {gbl/batchmode.i InfoFrame}
++  mFrameView = not mBatchMode.  
+   publish "IsAsyncProc" (output mSilent).
+   if  log-manager:logfile-name ne ?
+-  then DO:
+-      log-manager:write-message("Batch-mod=" + string(session:batch-mode) , "frameoxmError"). 
+-      log-manager:write-message("visible-frame-mod=" + string(mFramHandle:visible), "frameoxmError"). 
+-      log-manager:write-message("mSilent=" + string(mSilent), "frameoxmError"). 
+-      log-manager:write-message("create-window-option=" + string(create-window-option), "frameoxmError"). 
++  then do:
++      log-manager:write-message("Batch-mod=" + string(session:batch-mode) , "frameStatusWait"). 
++      log-manager:write-message("visible-frame-mod=" + string(mFramBachModHandle:visible), "frameStatusWait"). 
++      log-manager:write-message("mSilent=" + string(mSilent), "frameStatusWait"). 
++      log-manager:write-message("create-window-option=" + string(create-window-option), "frameStatusWait"). 
+   end.
+-/*   mSilent = mSilent or mFrameView.*/
++   mSilent = mSilent or mFrameView.
+    if mSilent ne true
+    then do:
+      IF create-window-option = 1 THEN DO:

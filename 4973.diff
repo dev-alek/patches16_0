@@ -1,0 +1,48 @@
+# HG changeset patch
+# User SSlivenko
+# Parent  b7c72acb45638c4a31091484b1477c3ed2c87096
+refs #4973 Закрытие заказов без статусов EDI
+
+http://exp-rm1/issues/4973
+
+diff -r b7c72acb4563 -r faf9194f8b16 cus/zakz-rcv.i
+--- a/cus/zakz-rcv.i	Thu Apr 11 13:20:52 2019 +0300
++++ b/cus/zakz-rcv.i	Thu Apr 11 13:26:03 2019 +0300
+@@ -1507,13 +1507,30 @@
+           )
+     then do:
+       if shar-buf_ord-doc.status_ = {&g___new} then do:
+-        message
+-        substitute(" По ПОСТАВЩИКУ &1&2 система работает по EDOC\EDI , Закрыть можно будет при корректировке заказа в статусе EDOC\EDI ПОДТВЕРЖДЕН"
+-                   ,shar-buf_ord-doc.cli-type
+-                   ,shar-buf_ord-doc.cli-code
+-                   )
+-        view-as alert-box information .
+-            next .
++        { gbl/chk-actg.i
++              v-cntxt-db-num
++              v-cntxt-userid
++              {&action-head-code-main}
++              'actn_ord-rcv_add-def-bypass-EDI':U
++              {&cntxt-object}
++              g#host-code
++              store-type
++              store-code
++              0
++              0
++              0
++              true
++              g-log
++            }
++            if g-log = false then do:
++              message
++              substitute(" По ПОСТАВЩИКУ &1&2 система работает по EDOC\EDI , Закрыть можно будет при корректировке заказа в статусе EDOC\EDI ПОДТВЕРЖДЕН"
++                         ,shar-buf_ord-doc.cli-type
++                         ,shar-buf_ord-doc.cli-code
++                         )
++              view-as alert-box information .
++              next .
++            end.
+       end. /*if shar-buf_ord-doc.status_ = {&g___new} then do:*/
+       if shar-buf_ord-doc.status_ = {&ord-rcv} then do:
+        define variable vv-ok as logical   no-undo .

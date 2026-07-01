@@ -1,0 +1,28 @@
+# HG changeset patch
+# User SSlivenko
+# Parent  203b86a48644d7e38a90f51c3f119a78cc6167bc
+refs #DEVBO-2078 Возврат товара поставщику по УПД. Обмен с 1С
+Тег EDI в договорах (с этой задачей "1" включает галку диадок, а "2" - галку edi
+http://exp-jira.expertek.local:8080/browse/DEVBO-2078
+
+diff -r 203b86a48644 -r 6e75bb4aed5b ibs/th/bge/1crn/import/impcontracts.cls
+--- a/ibs/th/bge/1crn/import/impcontracts.cls	Чт ноя 24 15:10:58 2022 +0300
++++ b/ibs/th/bge/1crn/import/impcontracts.cls	Чт ноя 24 15:12:58 2022 +0300
+@@ -200,7 +200,7 @@
+         ub.contract-attr.attr-code     = "contract-edi"
+         .
+     end.
+-    ub.contract-attr.attr-value = string(if objContracts:edi_ = 1 then "yes" else "no") . 
++    ub.contract-attr.attr-value = string(if objContracts:edi_ = 2 then "yes" else "no") . 
+      
+     find first ub.contract-attr exclusive-lock where ub.contract-attr.host-code = ub.contract.host-code and 
+       ub.contract-attr.contract-code = ub.contract.contract-code and
+@@ -214,7 +214,7 @@
+         ub.contract-attr.attr-code     = "contract-diadoc"
+         .
+     end.
+-    ub.contract-attr.attr-value = string(if objContracts:edi_ = 2 then "yes" else "no") . 
++    ub.contract-attr.attr-value = string(if objContracts:edi_ = 1 then "yes" else "no") . 
+   end method.
+   method private character date-1C (inValue as character):
+     

@@ -1,0 +1,30 @@
+# HG changeset patch
+# User ARostovtsev
+# Parent  f8b04ba69fcfefb2aa703d972dcab5d7c846a4bf
+refs #DEVBO-629 Большой размер УБД. РН-Москва. TH 16.0 #BTS-1820 ##BTS-1871
+Исправление ошибки при входе в пункт меню после сжатия БД
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-629
+https://msk-exp-jira.expertek.local/browse/BTS-1820
+https://msk-exp-jira.expertek.local/browse/BTS-1871
+
+diff --git a/adm/restseq.p b/adm/restseq.p
+--- a/adm/restseq.p
++++ b/adm/restseq.p
+@@ -1533,8 +1533,6 @@ procedure restore-s-menu-user-call :
+   on error undo, return error
+   :
+ 
+-  /*
+-  ЖДЕМ ДИМУ
+ 
+     {&init-validation}
+ 
+@@ -1548,7 +1546,6 @@ procedure restore-s-menu-user-call :
+     &undefine not-include-in-seq-records
+ 
+     {&update-sequence}
+-  */
+   end.
+ 
+ end procedure. /* restore-s-user-login-action-role */

@@ -1,0 +1,1182 @@
+# HG changeset patch
+# Parent 0dfeae80ccd5656f53fa477d96b2f6d703768f6c
+# User SKiryxin
+refs #3248 Доработки по учету магистрального газа
+
+http://exp-rm/redmine/issues/3248
+
+diff -r 0dfeae80ccd5 -r 8cc0ef02c4aa rep/r-shift1.p
+--- a/rep/r-shift1.p	Wed May 14 18:06:48 2014 +0400
++++ b/rep/r-shift1.p	Wed May 14 18:54:28 2014 +0400
+@@ -50,6 +50,8 @@
+ { rep/r-gl.i }
+ { rep/rshiftd1.i t "shared" }
+ { rul/ruleset_.i }
++{ ref/gds-attr.i }
++{ str/is-gas.i }
+ 
+ define shared stream Prnlibstream.
+ 
+@@ -179,6 +181,11 @@
+ define buffer control-rvs-line-pump for ub.rvs-line-pump.
+ define buffer buf_shift-pgds for shift-pgdst.
+ 
++define buffer buf_rvs-line-attr for ub.rvs-line-attr. /* Для газа */
++define buffer buf_prev-rvs-line-attr for ub.rvs-line-attr. /* Для газа */
++define buffer buf_control-rvs-doc for ub.rvs-doc. /* Для контрольной сверки, если нет сменной */
++define variable i-rvs-code as character no-undo. /* Для контроьной или сменной сверки */
++
+ define variable p-host-code       as integer   no-undo.
+ define variable v-sign            as decimal   no-undo .
+ 
+@@ -415,6 +422,151 @@
+   break by temp-rvs-line.gds-code by temp-rvs-line.pl-code
+ on error undo, return error return-value
+ :
++
++  /* Если природный газ */
++  if is-gas(temp-rvs-line.gds-code) then do:
++
++      /* Найдём атрибуты сверки за текущую и предыдущую смены */
++      
++      find first buf_rvs-line-attr where buf_rvs-line-attr.obj-code = temp-rvs-line.obj-code
++                                   and buf_rvs-line-attr.obj-type = temp-rvs-line.obj-type
++                                   and buf_rvs-line-attr.gds-code = temp-rvs-line.gds-code
++                                   and buf_rvs-line-attr.pl-code = temp-rvs-line.pl-code
++                                   and buf_rvs-line-attr.rvs-code = temp-rvs-line.rvs-code
++                                   and buf_rvs-line-attr.attr-code = "mask" no-lock.
++      
++      /* На previous-rvs-doc мы уже стоим (строка 261) */
++      
++      /* Если не было сменной - берем контрольную */
++      if not available previous-rvs-doc then do:
++          
++          find first buf_control-rvs-doc where buf_control-rvs-doc.obj-type = temp-rvs-line.obj-type
++                                           and buf_control-rvs-doc.obj-code = temp-rvs-line.obj-code
++                                           and buf_control-rvs-doc.shift-date = temp-rvs-line.shift-date
++                                           and buf_control-rvs-doc.shift-num = temp-rvs-line.shift-num
++                                           and buf_control-rvs-doc.status_ = {&fact}
++                                           and buf_control-rvs-doc.rvs-type = {&rvs-control} no-lock no-error.
++            
++            i-rvs-code = buf_control-rvs-doc.rvs-code.
++            
++      end. /* if not available previous-rvs-doc */
++      
++      else i-rvs-code = previous-rvs-doc.rvs-code.
++      
++      find first previous-rvs-line where previous-rvs-line.rvs-code = i-rvs-code
++                                     and previous-rvs-line.gds-code = temp-rvs-line.gds-code
++                                     and previous-rvs-line.obj-code = temp-rvs-line.obj-code
++                                     and previous-rvs-line.obj-type = temp-rvs-line.obj-type
++                                     and previous-rvs-line.pl-code = temp-rvs-line.pl-code no-lock no-error.
++      
++      find first buf_prev-rvs-line-attr where buf_prev-rvs-line-attr.obj-code = temp-rvs-line.obj-code
++                                        and buf_prev-rvs-line-attr.obj-type = temp-rvs-line.obj-type
++                                        and buf_prev-rvs-line-attr.gds-code = temp-rvs-line.gds-code
++                                        and buf_prev-rvs-line-attr.pl-code = temp-rvs-line.pl-code
++                                        and buf_prev-rvs-line-attr.rvs-code = i-rvs-code
++                                        and buf_prev-rvs-line-attr.attr-code = "mask" no-lock no-error.      
++
++      /* Проверим, поместимся ли на страницу */
++      
++      if line-counter( PrnLibstream ) + 5 > page-size( PrnLibstream ) then do:
++          page stream PrnLibstream .
++      end.
++      
++      /* Первая строчка для газа */
++      
++      assign
++      pol1 = "Метан (КПГ)"
++      pol2 = previous-rvs-line.state-level-total
++      pol5 = temp-rvs-line.state-level-petrol
++      pol6 = previous-rvs-line.state-level-petrol
++      pol7 = pol5 - pol6
++      pol9 = temp-rvs-line.state-level-total.
++
++      display stream PrnLibstream
++      {&All-sym}
++      pol1
++      pol2
++      pol5
++      pol6
++      pol7
++      pol9
++      with frame frame-1.
++      down stream PrnLibstream with frame frame-1.
++      
++      /* Вторая строчка для газа */
++      
++      assign
++      pol1 = "CH4 м3"
++      pol5 = integer(entry(1,buf_rvs-line-attr.attr-value, ";"))
++      pol6 = integer(entry(1,buf_prev-rvs-line-attr.attr-value, ";"))
++      pol7 = pol5 - pol6.
++      
++      display stream PrnLibstream
++      {&All-sym}
++      pol1
++      pol5
++      pol6
++      pol7
++      with frame frame-1.
++      down stream PrnLibstream with frame frame-1.      
++
++      /* Третья строчка для газа */
++      assign
++      pol1 = "Pвх-CH4 кгс/см2"
++      pol2 = integer(entry(2,buf_prev-rvs-line-attr.attr-value, ";"))
++      pol15 = integer(entry(2,buf_rvs-line-attr.attr-value, ";")).
++      
++      display stream PrnLibstream
++      {&All-sym}
++      pol1
++      pol2
++      pol15
++      with frame frame-1.
++      down stream PrnLibstream with frame frame-1.  
++      
++      /* Четвертая строчка для газа */
++
++      assign
++      pol1 = "Tвх - CH4 °C"
++      pol2 = integer(entry(3,buf_prev-rvs-line-attr.attr-value, ";"))
++      pol15 = integer(entry(3,buf_rvs-line-attr.attr-value, ";")).
++      
++      display stream PrnLibstream
++      {&All-sym}
++      pol1
++      pol2
++      pol15
++      with frame frame-1.
++      down stream PrnLibstream with frame frame-1.  
++      
++      /* Подчеркнем */
++      
++      underline stream PrnLibstream {&all-sym} {&all-pol} with frame frame-1.
++      down stream PrnLibstream with frame frame-1.
++
++/*                  Excel                    */
++
++/*      {&PutExcel}                          */
++/*          "Метан(КПГ)кгс/см2" {&tabulation}*/
++/*          "240" {&tabulation}              */
++/*          {&tabulation}                    */
++/*          {&tabulation}                    */
++/*          "10000000" {&tabulation}         */
++/*          "10000001" {&tabulation}         */
++/*          "1"        {&tabulation}         */
++/*          {&tabulation}                    */
++/*          "240" {&tabulation}              */
++/*      {&new-line}                          */
++/*          "CH4 м3"                         */
++/*      {&new-line}                          */
++/*          "Pвх - CH4 кгс/см2"              */
++/*      {&new-line}                          */
++/*          "Tвх - CH4 °C"                   */
++/*      {&new-line}.                         */
++
++      next.
++  end.
++
+   assign
+     accum-by-pl-code-pol3-l = 0
+     accum-by-pl-code-pol3-kg = 0
+diff -r 0dfeae80ccd5 -r 8cc0ef02c4aa str/all-rvs.w
+--- a/str/all-rvs.w	Wed May 14 18:06:48 2014 +0400
++++ b/str/all-rvs.w	Wed May 14 18:54:28 2014 +0400
+@@ -64,6 +64,8 @@
+ { str/getctxtp.i get }
+ { str/lib-rvs.i  }
+ { gbl/fltopend.i defproc }
++{ ref/gds-attr.i }
++{ str/is-gas.i }
+ 
+ define buffer buf-inv_trn-doc     for ub.trn-doc .
+ define buffer buf-spi_trn-doc     for ub.trn-doc .
+@@ -341,7 +343,7 @@
+      {&sort-clmn_27-br-dtl}
+      {&sort-clmn_28-br-dtl}
+      {&sort-clmn_29-br-dtl}
+-     {&sort-clmn_30-br-dtl}
++     {&sort-clmn_30-br-dtl} format "->>,>>>,>>>.<<<"
+      {&sort-clmn_31-br-dtl}
+      {&sort-clmn_32-br-dtl}
+      {&sort-clmn_33-br-dtl}
+@@ -741,12 +743,13 @@
+       no-error.
+     if available ub.rvs-line then do:
+       find first ub.goods no-lock
+-        where ub.goods.gds-code = ub.rvs-line.gds-code
+-      .
+-      message
+-        substitute( "Не заданы фактические остатки по товару &1 (&2)", ub.goods.gds-code, ub.goods.gds-name )
+-        view-as alert-box error.
+-      return no-apply.
++        where ub.goods.gds-code = ub.rvs-line.gds-code.
++      if is-gas(ub.rvs-line.gds-code) ne yes then do:
++        message
++          substitute( "Не заданы фактические остатки по товару &1 (&2)", ub.goods.gds-code, ub.goods.gds-name )
++          view-as alert-box error.
++        return no-apply.
++      end.
+     end.
+     tr:
+     do transaction
+@@ -918,12 +921,13 @@
+     no-error.
+   if available ub.rvs-line then do:
+     find first ub.goods no-lock
+-      where ub.goods.gds-code = ub.rvs-line.gds-code
+-    .
+-    message
+-      substitute( "Не заданы фактические остатки по товару &1 (&2)", ub.goods.gds-code, ub.goods.gds-name )
+-      view-as alert-box error.
+-    return no-apply.
++      where ub.goods.gds-code = ub.rvs-line.gds-code.
++    if is-gas(ub.rvs-line.gds-code) ne yes then do:
++      message
++        substitute( "Не заданы фактические остатки по товару &1 (&2)", ub.goods.gds-code, ub.goods.gds-name )
++        view-as alert-box error.
++      return no-apply.
++    end.
+   end.
+   find first buf-inv_trn-doc no-lock
+     where buf-inv_trn-doc.out-code = r-doc.rvs-code
+diff -r 0dfeae80ccd5 -r 8cc0ef02c4aa str/chk-rvs.p
+--- a/str/chk-rvs.p	Wed May 14 18:06:48 2014 +0400
++++ b/str/chk-rvs.p	Wed May 14 18:54:28 2014 +0400
+@@ -16,6 +16,8 @@
+ */
+ 
+ { cmp/str-glbl.i }
++{ ref/gds-attr.i }
++{ str/is-gas.i }
+ 
+ define input parameter parrecid as recid no-undo.
+ 
+@@ -121,6 +123,9 @@
+   if ub.rvs-doc.status_ = {&fact} then do:
+     /* Проверка того что заданы значения по установленому количеству во всех сверках */
+     for each ub.rvs-line no-lock where ub.rvs-line.rvs-code = ub.rvs-doc.rvs-code :
++      
++      if is-gas(ub.rvs-line.gds-code) then next.
++      
+       if ub.rvs-line.state-measure-qnty = ? or
+          ub.rvs-line.state-density      = ? or
+          ub.rvs-line.state-density      = 0 then do:
+diff -r 0dfeae80ccd5 -r 8cc0ef02c4aa str/ctrc2sht.p
+--- a/str/ctrc2sht.p	Wed May 14 18:06:48 2014 +0400
++++ b/str/ctrc2sht.p	Wed May 14 18:54:28 2014 +0400
+@@ -34,6 +34,7 @@
+ { gbl/getcntxt.i def }
+ { gbl/getcntxt.i get }
+ { ref/gds-attr.i }
++{ str/is-gas.i}
+ 
+ define variable rec-rvs-shift as recid         no-undo .
+ define variable p-db-num      as integer       no-undo .
+@@ -59,6 +60,8 @@
+ define buffer bf_place-error      for ub.place .
+ define buffer bf_pl-gds           for ub.pl-gds .
+ define buffer bf_pl-pump-nozzle   for ub.pl-pump-nozzle .
++define buffer buf_ctrl-rvs-line-attr   for ub.rvs-line-attr .
++define buffer buf_shift-rvs-line-attr   for ub.rvs-line-attr .
+ 
+ define temp-table tt_pl-gds no-undo
+   field pl-code  like ub.pl-gds.pl-code
+@@ -486,6 +489,31 @@
+         end. /* for each bf_rvs-line-pump */
+         find first ctrl_rvs-line        no-lock where
+             recid( ctrl_rvs-line ) = recid( bf_rvs-line ) .
++      
++          /* Добавим атрибуты для газа */
++        
++          find first buf_ctrl-rvs-line-attr where buf_ctrl-rvs-line-attr.obj-code = ctrl_rvs-line.obj-code
++                                              and buf_ctrl-rvs-line-attr.obj-type = ctrl_rvs-line.obj-type
++                                              and buf_ctrl-rvs-line-attr.gds-code = ctrl_rvs-line.gds-code
++                                              and buf_ctrl-rvs-line-attr.pl-code = ctrl_rvs-line.pl-code
++                                              and buf_ctrl-rvs-line-attr.rvs-code = ctrl_rvs-line.rvs-code
++                                              and buf_ctrl-rvs-line-attr.attr-code = "mask" no-lock no-error.
++          
++          if available (buf_ctrl-rvs-line-attr) then do: /* Если есть линии с метаном */
++          
++              create buf_shift-rvs-line-attr. 
++              
++              assign
++                  buf_shift-rvs-line-attr.obj-code = buf_ctrl-rvs-line-attr.obj-code
++                  buf_shift-rvs-line-attr.obj-type = buf_ctrl-rvs-line-attr.obj-type
++                  buf_shift-rvs-line-attr.gds-code = buf_ctrl-rvs-line-attr.gds-code
++                  buf_shift-rvs-line-attr.pl-code = buf_ctrl-rvs-line-attr.pl-code
++                  buf_shift-rvs-line-attr.rvs-code = shift_rvs-doc.rvs-code
++                  buf_shift-rvs-line-attr.attr-code = buf_ctrl-rvs-line-attr.attr-code
++                  buf_shift-rvs-line-attr.attr-value = buf_ctrl-rvs-line-attr.attr-value.
++          
++          end. /* if available (buf_rvs-line-attr) */
++      
+       end. /* for each bf_rvs-line */
+     end. /* on error */
+ 
+@@ -539,7 +567,7 @@
+                bf_rvs-line.obj-type           = shift_rvs-doc.obj-type and
+                bf_rvs-line.obj-code           = shift_rvs-doc.obj-code and
+                bf_rvs-line.state-measure-qnty = ?                      no-error .
+-    if available bf_rvs-line then do:
++    if available bf_rvs-line and is-gas(bf_rvs-line.gds-code) ne yes then do:
+       {&SetCursorNo}
+       run waitfram-hide in this-procedure .
+       undo Main-Block, return error substitute( 'Не заданы фактические остатки по товару &1.'
+diff -r 0dfeae80ccd5 -r 8cc0ef02c4aa str/in-line.w
+--- a/str/in-line.w	Wed May 14 18:06:48 2014 +0400
++++ b/str/in-line.w	Wed May 14 18:54:28 2014 +0400
+@@ -116,7 +116,6 @@
+ { str/prslnew.i "proc"         }
+ { gbl/ptrlprop.i def           }
+ { str/in-ptrl.i def one-line   }
+-{ ref/gds-attr.i               }
+ { gbl/thbj-def.i               }
+ { ref/gdsoattr.i               }
+ { gbl/clntattr.i               }
+diff -r 0dfeae80ccd5 -r 8cc0ef02c4aa str/in-ptrl.i
+--- a/str/in-ptrl.i	Wed May 14 18:06:48 2014 +0400
++++ b/str/in-ptrl.i	Wed May 14 18:54:28 2014 +0400
+@@ -26,6 +26,8 @@
+     { str/plgdsfnd.i parparentproc }
+     { str/lib-rvs.i                }
+     { str/rvsttdef.i rvs           }
++    { ref/gds-attr.i }
++    { str/is-gas.i }
+ 
+     define variable v-prt-car-num          as character    no-undo .
+     define variable v-prt-car-vol          as character    no-undo .
+@@ -246,6 +248,9 @@
+                 view-as alert-box error .
+               return error .
+             end.
++            
++            if is-gas(buf_before_rvs-line.gds-code) then next.
++            
+             if buf_before_rvs-line.state-measure-qnty = ?
+             then do:
+               message
+@@ -612,18 +617,36 @@
+             end.
+           end.
+           when "edit":U then do:
+-            run str/rvs-lin.w
+-              (input  parparentproc
+-              ,input  recid( buf_rvs-line )
+-              ,input  p-action
+-              ,input  substitute( " # &1 товар &2 &3 &4  складское место &5"
+-                                  ,buf_rvs-doc.rvs-code
+-                                  ,buf_goods.artic
+-                                  ,buf_goods.prod-type
+-                                  ,buf_goods.prod-code
+-                                  ,v-pl-code
+-                                )
+-              ) no-error .
++
++            if not error-status :error 
++               and is-gas(buf_goods.gds-code) then do:
++               
++                run str/rvs-lin-mask.w
++                  (input  parparentproc
++                  ,input  recid( buf_rvs-line )
++                  ,input  p-action
++                  ,input  substitute(" # &1 товар &2 &3 &4  складское место &5"
++                                    ,buf_rvs-doc.rvs-code
++                                    ,buf_goods.artic
++                                    ,buf_goods.prod-type
++                                    ,buf_goods.prod-code
++                                    ,v-pl-code)) no-error.
++            end.
++            
++            else do:
++            
++                run str/rvs-lin.w
++                  (input  parparentproc
++                  ,input  recid( buf_rvs-line )
++                  ,input  p-action
++                  ,input  substitute(" # &1 товар &2 &3 &4  складское место &5"
++                                    ,buf_rvs-doc.rvs-code
++                                    ,buf_goods.artic
++                                    ,buf_goods.prod-type
++                                    ,buf_goods.prod-code
++                                    ,v-pl-code)) no-error.
++            end.
++            
+             if error-status :error then do:
+               message
+                 "Ошибка при редактировании строки сверки." skip
+@@ -640,107 +663,110 @@
+           end.
+         end case.
+ 
+-        if p-action = {&update} then do:
+-          if p-action-type = "meas":U then do:
+-            { str/rvsclcln.i
+-              recid(buf_rvs-line)
+-              no-error
+-            }
+-            if error-status :error then do:
+-              message
+-                "Ошибка при пересчете строки документа сверки." skip
+-                return-value skip
+-                error-status :get-message(1) skip
+-                view-as alert-box error .
+-              undo block_tr, return error .
++        if not is-gas(buf_goods.gds-code) then do:
++
++            if p-action = {&update} then do:
++              if p-action-type = "meas":U then do:
++                { str/rvsclcln.i
++                  recid(buf_rvs-line)
++                  no-error
++                }
++                if error-status :error then do:
++                  message
++                    "Ошибка при пересчете строки документа сверки." skip
++                    return-value skip
++                    error-status :get-message(1) skip
++                    view-as alert-box error .
++                  undo block_tr, return error .
++                end.
++              end.
++    
++              { str/rvsclchd.i
++                recid(buf_rvs-doc)
++                false
++                no-error
++              }
++              if error-status :error then do:
++                message
++                  "Ошибка при пересчете документа сверки." skip
++                  return-value skip
++                  error-status :get-message(1) skip
++                  view-as alert-box error .
++                undo block_tr, return error .
++              end.
++    
++              run return-rvs-qnty in this-procedure
++                ( input t-doc.doc-code
++                 ,input buf_goods.gds-code
++                 ,input v-pl-code
++                 ,output v-rvs-qnty-before
++                 ,output v-rvs-qnty-after
++                 ,output v-rvs-cli-qnty-before
++                 ,output v-rvs-cli-qnty-after
++                ) no-error .
++              if error-status :error then do:
++                undo block_tr, return error return-value .
++              end.
++    
++              if p-rvs-type = {&rvs-after-doc} then do:
++                if v-rvs-qnty-after = ?
++                  or v-rvs-qnty-after = 0
++                then do:
++                  message
++                    "Не задано количество по сверке <<после_док>>"
++                    "по резервуару" v-pl-code "."
++                    view-as alert-box error .
++                  undo block_tr, return error .
++                end.
++                if v-rvs-cli-qnty-after = ?
++                  or v-rvs-cli-qnty-after = 0
++                then do:
++                  /* ругаемся на плотность потому что в строке редактирования сверки у нас открыто поле плотность */
++                  message
++                    "Не задана плотность в сверке <<после_док>>"
++                    "по резервуару" v-pl-code "."
++                    view-as alert-box error .
++                  undo block_tr, return error .
++                end.
++              end.
++    
++              if v-rvs-qnty-after <> ?
++                and v-rvs-qnty-after <> 0
++              then do:
++                if v-rvs-qnty-after - v-rvs-qnty-before <= 0
++                  or v-rvs-qnty-after - v-rvs-qnty-before = ?
++                then do:
++                  message
++                    substitute( "Ошибка по результатам сверки." ) skip
++                    substitute( "Место хранения: &1 .", v-pl-code ) skip
++                    substitute( "Количество залитого топлива: &1 (&2).", v-rvs-qnty-after - v-rvs-qnty-before, buf_goods.unit-base ) skip
++                    view-as alert-box .
++                  undo block_tr, return error .
++                end.
++                if v-rvs-cli-qnty-after - v-rvs-cli-qnty-before <= 0
++                  or v-rvs-cli-qnty-after - v-rvs-cli-qnty-before = ?
++                then do:
++                  message
++                    substitute( "Ошибка по результатам сверки." ) skip
++                    substitute( "Место хранения: &1 .", v-pl-code ) skip
++                    substitute( "Количество залитого топлива: &1 (&2).", v-rvs-cli-qnty-after - v-rvs-cli-qnty-before, buf_goods.unit-cli ) skip
++                    view-as alert-box .
++                  undo block_tr, return error .
++                end.
++    
++                assign
++                  v-rvs-density = (v-rvs-cli-qnty-after - v-rvs-cli-qnty-before) / (v-rvs-qnty-after - v-rvs-qnty-before)
++                .
++                if Valid-Density( v-rvs-density, (buf_goods.unit-base = buf_goods.unit-cli)  ) <> true then do:
++                  message
++                    substitute( "Ошибка по результатам сверки." ) skip
++                    substitute( "Место хранения: &1 .", v-pl-code ) skip
++                    substitute( "Плотность залитого топлива: &1.", v-rvs-density ) skip
++                    view-as alert-box .
++                  undo block_tr, return error .
++                end.
++              end. /* v-rvs-qnty-after <> ? */
+             end.
+-          end.
+-
+-          { str/rvsclchd.i
+-            recid(buf_rvs-doc)
+-            false
+-            no-error
+-          }
+-          if error-status :error then do:
+-            message
+-              "Ошибка при пересчете документа сверки." skip
+-              return-value skip
+-              error-status :get-message(1) skip
+-              view-as alert-box error .
+-            undo block_tr, return error .
+-          end.
+-
+-          run return-rvs-qnty in this-procedure
+-            ( input t-doc.doc-code
+-             ,input buf_goods.gds-code
+-             ,input v-pl-code
+-             ,output v-rvs-qnty-before
+-             ,output v-rvs-qnty-after
+-             ,output v-rvs-cli-qnty-before
+-             ,output v-rvs-cli-qnty-after
+-            ) no-error .
+-          if error-status :error then do:
+-            undo block_tr, return error return-value .
+-          end.
+-
+-          if p-rvs-type = {&rvs-after-doc} then do:
+-            if v-rvs-qnty-after = ?
+-              or v-rvs-qnty-after = 0
+-            then do:
+-              message
+-                "Не задано количество по сверке <<после_док>>"
+-                "по резервуару" v-pl-code "."
+-                view-as alert-box error .
+-              undo block_tr, return error .
+-            end.
+-            if v-rvs-cli-qnty-after = ?
+-              or v-rvs-cli-qnty-after = 0
+-            then do:
+-              /* ругаемся на плотность потому что в строке редактирования сверки у нас открыто поле плотность */
+-              message
+-                "Не задана плотность в сверке <<после_док>>"
+-                "по резервуару" v-pl-code "."
+-                view-as alert-box error .
+-              undo block_tr, return error .
+-            end.
+-          end.
+-
+-          if v-rvs-qnty-after <> ?
+-            and v-rvs-qnty-after <> 0
+-          then do:
+-            if v-rvs-qnty-after - v-rvs-qnty-before <= 0
+-              or v-rvs-qnty-after - v-rvs-qnty-before = ?
+-            then do:
+-              message
+-                substitute( "Ошибка по результатам сверки." ) skip
+-                substitute( "Место хранения: &1 .", v-pl-code ) skip
+-                substitute( "Количество залитого топлива: &1 (&2).", v-rvs-qnty-after - v-rvs-qnty-before, buf_goods.unit-base ) skip
+-                view-as alert-box .
+-              undo block_tr, return error .
+-            end.
+-            if v-rvs-cli-qnty-after - v-rvs-cli-qnty-before <= 0
+-              or v-rvs-cli-qnty-after - v-rvs-cli-qnty-before = ?
+-            then do:
+-              message
+-                substitute( "Ошибка по результатам сверки." ) skip
+-                substitute( "Место хранения: &1 .", v-pl-code ) skip
+-                substitute( "Количество залитого топлива: &1 (&2).", v-rvs-cli-qnty-after - v-rvs-cli-qnty-before, buf_goods.unit-cli ) skip
+-                view-as alert-box .
+-              undo block_tr, return error .
+-            end.
+-
+-            assign
+-              v-rvs-density = (v-rvs-cli-qnty-after - v-rvs-cli-qnty-before) / (v-rvs-qnty-after - v-rvs-qnty-before)
+-            .
+-            if Valid-Density( v-rvs-density, (buf_goods.unit-base = buf_goods.unit-cli)  ) <> true then do:
+-              message
+-                substitute( "Ошибка по результатам сверки." ) skip
+-                substitute( "Место хранения: &1 .", v-pl-code ) skip
+-                substitute( "Плотность залитого топлива: &1.", v-rvs-density ) skip
+-                view-as alert-box .
+-              undo block_tr, return error .
+-            end.
+-          end. /* v-rvs-qnty-after <> ? */
+         end.
+       end. /* on error */
+     end procedure. /* action-rvs-line */
+@@ -1043,6 +1069,9 @@
+                                ,tt-doc-pl.pl-code
+                              ).
+           end.
++          
++          if is-gas(buf-after_rvs-line.gds-code) then next.
++          
+           if buf-before_rvs-line.state-measure-qnty = ? then do:
+             return substitute( 'Документ "&1", товар &2, резервуар &3.&4Не задан фактический остаток (&5) в сверке <<до налива топлива>>.'
+                                ,p-doc-code
+diff -r 0dfeae80ccd5 -r 8cc0ef02c4aa str/is-gas.i
+--- /dev/null	Thu Jan 01 00:00:00 1970 +0000
++++ b/str/is-gas.i	Wed May 14 18:54:28 2014 +0400
+@@ -0,0 +1,44 @@
++
++/*------------------------------------------------------------------------
++    File        : is-gas.i
++    
++    Purpose     : Функция для определения природного газа по коду товара.
++                  Для работы требуются инклудники:
++                      {cmp/str-glbl.i}
++                      {ref/gds-attr.i}
++                  
++                  Они должны быть выше { str/in-ptrl.i def one-line }, если такой имеется.
++
++    Author(s)   : SKiryxin
++    Created     : Mon Jan 21 11:59:23 MSK 2013
++    Notes       : 
++  ----------------------------------------------------------------------*/
++
++/* ************************  Function Implementations ***************** */
++
++function is-gas returns logical 
++        (input p-gds-code as integer):
++/*------------------------------------------------------------------------------
++        Purpose: Возвращает logical, топливный товар или нет
++        Notes:
++------------------------------------------------------------------------------*/    
++
++define variable result as logical no-undo.
++define variable c-value as character no-undo.
++define variable c-type as character no-undo.
++
++/* Стандартное нахождение атрибута */
++do on error undo, return error:
++    &scop proc-name gds-attr-value
++    {&run_proc_attr-lib}
++      (input  p-gds-code
++      ,input  {&attr-is-gas}
++      ,output c-value
++      ,output c-type) no-error.
++end.
++
++result = logical(c-value) no-error. /* При ошибке останется initial no */
++
++return result.
++
++end function.
+\ No newline at end of file
+diff -r 0dfeae80ccd5 -r 8cc0ef02c4aa str/out-prt.w
+--- a/str/out-prt.w	Wed May 14 18:06:48 2014 +0400
++++ b/str/out-prt.w	Wed May 14 18:54:28 2014 +0400
+@@ -86,7 +86,6 @@
+ { trg/partsplt.i }
+ { gbl/ptrlprop.i def            }
+ { str/in-ptrl.i  def one-line   }
+-{ ref/gds-attr.i }
+ { str/prslnew.i "proc"         }
+ { gbl/lineattr.i    }
+ { gbl/getsect.i  def }
+diff -r 0dfeae80ccd5 -r 8cc0ef02c4aa str/rvs-doc.w
+--- a/str/rvs-doc.w	Wed May 14 18:06:48 2014 +0400
++++ b/str/rvs-doc.w	Wed May 14 18:54:28 2014 +0400
+@@ -51,6 +51,8 @@
+ { str/lib-rvs.i       }
+ { gbl/waitfram.i      }
+ { str/rvsttdef.i file }
++{ ref/gds-attr.i      }
++{ str/is-gas.i        }
+ 
+ define buffer r-doc          for ub.rvs-doc.
+ define buffer cur_shift-obj  for ub.shift-obj.
+@@ -314,7 +316,7 @@
+       {&sort-clmn_29-br-line}
+       {&sort-clmn_30-br-line}
+       {&sort-clmn_31-br-line}
+-      {&sort-clmn_32-br-line}
++      {&sort-clmn_32-br-line} format "->>,>>>,>>>.<<<"
+       {&sort-clmn_33-br-line}
+       {&sort-clmn_34-br-line}
+       {&sort-clmn_35-br-line}
+@@ -1576,6 +1578,25 @@
+ 
+ if varlog <> yes then do: return no-apply. end.
+ find first buf_goods where buf_goods.gds-code = ub.rvs-line.gds-code no-lock.
++
++if not error-status :error 
++   and is-gas(buf_goods.gds-code) then do:
++   
++    run str/rvs-lin-mask.w
++      (input  parparentproc
++      ,input  recid(ub.rvs-line)
++      ,input  {&update}
++      ,input  " # "     + r-doc.rvs-code +
++              " товар " + buf_goods.artic     + " " +
++                          buf_goods.prod-type + " " +
++                          string(buf_goods.prod-code) +
++              " складское место " + string(ub.rvs-line.pl-code)
++      ) no-error.
++   
++end.
++
++else do:
++
+ run str/rvs-lin.w
+   (input  parparentproc
+   ,input  recid(ub.rvs-line)
+@@ -1586,6 +1607,9 @@
+                       string(buf_goods.prod-code) +
+           " складское место " + string(ub.rvs-line.pl-code)
+   ) no-error.
++
++end.
++
+ if error-status :error then do:
+    message "Ошибка при редактировании строки сверки." skip
+            return-value skip
+@@ -2129,16 +2153,38 @@
+   end case .
+ if varlog <> yes then do: return error. end.
+ find first buf_goods where buf_goods.gds-code = ub.rvs-line.gds-code no-lock.
+-run str/rvs-lin.w
+-  (input  parparentproc
+-  ,input  recid(ub.rvs-line)
+-  ,input  {&lookup}
+-  ,input  " # "     + r-doc.rvs-code +
+-          " товар " + buf_goods.artic     + " " +
+-                      buf_goods.prod-type + " " +
+-                      string(buf_goods.prod-code) +
+-          " складское место " + string(ub.rvs-line.pl-code)
+-  ) no-error.
++
++if not error-status :error 
++   and is-gas(buf_goods.gds-code) then do:
++   
++    run str/rvs-lin-mask.w
++      (input  parparentproc
++      ,input  recid(ub.rvs-line)
++      ,input  {&lookup}
++      ,input  " # "     + r-doc.rvs-code +
++              " товар " + buf_goods.artic     + " " +
++                          buf_goods.prod-type + " " +
++                          string(buf_goods.prod-code) +
++              " складское место " + string(ub.rvs-line.pl-code)
++      ) no-error.
++   
++end.
++
++else do:
++
++    run str/rvs-lin.w
++      (input  parparentproc
++      ,input  recid(ub.rvs-line)
++      ,input  {&lookup}
++      ,input  " # "     + r-doc.rvs-code +
++              " товар " + buf_goods.artic     + " " +
++                          buf_goods.prod-type + " " +
++                          string(buf_goods.prod-code) +
++              " складское место " + string(ub.rvs-line.pl-code)
++      ) no-error.
++
++end.
++
+ if error-status :error then do:
+    message "Ошибка при просмотре строки сверки." skip
+            return-value skip
+diff -r 0dfeae80ccd5 -r 8cc0ef02c4aa str/rvs-lin-mask.w
+--- /dev/null	Thu Jan 01 00:00:00 1970 +0000
++++ b/str/rvs-lin-mask.w	Wed May 14 18:54:28 2014 +0400
+@@ -0,0 +1,382 @@
++&ANALYZE-SUSPEND _VERSION-NUMBER UIB_v8r12 GUI
++&ANALYZE-RESUME
++/* Connected Databases 
++          ub               PROGRESS
++*/
++&Scoped-define WINDOW-NAME CURRENT-WINDOW
++&Scoped-define FRAME-NAME Dialog-Frame
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CUSTOM _DEFINITIONS Dialog-Frame 
++/*
++
++$Revision$
++$Author$
++$Date$
++$Workfile$
++$Archive$
++
++Экран работы со строкой сверки
++
++Автор: SKiryxin
++Дата создания: 15/01/13
++Author: SKiryxin
++Creation date: 15/01/13
++
++*/
++
++define  input parameter parparentproc   as handle    no-undo.
++define  input parameter parrec-rvs-line as recid     no-undo.
++define  input parameter parmode         as character no-undo.
++define  input parameter partitle        as character no-undo.
++
++define variable vss-revision    as character no-undo initial "$Revision$":U.
++define variable vss-author      as character no-undo initial "$Author$":U.
++define variable vss-date        as character no-undo initial "$Date$":U.
++define variable vss-workfile    as character no-undo initial "$Workfile$":U.
++define variable vss-archive     as character no-undo initial "$Archive$":U.
++define variable vss-description as character no-undo initial "Экран работы со строкой сверки":U.
++
++{ cmp/vssrevis.i }
++{ cmp/str-glbl.i }
++{ cmp/showinf.i  }
++{ cmp/library.i  }
++{ gbl/getcntxt.i def }
++
++define variable v-return-val as character no-undo initial "":U.
++define variable rec-rvs-line-attr as recid  no-undo.    /* Чтобы дважды не искать */
++
++define buffer buf_rvs-line for ub.rvs-line.
++define buffer buf_rvs-line-attr for ub.rvs-line-attr.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++&ANALYZE-SUSPEND _UIB-PREPROCESSOR-BLOCK 
++
++/* ********************  Preprocessor Definitions  ******************** */
++
++&Scoped-define PROCEDURE-TYPE DIALOG-BOX
++&Scoped-define DB-AWARE no
++
++/* Name of designated FRAME-NAME and/or first browse and/or first query */
++&Scoped-define FRAME-NAME Dialog-Frame
++
++/* Standard List Definitions                                            */
++&Scoped-Define ENABLED-OBJECTS b-save RECT-M RECT-C b-cancel ~
++fill-in-mag-count fill-in-mag-pres fill-in-mag-temper fill-in-cap-count ~
++fill-in-cap-pres 
++&Scoped-Define DISPLAYED-OBJECTS fill-in-mag-count fill-in-mag-pres ~
++fill-in-mag-temper fill-in-cap-count fill-in-cap-pres 
++
++/* Custom List Definitions                                              */
++/* List-1,List-2,List-3,List-4,List-5,List-6                            */
++&Scoped-define List-1 Dialog-Frame 
++
++/* _UIB-PREPROCESSOR-BLOCK-END */
++&ANALYZE-RESUME
++
++
++
++/* ***********************  Control Definitions  ********************** */
++
++/* Define a dialog box                                                  */
++
++/* Definitions of the field level widgets                               */
++DEFINE BUTTON b-cancel AUTO-END-KEY 
++     LABEL "&Отмена" 
++     SIZE 10 BY 1
++     BGCOLOR 8 .
++
++DEFINE BUTTON b-save AUTO-GO 
++     LABEL "&Ввод" 
++     SIZE 10 BY 1
++     BGCOLOR 8 .
++
++DEFINE VARIABLE fill-in-cap-count AS DECIMAL FORMAT ">>,>>>,>>9.99":U INITIAL 0 
++     LABEL "Показания счетчика" 
++     VIEW-AS FILL-IN 
++     SIZE 15 BY .95 NO-UNDO.
++
++DEFINE VARIABLE fill-in-cap-pres AS DECIMAL FORMAT ">>9.99":U INITIAL 0 
++     LABEL "Остаточное давление" 
++     VIEW-AS FILL-IN 
++     SIZE 15 BY .95 NO-UNDO.
++
++DEFINE VARIABLE fill-in-mag-count AS DECIMAL FORMAT ">>,>>>,>>9.99":U INITIAL 0 
++     LABEL "Показания счетчика" 
++     VIEW-AS FILL-IN 
++     SIZE 15 BY .95 NO-UNDO.
++
++DEFINE VARIABLE fill-in-mag-pres AS DECIMAL FORMAT ">>9.99":U INITIAL 0 
++     LABEL "Входящее давление" 
++     VIEW-AS FILL-IN 
++     SIZE 15 BY .95 NO-UNDO.
++
++DEFINE VARIABLE fill-in-mag-temper AS DECIMAL FORMAT "99.99":U INITIAL 0 
++     LABEL "Температура" 
++     VIEW-AS FILL-IN 
++     SIZE 15 BY .95 NO-UNDO.
++
++DEFINE RECTANGLE RECT-C
++     EDGE-PIXELS 2 GRAPHIC-EDGE  NO-FILL   
++     SIZE 57 BY 3.57.
++
++DEFINE RECTANGLE RECT-M
++     EDGE-PIXELS 2 GRAPHIC-EDGE  NO-FILL   
++     SIZE 57 BY 5.
++
++
++/* ************************  Frame Definitions  *********************** */
++
++DEFINE FRAME Dialog-Frame
++     b-save AT ROW 1 COL 1
++     b-cancel AT ROW 1 COL 11
++     fill-in-mag-count AT ROW 3.38 COL 35 COLON-ALIGNED WIDGET-ID 26
++     fill-in-mag-pres AT ROW 4.81 COL 35 COLON-ALIGNED WIDGET-ID 28
++     fill-in-mag-temper AT ROW 6.24 COL 35 COLON-ALIGNED WIDGET-ID 30
++     fill-in-cap-count AT ROW 9.57 COL 34 COLON-ALIGNED WIDGET-ID 36
++     fill-in-cap-pres AT ROW 11 COL 34 COLON-ALIGNED WIDGET-ID 38
++     "Данные по накопительной емкости" VIEW-AS TEXT
++          SIZE 38 BY .71 AT ROW 8.14 COL 24 WIDGET-ID 32
++     "Данные о заборе газа из магистрали" VIEW-AS TEXT
++          SIZE 40 BY .71 AT ROW 2.19 COL 22 WIDGET-ID 22
++     RECT-M AT ROW 2.91 COL 12 WIDGET-ID 24
++     RECT-C AT ROW 8.86 COL 12 WIDGET-ID 34
++     SPACE(11.19) SKIP(0.61)
++    WITH VIEW-AS DIALOG-BOX KEEP-TAB-ORDER 
++         SIDE-LABELS NO-UNDERLINE THREE-D  SCROLLABLE 
++         TITLE "Документ сверки"
++         CANCEL-BUTTON b-cancel.
++
++
++/* *********************** Procedure Settings ************************ */
++
++&ANALYZE-SUSPEND _PROCEDURE-SETTINGS
++/* Settings for THIS-PROCEDURE
++   Type: DIALOG-BOX
++   Allow: Basic,Browse,DB-Fields,Query
++   Temp-Tables and Buffers:
++      TABLE: tt-rvs-line T "?" NO-UNDO ub rvs-line
++   END-TABLES.
++ */
++&ANALYZE-RESUME _END-PROCEDURE-SETTINGS
++
++
++
++/* ***********  Runtime Attributes and AppBuilder Settings  *********** */
++
++&ANALYZE-SUSPEND _RUN-TIME-ATTRIBUTES
++/* SETTINGS FOR DIALOG-BOX Dialog-Frame
++   FRAME-NAME 1                                                         */
++ASSIGN 
++       FRAME Dialog-Frame:SCROLLABLE       = FALSE
++       FRAME Dialog-Frame:HIDDEN           = TRUE.
++
++/* _RUN-TIME-ATTRIBUTES-END */
++&ANALYZE-RESUME
++
++ 
++
++
++
++/* ************************  Control Triggers  ************************ */
++
++&Scoped-define SELF-NAME Dialog-Frame
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL Dialog-Frame Dialog-Frame
++ON WINDOW-CLOSE OF FRAME Dialog-Frame /* Документ сверки */
++DO:
++  v-return-val = "cancel".
++  APPLY "END-ERROR":U TO SELF.
++END.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++&Scoped-define SELF-NAME b-cancel
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL b-cancel Dialog-Frame
++ON CHOOSE OF b-cancel IN FRAME Dialog-Frame /* Отмена */
++DO:
++  { gbl/stdbtn.i }
++  v-return-val = "cancel".
++  APPLY "END-ERROR":U TO SELF.
++END.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++&Scoped-define SELF-NAME b-cancel
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL b-cancel Dialog-Frame
++ON CHOOSE OF b-save IN FRAME Dialog-Frame /* Сохранить */
++DO:
++
++find first buf_rvs-line where recid(buf_rvs-line) = parrec-rvs-line no-error.
++find first buf_rvs-line-attr where recid(buf_rvs-line-attr) = rec-rvs-line-attr no-error.
++
++assign frame {&frame-name} fill-in-cap-count
++                           fill-in-cap-pres
++                           fill-in-mag-count
++                           fill-in-mag-pres
++                           fill-in-mag-temper.
++
++if not available buf_rvs-line-attr then do:
++    create buf_rvs-line-attr. 
++    
++    assign
++        buf_rvs-line-attr.obj-code = buf_rvs-line.obj-code
++        buf_rvs-line-attr.obj-type = buf_rvs-line.obj-type
++        buf_rvs-line-attr.gds-code = buf_rvs-line.gds-code
++        buf_rvs-line-attr.pl-code = buf_rvs-line.pl-code
++        buf_rvs-line-attr.rvs-code = buf_rvs-line.rvs-code
++        buf_rvs-line-attr.attr-code = "mask"
++        /* Значение атрибута - составное: показатель счетчика емкости ; остаточное давление ; температура */
++        buf_rvs-line-attr.attr-value = substitute("&1;&2;&3",fill-in-mag-count,fill-in-mag-pres,fill-in-mag-temper)
++        buf_rvs-line.state-level-petrol = fill-in-cap-count
++        buf_rvs-line.state-level-total = fill-in-cap-pres.
++        buf_rvs-line.state-density = 0.666.
++        
++end. /* if not available buf_rvs-line-attr */
++
++else do:
++    /* Значение атрибута - составное: показатель счетчика емкости ; остаточное давление ; температура */
++    assign
++        buf_rvs-line-attr.attr-value = substitute("&1;&2;&3",fill-in-mag-count,fill-in-mag-pres,fill-in-mag-temper)
++        buf_rvs-line.state-level-petrol = fill-in-cap-count
++        buf_rvs-line.state-level-total = fill-in-cap-pres.
++end.
++
++END.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++&Scoped-define SELF-NAME b-save
++&UNDEFINE SELF-NAME
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CUSTOM _MAIN-BLOCK Dialog-Frame 
++
++
++/* ***************************  Main Block  *************************** */
++
++/* Parent the dialog-box to the ACTIVE-WINDOW, if there is no parent.   */
++IF VALID-HANDLE(ACTIVE-WINDOW) AND FRAME {&FRAME-NAME}:PARENT eq ?
++THEN FRAME {&FRAME-NAME}:PARENT = ACTIVE-WINDOW.
++
++/* Now enable the interface and wait for the exit condition.            */
++/* (NOTE: handle ERROR and END-KEY so cleanup code will always fire.    */
++MAIN-BLOCK:
++DO ON ERROR   UNDO MAIN-BLOCK, LEAVE MAIN-BLOCK
++   ON END-KEY UNDO MAIN-BLOCK, LEAVE MAIN-BLOCK:
++
++  run get-values in this-procedure. /* Получим данные */
++  run enable_UI in this-procedure.
++  assign frame {&frame-name} :title = frame {&frame-name} :title + " - " + parmode + " - " +  partitle.
++  run ui-on in this-procedure.
++  
++  WAIT-FOR GO OF FRAME {&FRAME-NAME}.
++END.
++
++RUN disable_UI.
++return v-return-val.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++
++/* **********************  Internal Procedures  *********************** */
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE disable_UI Dialog-Frame  _DEFAULT-DISABLE
++PROCEDURE disable_UI :
++/*------------------------------------------------------------------------------
++  Purpose:     DISABLE the User Interface
++  Parameters:  <none>
++  Notes:       Here we clean-up the user-interface by deleting
++               dynamic widgets we have created and/or hide 
++               frames.  This procedure is usually called when
++               we are ready to "clean-up" after running.
++------------------------------------------------------------------------------*/
++  /* Hide all frames. */
++  HIDE FRAME Dialog-Frame.
++END PROCEDURE.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE enable_UI Dialog-Frame  _DEFAULT-ENABLE
++PROCEDURE enable_UI :
++/*------------------------------------------------------------------------------
++  Purpose:     ENABLE the User Interface
++  Parameters:  <none>
++  Notes:       Here we display/view/enable the widgets in the
++               user-interface.  In addition, OPEN all queries
++               associated with each FRAME and BROWSE.
++               These statements here are based on the "Other 
++               Settings" section of the widget Property Sheets.
++------------------------------------------------------------------------------*/
++  DISPLAY fill-in-mag-count fill-in-mag-pres fill-in-mag-temper 
++          fill-in-cap-count fill-in-cap-pres 
++      WITH FRAME Dialog-Frame.
++  ENABLE b-save RECT-M RECT-C b-cancel fill-in-mag-count
++         fill-in-mag-pres fill-in-mag-temper fill-in-cap-count fill-in-cap-pres
++      WITH FRAME Dialog-Frame.
++  VIEW FRAME Dialog-Frame.
++  {&OPEN-BROWSERS-IN-QUERY-Dialog-Frame}
++END PROCEDURE.
++
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE ui-on Include
++procedure ui-on:
++	/*------------------------------------------------------------------------------
++			Purpose: Включение интерфейса с нужными параметрами
++			Notes:  																	  
++	------------------------------------------------------------------------------*/
++if parmode = {&lookup} then
++    disable b-save fill-in-mag-count fill-in-mag-pres 
++            fill-in-mag-temper fill-in-cap-count fill-in-cap-pres
++            with frame Dialog-Frame.
++
++end procedure.
++	
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME
++	
++&ANALYZE-SUSPEND _UIB-CODE-BLOCK _PROCEDURE get-values Include
++procedure get-values:
++	/*------------------------------------------------------------------------------
++			Purpose: Получим знаения строки
++			Notes: 
++	------------------------------------------------------------------------------*/
++find first buf_rvs-line no-lock where recid(buf_rvs-line) = parrec-rvs-line no-error.
++
++find first buf_rvs-line-attr where buf_rvs-line-attr.obj-code = buf_rvs-line.obj-code
++                                       and buf_rvs-line-attr.obj-type = buf_rvs-line.obj-type
++                                       and buf_rvs-line-attr.gds-code = buf_rvs-line.gds-code
++                                       and buf_rvs-line-attr.pl-code = buf_rvs-line.pl-code
++                                       and buf_rvs-line-attr.rvs-code = buf_rvs-line.rvs-code
++                                       and buf_rvs-line-attr.attr-code = "mask" no-error.
++
++rec-rvs-line-attr = recid(buf_rvs-line-attr) no-error.
++
++if not available buf_rvs-line then do:
++   message "Неверно переданы параметры."
++           "Не найдена строка сверки с recid " parrec-rvs-line " ."
++   view-as alert-box error.
++   return error.
++end.
++
++assign 
++    fill-in-cap-count = buf_rvs-line.state-level-petrol
++    fill-in-cap-pres = buf_rvs-line.state-level-total
++    /* Значение атрибута - составное: показатель счетчика емкости ; остаточное давление ; температура */
++    fill-in-mag-count = integer(entry(1,buf_rvs-line-attr.attr-value, ";")) 
++    fill-in-mag-pres = integer(entry(2,buf_rvs-line-attr.attr-value, ";"))
++    fill-in-mag-temper = integer(entry(3,buf_rvs-line-attr.attr-value, ";")) no-error.
++
++end procedure.
++	
++/* _UIB-CODE-BLOCK-END */
++&ANALYZE-RESUME

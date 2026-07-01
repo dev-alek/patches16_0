@@ -1,0 +1,58 @@
+# HG changeset patch
+# User EShklyar
+# Parent  69590a336c3b9e1572d1213e845ded3278481b30
+refs #DEVBO-871 Формата поля код океи в справочнике единиц измерения не хватает
+
+http://exp-jira.expertek.local:8080/browse/DEVBO-871
+
+diff --git a/ref/units.w b/ref/units.w
+--- a/ref/units.w
++++ b/ref/units.w
+@@ -120,7 +120,7 @@ DEFINE BROWSE br-units QUERY br-units NO
+       ub.units.long-name FORMAT "X(30)"
+       (IF (ub.units.type = "" ) THEN ("") ELSE ({&unit-type-name} + {&unit-type-name-toplivo})) COLUMN-LABEL "Описание типа" FORMAT "x(30)"
+       ub.units.type FORMAT "X(12)"
+-      ub.units.OKEI COLUMn-LABEL "Код!ОКЕИ"
++      ub.units.OKEI COLUMn-LABEL "Код!ОКЕИ" format "9999"
+     WITH SEPARATORS
+           &IF '{&WINDOW-SYSTEM}' = 'TTY':U &THEN SIZE 69 BY 13
+           &ELSE size 86.25 by 12.58 &ENDIF
+diff --git a/ref/unitsi.w b/ref/unitsi.w
+--- a/ref/unitsi.w
++++ b/ref/unitsi.w
+@@ -164,9 +164,9 @@ DEFINE FRAME Dialog-Frame
+           SIZE 8 BY 1
+      UnitType AT ROW 3.75 COL 35.25 COLON-ALIGNED
+      tt-units.OKEI AT ROW 5.33 COL 20 COLON-ALIGNED
+-          LABEL "ОКЕИ"
+-          VIEW-AS FILL-IN
+-          SIZE 4 BY 1
++          LABEL "ОКЕИ" format "9999"
++          VIEW-AS FILL-IN 
++          SIZE 5.5 BY 1
+      UnitType-2 AT ROW 5.33 COL 35.25 COLON-ALIGNED
+      SPACE(6.12) SKIP(1.17)
+     WITH VIEW-AS DIALOG-BOX KEEP-TAB-ORDER
+@@ -309,14 +309,14 @@ DO ON ERROR   UNDO MAIN-BLOCK, LEAVE MAI
+  end.
+  { gbl/curdbnum.i v-db-num }
+  if p-mode <> {&lookup} then do:
+-    if v-db-num <> 0
+-    then do:
+-      message
+-      vss-workfile vss-revision vss-description skip
+-      "Неверное значение параметров вызова p-mode - нельзя изменять/добавлять записи ЕД.ИЗМ в УБД"
+-      view-as alert-box ERROR.
+-      undo, return error.
+-    end.
++/*    if v-db-num <> 0                                                                              */
++/*    then do:                                                                                      */
++/*      message                                                                                     */
++/*      vss-workfile vss-revision vss-description skip                                              */
++/*      "Неверное значение параметров вызова p-mode - нельзя изменять/добавлять записи ЕД.ИЗМ в УБД"*/
++/*      view-as alert-box ERROR.                                                                    */
++/*      undo, return error.                                                                         */
++/*    end.                                                                                          */
+   end.
+   for each tt-units:
+         delete tt-units.

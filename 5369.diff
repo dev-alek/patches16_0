@@ -1,0 +1,20 @@
+# HG changeset patch
+# User EShklyar
+# Parent  00595c5ca0f67c4061ac722f5252ec7cab354efe
+refs #5369 Загрузка расчетных счетов из ERP
+
+http://exp-rm/issues/5369
+
+diff -r 00595c5ca0f6 -r 34453c8ee0af ibs/th/bge/1crn/import/impbank-accounts.cls
+--- a/ibs/th/bge/1crn/import/impbank-accounts.cls	Thu Oct 17 16:48:43 2019 +0300
++++ b/ibs/th/bge/1crn/import/impbank-accounts.cls	Thu Oct 17 16:49:39 2019 +0300
+@@ -194,7 +194,8 @@
+       end.     
+       find first buf_fin-schet EXCLUSIVE-LOCK where buf_fin-schet.r-schet = objBank-Accounts:r-schet
+         and buf_fin-schet.cli-code = X_schet-clients.obj-code
+-        and buf_fin-schet.cli-type = X_schet-clients.obj-type no-error .
++        and buf_fin-schet.cli-type = X_schet-clients.obj-type 
++        and buf_fin-schet.code-bank = v-code-bank-schet no-error .
+       if AVAILABLE buf_fin-schet then 
+       do:
+         v-mode = {&update} .

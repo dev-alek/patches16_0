@@ -1,0 +1,310 @@
+# HG changeset patch
+# User SSlivenko
+# Parent  43369e7fe2f829475c1cc9797485f7e05753ff94
+refs #DEVBO-1155 ЗИ 215: Автозаполнения накладной НП   Объем по док пытаемся принимать к учёту.
+
+http://exp-jira.expertek.local:8080/browse/DEVBO-1155
+Замечания тех. ПСИ
+Объем по док пытаемся принимать к учёту.
+
+diff --git a/ibs/th/str/InfoSectionsTotal.cls b/ibs/th/str/InfoSectionsTotal.cls
+--- a/ibs/th/str/InfoSectionsTotal.cls
++++ b/ibs/th/str/InfoSectionsTotal.cls
+@@ -97,6 +97,10 @@ class ibs.th.str.InfoSectionsTotal:
+   define property DocQntyTotal as decimal no-undo
+     get.
+     set.
++    
++  define property DocVolumeTotal as decimal no-undo
++    get.
++    set.
+ 
+   define property CliQntyTotal as decimal no-undo
+     get.
+@@ -490,6 +494,7 @@ class ibs.th.str.InfoSectionsTotal:
+       TankWaterVolTotal = 0
+       TankWeightTotal = 0
+       DocQntyTotal = 0
++      DocVolumeTotal = 0
+       CliQntyTotal = 0
+       FactQntyTotal = 0
+       FactKgQntyTotal = 0
+@@ -517,6 +522,7 @@ class ibs.th.str.InfoSectionsTotal:
+         TankWaterVolTotal = round(InfoSectionCurr:TankWater, 3) + TankWaterVolTotal
+         TankWeightTotal = round(InfoSectionCurr:TankWeight, 3) + TankWeightTotal
+         DocQntyTotal = round(InfoSectionCurr:DocQnty, 3) + DocQntyTotal
++        DocVolumeTotal = round((if InfoSectionCurr:DocVolume > 0 then InfoSectionCurr:DocVolume else InfoSectionCurr:DocQnty), 3) + DocVolumeTotal
+         FactQntyTotal = round(InfoSectionCurr:FactQnty, 3) + FactQntyTotal
+         FactKgQntyTotal = round(InfoSectionCurr:FactKgQnty, 3) + FactKgQntyTotal
+         TPNormPLSum = round(InfoSectionCurr:TPNormPL, 3) + TPNormPLSum
+@@ -539,7 +545,7 @@ class ibs.th.str.InfoSectionsTotal:
+         .
+       end.
+     end.
+-    DocDensityAvg = CliQntyTotal / DocQntyTotal .
++    DocDensityAvg = CliQntyTotal / DocVolumeTotal .
+ 
+ 
+   end method.
+diff --git a/ibs/th/str/ptrl/forms/tanksection.cls b/ibs/th/str/ptrl/forms/tanksection.cls
+--- a/ibs/th/str/ptrl/forms/tanksection.cls
++++ b/ibs/th/str/ptrl/forms/tanksection.cls
+@@ -177,6 +177,7 @@ class ibs.th.str.ptrl.forms.tanksection 
+   
+   define variable v-cli-qnty    as decimal no-undo .
+   define variable v-doc-qnty    as decimal no-undo .
++  define variable v-doc-volume  as decimal no-undo .
+   define variable v-doc-density as decimal no-undo .
+     
+   constructor public tanksection ( infoSecs as class InfoSectionsTotal, idSec as int, inTanksecs as class tanksections):
+@@ -543,6 +544,21 @@ class ibs.th.str.ptrl.forms.tanksection 
+ 
+   end method.
+ 
++	/*------------------------------------------------------------------------------
++	 Purpose:
++	 Notes:
++	------------------------------------------------------------------------------*/
++	@VisualDesigner.
++  method private void DocVolLeave( input sender as System.Object, input e as System.EventArgs ):
++
++    infoSecsObj:GetInfoSectionProp(idSecTabPage).
++    infoSecsObj:InfoSectionCurr:DocVolume = decimal(maskedTextBoxDocVolume:text) .
++    v-doc-volume = infoSecsObj:InfoSectionCurr:DocVolume .
++
++    return.
++
++  end method.
++
+   method public void GetCopy(a as char, b as char, c as char, d as char ):
+     
+     assign
+@@ -1408,7 +1424,7 @@ class ibs.th.str.ptrl.forms.tanksection 
+     /*  */
+     /* buttonPl */
+     /*  */
+-    this-object:buttonPl:Location = new System.Drawing.Point(632, 136).
++    this-object:buttonPl:Location = new System.Drawing.Point(630, 138).
+     this-object:buttonPl:Name = "buttonPl".
+     this-object:buttonPl:Size = new System.Drawing.Size(47, 23).
+     this-object:buttonPl:TabIndex = 24.
+@@ -1419,9 +1435,9 @@ class ibs.th.str.ptrl.forms.tanksection 
+     /*  */
+     /* label19 */
+     /*  */
+-    this-object:label19:Font = new System.Drawing.Font("Microsoft Sans Serif", Progress.Util.CastUtil:ToSingle(8), System.Drawing.FontStyle:Regular, System.Drawing.GraphicsUnit:Point, System.Convert:ToByte(204)).
++    this-object:label19:Font = new System.Drawing.Font("Microsoft Sans Serif", Progress.Util.CastUtil:ToSingle(8.25), System.Drawing.FontStyle:Regular, System.Drawing.GraphicsUnit:Point, System.Convert:ToByte(204)).
+     this-object:label19:ForeColor = System.Drawing.SystemColors:ControlText.
+-    this-object:label19:Location = new System.Drawing.Point(534, 140).
++    this-object:label19:Location = new System.Drawing.Point(523, 142).
+     this-object:label19:Name = "label19".
+     this-object:label19:Size = new System.Drawing.Size(70, 18).
+     this-object:label19:TabIndex = 28.
+@@ -1431,9 +1447,9 @@ class ibs.th.str.ptrl.forms.tanksection 
+     /*  */
+     /* maskedTextBoxListTank */
+     /*  */
+-    this-object:maskedTextBoxListTank:Location = new System.Drawing.Point(603, 138).
++    this-object:maskedTextBoxListTank:Location = new System.Drawing.Point(596, 140).
+     this-object:maskedTextBoxListTank:Name = "maskedTextBoxListTank".
+-    this-object:maskedTextBoxListTank:Size = new System.Drawing.Size(29, 20).
++    this-object:maskedTextBoxListTank:Size = new System.Drawing.Size(32, 20).
+     this-object:maskedTextBoxListTank:TabIndex = 23.
+     this-object:maskedTextBoxListTank:KeyPress:Subscribe(this-object:KeyPressMaskTBIntNegNum_2).
+     /*  */
+@@ -1602,6 +1618,7 @@ class ibs.th.str.ptrl.forms.tanksection 
+     this-object:maskedTextBoxDocVolume:Size = new System.Drawing.Size(77, 20).
+     this-object:maskedTextBoxDocVolume:TabIndex = 26.
+     this-object:maskedTextBoxDocVolume:KeyPress:Subscribe(this-object:KeyPressMaskTBDecimal_5_3).
++    this-object:maskedTextBoxDocVolume:Leave:Subscribe(this-object:DocVolLeave).
+     /*  */
+     /* label47 */
+     /*  */
+@@ -2619,8 +2636,9 @@ class ibs.th.str.ptrl.forms.tanksection 
+     this-object:maskedTextBoxPaspDens:Text        = format_dens (infoSecObj:PaspDens).
+     this-object:maskedTextBoxPressure:Text        = if infoSecObj:Pressure = 0 or infoSecObj:Pressure = ? then "0." else format_pressure (infoSecObj:Pressure).
+     this-object:maskedTextBoxDocQnty:Text         = format_round_0 (infoSecObj:DocQnty).
++    v-doc-qnty = infoSecObj:DocQnty no-error .
+     this-object:maskedTextBoxDocVolume:Text       = format_round_0 (infoSecObj:DocVolume).
+-    v-doc-qnty = infoSecObj:DocQnty no-error .
++    v-doc-volume = infoSecObj:DocVolume no-error .
+     this-object:maskedTextBoxTTNTemp:Text         = if infoSecObj:TTNTemp = ? then "" else format_temper (infoSecObj:TTNTemp).
+     this-object:maskedTextBoxAccShip:Text         = format_round_3 (if infoSecObj:AccShip > 0 then infoSecObj:AccShip else 0.25).
+     this-object:maskedTextBoxDiameter:Text        = (infoSecObj:Diameter).
+@@ -3252,7 +3270,7 @@ class ibs.th.str.ptrl.forms.tanksection 
+     infoSecObj:DocDensity      = v-doc-density .         
+ /*    infoSecObj:DocQnty         = decimal(this-object:maskedTextBoxDocQnty:Text).*/
+     infoSecObj:DocQnty         = v-doc-qnty .    
+-    infoSecObj:DocVolume       = decimal(this-object:maskedTextBoxDocVolume:Text).  
++    infoSecObj:DocVolume       = v-doc-volume .  
+     infoSecObj:TTNTemp         = (if trim (this-object:maskedTextBoxTTNTemp:Text) = "" then ? else decimal(this-object:maskedTextBoxTTNTemp:Text) ).         
+     infoSecObj:AccShip         = decimal(this-object:maskedTextBoxAccShip:Text).         
+     infoSecObj:Diameter        = (this-object:maskedTextBoxDiameter:Text).        
+diff --git a/rep/akt-petrol.p b/rep/akt-petrol.p
+--- a/rep/akt-petrol.p
++++ b/rep/akt-petrol.p
+@@ -604,7 +604,7 @@ next_:
+                         .
+                     assign
+                         tt-petrol.name-gds   = v-gds-name
+-                        tt-petrol.vol-TH     = decimal(v-InfoSectionsTotal:GetInfoSectionProp(iNum):DocQnty)
++                        tt-petrol.vol-TH     = decimal(v-InfoSectionsTotal:GetInfoSectionProp(iNum):DocVolume)
+                         tt-petrol.density-TH = decimal(v-InfoSectionsTotal:GetInfoSectionProp(iNum):DocDensity) * 1000
+                         tt-petrol.temp-TH    = decimal(v-InfoSectionsTotal:GetInfoSectionProp(iNum):TTNTemp)
+                         .
+diff --git a/str/in-line.w b/str/in-line.w
+--- a/str/in-line.w
++++ b/str/in-line.w
+@@ -1619,7 +1619,7 @@ do:
+       if infoSectionsTotal:InfoSectionCurr:FactQnty = 0
+       or infoSectionsTotal:InfoSectionCurr:FactQnty = ?
+       then do :
+-        infoSectionsTotal:InfoSectionCurr:FactQnty = infoSectionsTotal:InfoSectionCurr:DocQnty.
++        infoSectionsTotal:InfoSectionCurr:FactQnty = (if infoSectionsTotal:InfoSectionCurr:DocVolume > 0 then infoSectionsTotal:InfoSectionCurr:DocVolume else infoSectionsTotal:InfoSectionCurr:DocQnty).
+       end .
+       if infoSectionsTotal:InfoSectionCurr:FactDensity = 0
+       or infoSectionsTotal:InfoSectionCurr:FactDensity = ?
+@@ -1649,7 +1649,7 @@ do:
+ 
+     if not infoSectionsTotal:CliQntyInput then do:
+       tt-fr-doc-line.doc-density:screen-value = string (infoSectionsTotal:DocDensityAvg).
+-      tt-fr-doc-line.doc-qnty:screen-value = string (infoSectionsTotal:DocQntyTotal).
++      tt-fr-doc-line.doc-qnty:screen-value = string (if infoSectionsTotal:DocVolumeTotal > 0 then infoSectionsTotal:DocVolumeTotal else infoSectionsTotal:DocQntyTotal).
+       if input frame {&frame-name} tt-fr-doc-line.doc-qnty <> tt-fr-doc-line.doc-qnty
+       then do:
+         assign
+@@ -1707,8 +1707,8 @@ do:
+               next sect_ .
+               
+             assign
+-              pl_cli-qnty   = pl_cli-qnty + (infoSectionsTotal:InfoSectionCurr:DocDensity * infoSectionsTotal:InfoSectionCurr:DocQnty)
+-              pl_doc-qnty   = pl_doc-qnty + infoSectionsTotal:InfoSectionCurr:DocQnty
++              pl_cli-qnty   = pl_cli-qnty + (infoSectionsTotal:InfoSectionCurr:DocDensity * (if infoSectionsTotal:InfoSectionCurr:DocVolume > 0 then infoSectionsTotal:InfoSectionCurr:DocVolume else infoSectionsTotal:InfoSectionCurr:DocQnty))
++              pl_doc-qnty   = pl_doc-qnty + (if infoSectionsTotal:InfoSectionCurr:DocVolume > 0 then infoSectionsTotal:InfoSectionCurr:DocVolume else infoSectionsTotal:InfoSectionCurr:DocQnty)
+               pl_fact-qnty  = pl_fact-qnty + infoSectionsTotal:InfoSectionCurr:FactQnty
+             .
+           end . 
+@@ -1807,8 +1807,8 @@ do:
+               next sect_ .
+               
+             assign
+-              pl_cli-qnty   = pl_cli-qnty + (infoSectionsTotal:InfoSectionCurr:DocDensity * infoSectionsTotal:InfoSectionCurr:DocQnty)
+-              pl_doc-qnty   = pl_doc-qnty + infoSectionsTotal:InfoSectionCurr:DocQnty
++              pl_cli-qnty   = pl_cli-qnty + (infoSectionsTotal:InfoSectionCurr:DocDensity * (if infoSectionsTotal:InfoSectionCurr:DocVolume > 0 then infoSectionsTotal:InfoSectionCurr:DocVolume else infoSectionsTotal:InfoSectionCurr:DocQnty))
++              pl_doc-qnty   = pl_doc-qnty + (if infoSectionsTotal:InfoSectionCurr:DocVolume > 0 then infoSectionsTotal:InfoSectionCurr:DocVolume else infoSectionsTotal:InfoSectionCurr:DocQnty)
+               pl_fact-qnty  = pl_fact-qnty + infoSectionsTotal:InfoSectionCurr:FactQnty
+             .
+           end . 
+@@ -1848,7 +1848,7 @@ do:
+       end .
+     end.
+     if not infoSectionsTotal:DensityInput then do:
+-      tt-fr-doc-line.doc-qnty:screen-value = string (infoSectionsTotal:DocQntyTotal).
++      tt-fr-doc-line.doc-qnty:screen-value = string (if infoSectionsTotal:DocVolumeTotal > 0 then infoSectionsTotal:DocVolumeTotal else infoSectionsTotal:DocQntyTotal).
+       tt-fr-doc-line.cli-qnty:screen-value = string (infoSectionsTotal:CliQntyTotal).
+       if input frame {&frame-name} tt-fr-doc-line.doc-qnty <> tt-fr-doc-line.doc-qnty
+       then do:
+@@ -1908,7 +1908,7 @@ do:
+               
+             assign
+               pl_cli-qnty   = pl_cli-qnty + infoSectionsTotal:InfoSectionCurr:CliQnty
+-              pl_doc-qnty   = pl_doc-qnty + infoSectionsTotal:InfoSectionCurr:DocQnty
++              pl_doc-qnty   = pl_doc-qnty + (if infoSectionsTotal:InfoSectionCurr:DocVolume > 0 then infoSectionsTotal:InfoSectionCurr:DocVolume else infoSectionsTotal:InfoSectionCurr:DocQnty)
+               pl_fact-qnty  = pl_fact-qnty + infoSectionsTotal:InfoSectionCurr:FactQnty
+             .
+           end . 
+@@ -2020,7 +2020,7 @@ do:
+               
+             assign
+               pl_cli-qnty   = pl_cli-qnty + infoSectionsTotal:InfoSectionCurr:CliQnty
+-              pl_doc-qnty   = pl_doc-qnty + infoSectionsTotal:InfoSectionCurr:DocQnty
++              pl_doc-qnty   = pl_doc-qnty + (if infoSectionsTotal:InfoSectionCurr:DocVolume > 0 then infoSectionsTotal:InfoSectionCurr:DocVolume else infoSectionsTotal:InfoSectionCurr:DocQnty)
+               pl_fact-qnty  = pl_fact-qnty + infoSectionsTotal:InfoSectionCurr:FactQnty
+             .
+           end . 
+@@ -2136,7 +2136,7 @@ do:
+               
+             assign
+               pl_cli-qnty   = pl_cli-qnty + infoSectionsTotal:InfoSectionCurr:CliQnty
+-              pl_doc-qnty   = pl_doc-qnty + infoSectionsTotal:InfoSectionCurr:DocQnty
++              pl_doc-qnty   = pl_doc-qnty + (if infoSectionsTotal:InfoSectionCurr:DocVolume > 0 then infoSectionsTotal:InfoSectionCurr:DocVolume else infoSectionsTotal:InfoSectionCurr:DocQnty)
+               pl_fact-qnty  = pl_fact-qnty + infoSectionsTotal:InfoSectionCurr:FactQnty
+             .
+           end . 
+@@ -2236,7 +2236,7 @@ do:
+               
+             assign
+               pl_cli-qnty   = pl_cli-qnty + infoSectionsTotal:InfoSectionCurr:CliQnty
+-              pl_doc-qnty   = pl_doc-qnty + infoSectionsTotal:InfoSectionCurr:DocQnty
++              pl_doc-qnty   = pl_doc-qnty + (if infoSectionsTotal:InfoSectionCurr:DocVolume > 0 then infoSectionsTotal:InfoSectionCurr:DocVolume else infoSectionsTotal:InfoSectionCurr:DocQnty)
+               pl_fact-qnty  = pl_fact-qnty + infoSectionsTotal:InfoSectionCurr:FactQnty
+             .
+           end . 
+@@ -2294,8 +2294,8 @@ do:
+             next sect_ .
+             
+           assign
+-            pl_cli-qnty   = pl_cli-qnty + (infoSectionsTotal:InfoSectionCurr:DocDensity * infoSectionsTotal:InfoSectionCurr:DocQnty)
+-            pl_doc-qnty   = pl_doc-qnty + infoSectionsTotal:InfoSectionCurr:DocQnty
++            pl_cli-qnty   = pl_cli-qnty + (infoSectionsTotal:InfoSectionCurr:DocDensity * (if infoSectionsTotal:InfoSectionCurr:DocVolume > 0 then infoSectionsTotal:InfoSectionCurr:DocVolume else infoSectionsTotal:InfoSectionCurr:DocQnty))
++            pl_doc-qnty   = pl_doc-qnty + (if infoSectionsTotal:InfoSectionCurr:DocVolume > 0 then infoSectionsTotal:InfoSectionCurr:DocVolume else infoSectionsTotal:InfoSectionCurr:DocQnty)
+             pl_fact-qnty  = pl_fact-qnty + infoSectionsTotal:InfoSectionCurr:FactQnty
+           .
+         end . 
+diff --git a/str/in-ptrl.i b/str/in-ptrl.i
+--- a/str/in-ptrl.i
++++ b/str/in-ptrl.i
+@@ -1186,7 +1186,7 @@ define variable vss-include-info{&vssseq
+               def var v-st-doc-temp as logical no-undo.
+               infoSectionObj = p-infoSectionsTotal:GetInfoSectionProp(ii).
+                             
+-              v-new-sec-fact-qnty = if infoSectionObj:FactQnty = 0 or infoSectionObj:FactQnty = ? then infoSectionObj:DocQnty else infoSectionObj:FactQnty.
++              v-new-sec-fact-qnty = if infoSectionObj:FactQnty = 0 or infoSectionObj:FactQnty = ? then (if infoSectionObj:DocVolume > 0 then infoSectionObj:DocVolume else infoSectionObj:DocQnty) else infoSectionObj:FactQnty.
+               if infoSectionObj:TankWeight > 0 and infoSectionObj:TankVol > 0 
+                 then v-calc-density = infoSectionObj:TankWeight / infoSectionObj:TankVol.
+                 else v-calc-density = ?.
+@@ -1209,9 +1209,11 @@ define variable vss-include-info{&vssseq
+                 end.
+               end.
+               else do:
++                define variable tmp-doc-qnty as decimal no-undo .
++                tmp-doc-qnty = (if infoSectionObj:DocVolume > 0 then infoSectionObj:DocVolume else infoSectionObj:DocQnty) .
+                 { str/stfactqt.i
+                   p-stfactplvalue
+-                  infoSectionObj:DocQnty
++                  tmp-doc-qnty 
+                   infoSectionObj:DocDensity
+                   0.00
+                   0.00
+@@ -1242,8 +1244,8 @@ define variable vss-include-info{&vssseq
+                 end.
+               end.
+               else do:
+-                infoSectionObj:FactQnty = infoSectionObj:DocQnty.
+-                infoSectionObj:FactDensity = infoSectionObj:DocDensity.                
++                infoSectionObj:FactQnty = (if infoSectionObj:DocVolume > 0 then infoSectionObj:DocVolume else infoSectionObj:DocQnty).
++                infoSectionObj:FactDensity = (if infoSectionObj:DocVolume > 0 then (infoSectionObj:CliQnty / infoSectionObj:DocVolume) else infoSectionObj:DocDensity).                
+               end.
+             
+             end.
+diff --git a/str/trn-stat.p b/str/trn-stat.p
+--- a/str/trn-stat.p
++++ b/str/trn-stat.p
+@@ -684,7 +684,7 @@ then do:
+       infoSectionsTotal:SaveDB().
+     end.
+     else do:
+-      if absolute (infoSectionsTotal:DocQntyTotal - bf_doc-line.doc-qnty) > 1
++      if absolute (infoSectionsTotal:DocVolumeTotal - bf_doc-line.doc-qnty) > 1
+         or absolute (infoSectionsTotal:DocDensityAvg - bf_doc-line.doc-density) > 1
+         or absolute (infoSectionsTotal:CliQntyTotal - bf_doc-line.cli-qnty) > 1
+         then do:
+@@ -694,7 +694,7 @@ then do:
+                                           bf_doc-line.doc-qnty,
+                                           bf_doc-line.doc-density,
+                                           bf_doc-line.cli-qnty,
+-                                          infoSectionsTotal:DocQntyTotal,
++                                          infoSectionsTotal:DocVolumeTotal,
+                                           infoSectionsTotal:DocDensityAvg,
+                                           infoSectionsTotal:CliQntyTotal
+                                           ).

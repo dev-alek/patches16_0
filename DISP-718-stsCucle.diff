@@ -1,0 +1,188 @@
+# HG changeset patch
+# User DARuban
+# Parent  620b1c549c9002efd70e873ca5a41d5950029bf9
+refs #DISP-718 Создание скрипта для автоматического закрытия смен ТН на несколькихААЗС
+проверка статуса в цикле
+настройки вынесены в файл
+http://exp-jira.expertek.local:8080/browse/DISP-718
+
+diff --git a/bge/dispsetting.xml b/bge/dispsetting.xml
+--- a/bge/dispsetting.xml
++++ b/bge/dispsetting.xml
+@@ -3,5 +3,12 @@
+   <disp>
+     <port>8080</port>
+   </disp>
++  <timeOutAndCucle>
++      <CucleAllOper>3</CucleAllOper>
++      <TimeOutSend>30</TimeOutSend>
++      <TimeOutClose>50</TimeOutClose>
++      <waitStsCucle>21</waitStsCucle>
++      <waitStsTime>30</waitStsTime>
++  </timeOutAndCucle>
+ </System>
+ 
+diff --git a/ibs/th/bge/disp/dispsetting.cls b/ibs/th/bge/disp/dispsetting.cls
+--- a/ibs/th/bge/disp/dispsetting.cls
++++ b/ibs/th/bge/disp/dispsetting.cls
+@@ -27,13 +27,6 @@ class ibs.th.bge.disp.dispsetting inheri
+    { cmp/str-glbl.i class }  
+    { GBL/xmldom.i   class }
+    { cmp/library.i class }
+-   define public property LoginAuth as character no-undo 
+-   get.
+-   private set.
+-    
+-   define public property PswdAuth as character no-undo 
+-   get.
+-   private set.
+    
+    define public property hostdisp as character no-undo 
+    get.
+@@ -42,7 +35,26 @@ class ibs.th.bge.disp.dispsetting inheri
+    define public property PortDisp as int no-undo init 8092 
+    get.
+    private set.
++        
++   define public property CucleAllOper as int no-undo init 3 
++   get.
++   private set.
+    
++   define public property TimeOutSend as int no-undo init 30 
++   get.
++   private set.
++   
++   define public property TimeOutClose as int no-undo init 50 
++   get.
++   private set.
++   
++   define public property waitStsCucle as int no-undo init 21 
++   get.
++   private set.
++   
++   define public property waitStsTime as int no-undo init 30 
++   get.
++   private set.
+    
+    constructor public dispsetting ():
+       define variable vFilesetting as character no-undo.
+@@ -54,8 +66,6 @@ class ibs.th.bge.disp.dispsetting inheri
+       then do:
+          
+          xmldom-load(vFileSetting).
+-         xmldom-read-unique("disp","PswdAuth",output PswdAuth, output vFound).
+-         xmldom-read-unique("disp","LoginAuth",output LoginAuth, output vFound).
+          xmldom-read-unique("disp","host",output hostdisp, output vFound).
+          if hostdisp eq ""
+             or hostdisp eq ?
+@@ -65,6 +75,33 @@ class ibs.th.bge.disp.dispsetting inheri
+             and vtext ne ?
+          then
+             portDisp = int(vText) no-error.
++         xmldom-read-unique("timeOutAndCucle","CucleAllOper",output vtext, output vFound).
++         if    vtext ne ""
++            and vtext ne ?
++         then
++            CucleAllOper = int(vText) no-error.
++            
++            xmldom-read-unique("timeOutAndCucle","TimeOutSend",output vtext, output vFound).
++         if    vtext ne ""
++            and vtext ne ?
++         then
++            TimeOutSend = int(vText) no-error.
++         xmldom-read-unique("timeOutAndCucle","TimeOutClose",output vtext, output vFound).
++         if    vtext ne ""
++            and vtext ne ?
++         then
++            TimeOutClose = int(vText) no-error.
++         xmldom-read-unique("timeOutAndCucle","waitStsCucle",output vtext, output vFound).
++         if    vtext ne ""
++            and vtext ne ?
++         then
++            waitStsCucle = int(vText) no-error.
++         xmldom-read-unique("timeOutAndCucle","waitStsTime",output vtext, output vFound).
++         if    vtext ne ""
++            and vtext ne ?
++         then
++            waitStsTime = int(vText) no-error.
++            
+          
+       end.
+    end constructor.
+diff --git a/ibs/th/str/CloseAndOpenShift.cls b/ibs/th/str/CloseAndOpenShift.cls
+--- a/ibs/th/str/CloseAndOpenShift.cls
++++ b/ibs/th/str/CloseAndOpenShift.cls
+@@ -12,8 +12,10 @@
+ using Progress.Lang.*.
+ 
+ block-level on error undo, throw.
+-&glob TimeOutSend 30
+-&glob TimeOutRvs  50
++&glob TimeOutSend getDispSet():TimeOutSend
++&glob TimeOutRvs  getDispSet():TimeOutClose
++&glob waitStsCucle getDispSet():waitStsCucle
++&glob waitStsTime getDispSet():waitStsTime
+ class ibs.th.str.CloseAndOpenShift: 
+    /*------------------------------------------------------------------------------
+     Purpose:
+@@ -352,9 +354,7 @@ class ibs.th.str.CloseAndOpenShift:
+          dynamic-invoke (mTso,iOperation).
+          mTso:waitReadSts().
+          myPause ( 1 ).
+-         mTso:tso-send-Stat().
+-         mTso:waitReadSts().
+-         if mTso:AllTsoInSts(iStList)
++         if waitTSOSts({&waitStsCucle},{&waitStsTime},iStList)
+          then
+             return yes.
+          
+@@ -393,17 +393,25 @@ class ibs.th.str.CloseAndOpenShift:
+    end.
+ 
+    method public logical canCloseShift(iCycle as integer, iStList as character ):
++      return waitTSOSts(iCycle,{&TimeOutRvs},iStList).
++   end.
++   
++   method public logical waitTSOSts(iCycle as integer,iTimeOutCycl as integer ,iStList as character ):
+       define variable vi as integer no-undo.
+       do vi = 1 to iCycle:
++         putLog("Получение статуса устройства цикл № " + string(vi)).
+          if vi ne 1
+          then
+-            myPause ({&TimeOutRvs}).
++            myPause (iTimeOutCycl).
+          mTso:tso-send-Stat().
+          mTso:waitReadSts().
+          if mTso:AllTsoInSts(iStList)
+-         then
++         then do:
++            putLog("Все устройства в статусе " + iStList ).
+             return yes.
+-         
++         end.
++         putLog("Не все устройства в статусе " + iStList ).
++            
+       end.
+       return no.
+    end.
+diff --git a/str/proc-startNewShiftTso.p b/str/proc-startNewShiftTso.p
+--- a/str/proc-startNewShiftTso.p
++++ b/str/proc-startNewShiftTso.p
+@@ -5,7 +5,7 @@ define variable vss-date        as chara
+ define variable vss-workfile    as character no-undo init "$Workfile$":U .
+ define variable vss-archive     as character no-undo init "$Archive$":U .
+ define variable vss-description as character no-undo init "Процедура закрытия смены и отпрытия новой".
+-define variable mcicle as integer no-undo init 3.
++define variable mcicle as integer no-undo.
+ { utl/proc-async.i proc_def}
+ { adm/auto-def.i }
+ { cmp/trg-def.i }
+@@ -65,7 +65,7 @@ do  on error  undo, return error:
+       mDebug = false.
+    subscribe "sendStatJson"           anywhere.
+    mWorkShift = new ibs.th.str.CloseAndOpenShift(mDebug).
+-   
++   mcicle = mWorkShift:getDispSet():CucleAllOper.
+    current-window:hidden = yes.
+    run PutStatAsunc("Останавливаем смены").
+    if not mWorkShift:StopShift(mcicle)

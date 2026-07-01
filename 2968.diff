@@ -1,0 +1,28 @@
+# HG changeset patch
+# Parent 6f6948e67b9572fdf4d2631399a1e2807616458e
+# User hva90
+refs #2968 Обработка ошибки в ДатаКрат
+
+diff -r 6f6948e67b95 -r a4bf23a2c279 utl/i2054-02.p
+--- a/utl/i2054-02.p	Fri Feb 21 15:28:08 2014 +0400
++++ b/utl/i2054-02.p	Fri Feb 21 15:39:34 2014 +0400
+@@ -1106,7 +1106,8 @@
+                                       )
+           .
+           run pcall-log-file in p-log-handle ( input v-end-message ) .
+-          undo _save-block, return error v-end-message.
++          /* undo _save-block, return error v-end-message. */
++          undo _save-block, return.
+         end.
+         case v-ext-doc-type
+         :
+@@ -1121,7 +1122,8 @@
+                                           )
+               .
+               run pcall-log-file in p-log-handle ( input v-end-message ) .
+-              undo _save-block, return error v-end-message.
++              /* undo _save-block, return error v-end-message. */
++              undo _save-block, return.
+             end.
+             assign
+               parrec-doc = recid(buf_trn-doc)

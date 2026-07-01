@@ -1,0 +1,355 @@
+# HG changeset patch
+# User DRuban
+# Parent  6ede9fb98c9749934e1402e0c131cb37699768cb
+refs #DISP-718 Создание скрипта для автоматического закрытия смен ТН на несколькихААЗС
+Отправка команд открытия и закрытия смены на заправщик
+http://exp-jira.expertek.local:8080/browse/DISP-718
+
+diff --git a/gbl/attr-lib.i b/gbl/attr-lib.i
+--- a/gbl/attr-lib.i
++++ b/gbl/attr-lib.i
+@@ -21,9 +21,8 @@ getAttrLib ().
+ &if defined (include_attr-lib) = 0 &then
+ &glob include_attr-lib yes
+ &if "{1}" = "class" &then
+-
++define variable g#attr-lib  as handle no-undo .
+ method private void getAttrLib ():
+-   define variable g#attr-lib  as handle no-undo .
+    run gbl/getgattrlib.p (output g#attr-lib).
+ end.
+ 
+diff --git a/ibs/th/str/tso_trg.cls b/ibs/th/str/tso_trg.cls
+--- a/ibs/th/str/tso_trg.cls
++++ b/ibs/th/str/tso_trg.cls
+@@ -10,6 +10,7 @@
+   ----------------------------------------------------------------------*/
+ 
+ using Progress.Lang.*.
++using ibs.th.gbl.propmap.
+ 
+ block-level on error undo, throw.
+ 
+@@ -25,6 +26,7 @@ class ibs.th.str.tso_trg:
+    
+    { cmp/str-glbl.i class }
+    { ref/tso-tt.i}
++   { gbl/attr-lib.i class }
+    define variable rid-list-tso as character no-undo.
+    
+    define variable g#dbNum as integer no-undo.
+@@ -53,7 +55,7 @@ class ibs.th.str.tso_trg:
+    
+    constructor public tso_trg ():
+       this-object(?).
+-      
++      getAttrLib().
+    end.
+    
+    constructor public tso_trg (input iparparentproc   as handle):
+@@ -63,6 +65,7 @@ class ibs.th.str.tso_trg:
+    constructor public tso_trg (input iparparentproc   as handle,
+                                input iSilent          as logical  ):
+       super ().
++      getAttrLib().
+       parparentproc = iparparentproc.
+       SilentMode = iSilent.
+       run gbl/getdbnum.p (output g#dbNum).
+@@ -144,19 +147,21 @@ class ibs.th.str.tso_trg:
+ &scop xml-cmd-open-shift '<?xml version="1.0" encoding="UTF-8"?>~
+ <control type="REQUEST">~
+   <Command ctrl="ADD">~
+-    <CommType>tsoOperate</CommType>~
++    <CommType>#Operate#</CommType>~
+     <CommValue>shift_open</CommValue>~
+     <CashierCode>&1</CashierCode>~
+     <ShiftNumber>&2</ShiftNumber>~
++    <IsRunning>1</IsRunning>~
+   </Command>~
+ </control>'
+ 
+ &scop xml-cmd-other '<?xml version="1.0" encoding="UTF-8"?>~
+ <control type="REQUEST">~
+   <Command ctrl="ADD">~
+-    <CommType>tsoOperate</CommType>~
++    <CommType>#Operate#</CommType>~
+     <CommValue>&1</CommValue>~
+     <CashierCode>&2</CashierCode>~
++    &3~
+   </Command>~
+ </control>'
+    
+@@ -318,7 +323,7 @@ class ibs.th.str.tso_trg:
+       
+       define variable v-command as character no-undo.
+       
+-      v-command = substitute({&xml-cmd-other}, "shift_stop", icashier). 
++      v-command = substitute({&xml-cmd-other}, "shift_stop", icashier ,"<StopReason>1</StopReason><StopReasonMsg>РџРµСЂРµСЃРјРµРЅРѕРє</StopReasonMsg>"). 
+       sendTsoCommand(v-command,?, rid-list).
+       return yes.
+    end.
+@@ -359,6 +364,10 @@ class ibs.th.str.tso_trg:
+       define variable vSocet as handle no-undo.
+       define variable vWiatresp as logical   no-undo.
+       define variable v-command as character no-undo.
++      if     session:debug-alert
++         and imethod eq "" or imethod eq ?
++      then 
++          imethod = "parse-debug". 
+       vWiatresp = imethod ne "" and imethod ne ?.
+       if trim(rid-list) > ""
+       then do :
+@@ -409,7 +418,7 @@ class ibs.th.str.tso_trg:
+                v-command = UpdCommand(substring (icommand,12)).
+             else
+                v-command = icommand.
+-            
++            v-command = replace (v-command,"#Operate#",if tt-tso.device eq mdevice:TCOAGC:NameProp then "tsoOperate" else "rfOperate").
+             vSocet = addSocet(tt-tso.obj-code, tt-tso.tso-num,imethod).
+             if valid-handle (vSocet)
+             then do:
+@@ -525,6 +534,8 @@ class ibs.th.str.tso_trg:
+          refrash().
+       return isWork.
+    end. 
++   method public void parse-debug (iMemptr as memptr):
++   end.
+    
+    method public void parse-xml (iMemptr as memptr):
+       define variable hDoc as handle no-undo.
+@@ -642,131 +653,64 @@ class ibs.th.str.tso_trg:
+       define buffer buf_pump           for ub.pump.
+       define buffer buf_clients        for ub.clients.
+       define buffer tt-tso for tt-tso.
++      define variable vQuery as handle    no-undo.
++      define variable vqry   as character no-undo.
++      create query vQuery.
++      vQuery:set-buffers(buffer buf_cash-desk:HANDLE).
++      
+       case iparref-mode:
+          when {&all} then do:
+-            for each buf_cash-desk-attr no-lock where ( buf_cash-desk-attr.attr-code          = "device-kind":U
+-                                                  and buf_cash-desk-attr.attr-value-integer = mdevice:TCOAGC:KeyInt)
+-                                                  or 
+-                                                     ( buf_cash-desk-attr.attr-code          = "device-kind":U
+-                                                  and buf_cash-desk-attr.attr-value-integer = mdevice:Tanker:KeyInt):
+-               find first buf_cash-desk no-lock where buf_cash-desk.db-num   = buf_cash-desk-attr.db-num
+-                                           and buf_cash-desk.obj-code = buf_cash-desk-attr.obj-code
+-                                           and buf_cash-desk.pos-type = buf_cash-desk-attr.pos-type
+-                                           and buf_cash-desk.cash-num = buf_cash-desk-attr.cash-num
+-                                           and buf_cash-desk.is-del   = no 
+-                                           no-error .
+-               if available buf_cash-desk
+-               then do :
+-                  create tt-tso.
+-                  assign
+-                     tt-tso.db-num       = buf_cash-desk.db-num
+-                     tt-tso.obj-code     = buf_cash-desk.obj-code
+-                     tt-tso.tso-num      = buf_cash-desk.cash-num
+-                     tt-tso.tso-addr     = replace(buf_cash-desk.addr-path, {&delim-par}, '://')
+-                     tt-tso.tso-host     = entry(1,entry(2,buf_cash-desk.addr-path, {&delim-par}),":")
+-                     tt-tso.tso-port     = int(entry(2,entry(2,buf_cash-desk.addr-path, {&delim-par}),":"))
+-                     tt-tso.Tso-protocol = entry(1,buf_cash-desk.addr-path, {&delim-par})
+-                     
+-                  .
+-                  if not buf_cash-desk.cash-on
+-                  then
+-                     tt-tso.ShiftState      = mShiftState:DontWork:NameProp.
+-               end.                                                           
+-            end.  
+-            for each buf_pump no-lock :
+-               create tt-pump .
+-               assign
+-                  tt-pump.pump-code = buf_pump.pump-code
+-                  tt-pump.obj-type  = buf_pump.obj-type
+-                  tt-pump.obj-code  = buf_pump.obj-code
+-               .
+-            end.
++            vqry = substitute("FOR EACH buf_cash-desk where buf_cash-desk.is-del = no no-lock").
+          end. /*when {&all} then do:*/
+          when {&g___object} then do:
+-            for each buf_cash-desk-attr no-lock where (buf_cash-desk-attr.obj-code = iObjCode
+-                                            and buf_cash-desk-attr.attr-code = "device-kind"   
+-                                            and buf_cash-desk-attr.attr-value-integer = mdevice:TCOAGC:KeyInt)
+-                                            or
+-                                            (buf_cash-desk-attr.obj-code = iObjCode
+-                                            and buf_cash-desk-attr.attr-code = "device-kind"   
+-                                            and buf_cash-desk-attr.attr-value-integer = mdevice:Tanker:KeyInt) :
+-               find first buf_cash-desk no-lock where buf_cash-desk.db-num   = buf_cash-desk-attr.db-num
+-                                           and buf_cash-desk.obj-code = buf_cash-desk-attr.obj-code
+-                                           and buf_cash-desk.pos-type = buf_cash-desk-attr.pos-type
+-                                           and buf_cash-desk.cash-num = buf_cash-desk-attr.cash-num
+-                                           and buf_cash-desk.is-del   = no 
+-                                           no-error .
+-               if available buf_cash-desk
+-               then do :
+-                  create tt-tso.
+-                  assign
+-                     tt-tso.db-num       = buf_cash-desk.db-num
+-                     tt-tso.obj-code     = buf_cash-desk.obj-code
+-                     tt-tso.tso-num      = buf_cash-desk.cash-num
+-                     tt-tso.tso-addr     = replace(buf_cash-desk.addr-path, {&delim-par}, '://')
+-                     tt-tso.tso-host     = entry(1,entry(2,buf_cash-desk.addr-path, {&delim-par}),":")
+-                     tt-tso.tso-port     = int(entry(2,entry(2,buf_cash-desk.addr-path, {&delim-par}),":"))
+-                     tt-tso.Tso-protocol = entry(1,buf_cash-desk.addr-path, {&delim-par})
+-                  .
+-                  if not buf_cash-desk.cash-on
+-                  then
+-                     tt-tso.ShiftState      = mShiftState:DontWork:NameProp.
+-               end.                                                           
+-            end. 
+-            for each buf_pump no-lock where buf_pump.obj-type = iobjtype
+-                                        and buf_pump.obj-code = iobjcode :
+-               create tt-pump .
+-               assign
+-                  tt-pump.pump-code = buf_pump.pump-code
+-                  tt-pump.obj-type  = buf_pump.obj-type
+-                  tt-pump.obj-code  = buf_pump.obj-code
+-               .
+-            end.
++            vqry = substitute("FOR EACH buf_cash-desk where buf_cash-desk.obj-code  = &1 and buf_cash-desk.is-del = no no-lock",iObjCode).
+          end.
+          when "db":U then do:
+-            for each buf_cash-desk-attr no-lock where (buf_cash-desk-attr.db-num = g#dbNum
+-                                            and buf_cash-desk-attr.attr-code = "device-kind"
+-                                            and buf_cash-desk-attr.attr-value-integer = mdevice:TCOAGC:KeyInt)
+-                                            or
+-                                               (buf_cash-desk-attr.db-num = g#dbNum
+-                                            and buf_cash-desk-attr.attr-code = "device-kind"
+-                                            and buf_cash-desk-attr.attr-value-integer = mdevice:Tanker:KeyInt)  :
+-               find first buf_cash-desk no-lock where buf_cash-desk.db-num   = buf_cash-desk-attr.db-num
+-                                           and buf_cash-desk.obj-code = buf_cash-desk-attr.obj-code
+-                                           and buf_cash-desk.pos-type = buf_cash-desk-attr.pos-type
+-                                           and buf_cash-desk.cash-num = buf_cash-desk-attr.cash-num
+-                                           and buf_cash-desk.is-del   = no 
+-                                           no-error .
+-               if available buf_cash-desk
+-               then do :
+-                  create tt-tso.
+-                  assign
+-                     tt-tso.db-num       = buf_cash-desk.db-num
+-                     tt-tso.obj-code     = buf_cash-desk.obj-code
+-                     tt-tso.tso-num      = buf_cash-desk.cash-num
+-                     tt-tso.tso-addr     = replace(buf_cash-desk.addr-path, {&delim-par}, '://')
+-                     tt-tso.tso-addr     = entry(1,entry(2,buf_cash-desk.addr-path, {&delim-par}),":")
+-                     tt-tso.tso-port     = int(entry(2,entry(2,buf_cash-desk.addr-path, {&delim-par}),":"))
+-                     tt-tso.Tso-protocol = entry(1,buf_cash-desk.addr-path, {&delim-par})
+-                  .
+-                  if not buf_cash-desk.cash-on
+-                  then
+-                     tt-tso.ShiftState      = mShiftState:DontWork:NameProp.
+-               end.                                                           
+-            end.  
+-            for each buf_clients no-lock where buf_clients.db-num = g#dbNum :
+-               for each buf_pump no-lock where buf_pump.obj-type = buf_clients.obj-type
+-                                           and buf_pump.obj-code = buf_clients.obj-code :
+-                  create tt-pump .
+-                  assign
+-                     tt-pump.pump-code = buf_pump.pump-code
+-                     tt-pump.obj-type  = buf_pump.obj-type
+-                     tt-pump.obj-code  = buf_pump.obj-code
+-                  .
+-               end.
+-            end.                                      
++            vqry = substitute("FOR EACH buf_cash-desk where buf_buf_cash-desk.db-num   = &1  and buf_cash-desk.is-del = no no-lock",g#dbNum).
+          end.
+       end case.
++      vQuery:query-prepare(vqry).
++      vQuery:query-open ().
++      vQuery:get-first ().
++      do while not vQuery:query-off-end:
++         define variable vdevice as propmap no-undo.
++         vdevice = getDevice(buf_cash-desk.db-num, 
++                             buf_cash-desk.obj-cod, 
++                             buf_cash-desk.pos-type, 
++                             buf_cash-desk.cash-num).
++         if     vdevice ne mdevice:TCOAGC
++            and vdevice ne mdevice:Tanker
++         then do :
++            vQuery:get-next (). /* Вывод из оборота */
++            next .
++         end .
++         create tt-tso.
++         assign
++            tt-tso.db-num       = buf_cash-desk.db-num
++            tt-tso.obj-code     = buf_cash-desk.obj-code
++            tt-tso.tso-num      = buf_cash-desk.cash-num
++            tt-tso.tso-addr     = replace(buf_cash-desk.addr-path, {&delim-par}, '://')
++            tt-tso.tso-host     = entry(1,entry(2,buf_cash-desk.addr-path, {&delim-par}),":")
++            tt-tso.tso-port     = int(entry(2,entry(2,buf_cash-desk.addr-path, {&delim-par}),":"))
++            tt-tso.Tso-protocol = entry(1,buf_cash-desk.addr-path, {&delim-par})
++            tt-tso.device       = vdevice:NameProp
++         .
++         if not buf_cash-desk.cash-on
++         then
++            tt-tso.ShiftState      = mShiftState:DontWork:NameProp.
++         vQuery:get-next ().
++      end.                                                           
++      for each buf_clients no-lock where buf_clients.db-num = g#dbNum :
++         for each buf_pump no-lock where buf_pump.obj-type = buf_clients.obj-type
++                                     and buf_pump.obj-code = buf_clients.obj-code :
++            create tt-pump .
++            assign
++               tt-pump.pump-code = buf_pump.pump-code
++               tt-pump.obj-type  = buf_pump.obj-type
++               tt-pump.obj-code  = buf_pump.obj-code
++            .
++         end.
++      end.
+    end.
+    
+    method public handle getQuery (input iNameQuery as character ) :
+@@ -950,4 +894,41 @@ class ibs.th.str.tso_trg:
+       icommand = replace(icommand,"#NextShift#",string(s-num)).
+       return icommand.
+    end.
++   
++   method public propmap getDevice (idb-num   as integer,
++                                    iObjCode as integer,
++                                    iPostType as character,
++                                    iCashNum  as integer      
++   ):
++      
++   define variable v-attr-value as character no-undo .
++   define variable v-attr-type  as character no-undo .
++   define variable v-device-kind as integer no-undo.
++   define variable v-date as date no-undo.
++   define variable v-decimal as decimal no-undo.
++   define variable v-logical as logical no-undo.
++   define variable v-dop as character no-undo.
++   run cd-attr-value in g#attr-lib
++      ( input idb-num
++       ,input iObjCode
++       ,input iPostType
++       ,input iCashNum
++       ,input  (if iPostType = {&cd-type-ibm-xml}
++                then {&cda-IBM-XML_operative}
++                else {&cda-AUTOTANK_operative})
++       ,input  (if iPostType = {&cd-type-ibm-xml}
++                then {&cda-IBM-XML_operative_device-kind}
++                else {&cda-AUTOTANK_operative_device-kind})
++       ,output v-attr-value
++       ,output v-date
++       ,output v-decimal
++       ,output v-device-kind
++       ,output v-logical
++       ,output v-dop
++       ) no-error.
++   if v-device-kind = ?
++   then v-device-kind = 0.
++   
++   return mdevice:GetProp(v-device-kind).
++end.
+ end class.
+\ No newline at end of file
+diff --git a/ref/tso-tt.i b/ref/tso-tt.i
+--- a/ref/tso-tt.i
++++ b/ref/tso-tt.i
+@@ -15,6 +15,7 @@
+       field tso-port      as integer
+       field Tso-protocol  as character
+       field TRkBusy       as logical
++      field device        as character
+       
+    index pi as primary unique
+       tso-num obj-code

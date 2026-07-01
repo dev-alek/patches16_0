@@ -1,0 +1,34 @@
+# HG changeset patch
+# User VSpiridonov
+# Parent  b2fe525e243216ef1e33a4d2c675bf380efc6083
+refs #DEVBO-312+706  возврат BTS-706
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-312
+https://msk-exp-jira.expertek.local/browse/BTS-1215
+
+diff --git a/ref/imp-goods-1C-RN.p b/ref/imp-goods-1C-RN.p
+--- a/ref/imp-goods-1C-RN.p
++++ b/ref/imp-goods-1C-RN.p
+@@ -1,4 +1,3 @@
+-
+ /*------------------------------------------------------------------------
+     File        : imp-goods-1C-RN.p
+     Purpose     : 
+@@ -530,7 +529,7 @@ end.
+   end.   
+   
+   
+-/*   откат изменений по BTS-706   
++/*    изменения по BTS-706   */
+ 
+   if p-GdsObj:gds-type = {&gds-goods} then do:   /* атрибут товар, если до него был атрибут блюдо */ 
+        for each buf-clients no-lock where buf-clients.db-num = g#db-num
+@@ -578,7 +577,7 @@ end.
+        end.                                
+   end.   
+ 
+-откат изменений по BTS-706  */
++/* изменения по BTS-706  */
+ 
+   /* ----- баркоды товара ----- */
+   v-barcode-list = "" .

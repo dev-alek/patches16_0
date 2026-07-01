@@ -1,0 +1,58 @@
+# HG changeset patch
+# User BelovaMM
+# Parent  dc6483d8c093bf84bdd8fc26c2143468d915f3bb
+refs #DEVBO-722 Ќеобходимо реализовать проверку каждой сканируемой марки товара при работе с документом внутреннего расхода (внутреннего перемещени€). #BTS-2486
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-722
+https://msk-exp-jira.expertek.local/browse/BTS-2486
+
+diff --git a/str/chs-alcmarks.w b/str/chs-alcmarks.w
+--- a/str/chs-alcmarks.w
++++ b/str/chs-alcmarks.w
+@@ -1016,7 +1016,7 @@ PROCEDURE save_update :
+           return.
+         end.  
+                 
+-        /*vStatusCheckMark = marking:checkScanMark(t_doc.obj-code, v-mark, vcodident, no, output vRunedOffLineCheck) no-error.
++        vStatusCheckMark = marking:checkScanMark(t_doc.obj-code, v-mark, vcodident, no, output vRunedOffLineCheck) no-error.
+         if error-status:error then
+         do:
+             run dispmessage (
+@@ -1037,7 +1037,7 @@ PROCEDURE save_update :
+               "ѕроверка марки дала отрицательный результат, марка не может быть добавлена в документ."
+               ).
+             return.
+-        end.*/
++        end.
+       end.
+       when {&TDEDT_Ras_Perem} then
+       do:
+@@ -1048,6 +1048,28 @@ PROCEDURE save_update :
+                           ).
+           return.
+         end.  
++        vStatusCheckMark = marking:checkScanMark(t_doc.obj-code, v-mark, vcodident, no, output vRunedOffLineCheck) no-error.
++        if error-status:error then
++        do:
++            run dispmessage (
++              substitute("ћарка не может быть перемещена,~nт.к. возникла ошибка при проверке: &1.",error-status:get-message(1))
++              ).
++            return.
++        end.
++        if vStatusCheckMark = 2 then
++        do:
++            run dispmessage (
++              "ѕроверка марки не выполнена, марка не может быть добавлена в документ."
++              ).
++            return.
++        end.
++        if vStatusCheckMark = 0 then
++        do:
++            run dispmessage (
++              "ѕроверка марки дала отрицательный результат, марка не может быть добавлена в документ."
++              ).
++            return.
++        end.
+       end.
+       when {&TDEDT_Spi_Vnesh} then
+       do:

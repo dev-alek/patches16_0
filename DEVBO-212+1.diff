@@ -1,0 +1,83 @@
+# HG changeset patch
+# User SSlivenko
+# Parent  d022d078e2c8c3ba045428cf76dd77df26624f93
+refs #DEVBO-212 (!!!НЕ РЕГИСТРИРОВАТЬ (для разгребания кучи пакетов NWS)!!!) Замедление разбора новостей на ТБД. Башнефть. #BTS-918 (!!!НЕ РЕГИСТРИРОВАТЬ (для разгребания кучи пакетов NWS)!!!)
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-212
+https://msk-exp-jira.expertek.local/browse/BTS-918
+В соответствии с договоренностями на АКС, прошу рассмотреть возможность предоставления исправления,
+которое позволит при разборе пакетов в ТБД пропускать записи вида "...command bush cmd-rum-send schedule..."
+для ускорения разбора накопившегося массива новостей с АЗК.
+
+diff --git a/nws/imp-pck.p b/nws/imp-pck.p
+--- a/nws/imp-pck.p
++++ b/nws/imp-pck.p
+@@ -704,33 +704,42 @@ procedure local-imp-pck :
+           on endkey undo, return error substitute("&1. endkey transaction_block_command&2запись N &3&2привязанная запись &4", vss-workfile, {&new-line}, v-rec-cnt, v-sub-rec-cnt )
+           on stop   undo, return error substitute("&1. stop transaction_block_command&2запись N &3&2привязанная запись &4", vss-workfile, {&new-line}, v-rec-cnt, v-sub-rec-cnt )
+           :
+-            run check-imp-rec in this-procedure
+-              ( input  "create":U
+-               ,input  p-db-src
+-               ,input  p-pck-num
+-               ,input  v-uniq-key-rt
+-               ,output v-present
+-              ) no-error .
+-            if error-status :error then do:
+-              undo, return error substitute( "&1 запись N &2&3Позиция в файле &4", return-value, v-rec-cnt, {&new-line}, seek(imp-stream) ) .
+-            end.
+-            if v-present = true then do:
+-              assign
+-                v-qnty-skip  = v-sub-rec-num * 2
+-              .
+-              do v-ind = 1 to v-qnty-skip :
+-                /* пропускаем строчки */
+-                import stream imp-stream v-temp-all .
++            if v-rec-name = "command"
++            and index(v-rec-full, "cmd-rum-send") > 0
++            and index(v-rec-full, "schedule") > 0
++            and index(v-rec-full, "autosuz") > 0
++            then do :
++              
++            end .
++            else do :
++              run check-imp-rec in this-procedure
++                ( input  "create":U
++                 ,input  p-db-src
++                 ,input  p-pck-num
++                 ,input  v-uniq-key-rt
++                 ,output v-present
++                ) no-error .
++              if error-status :error then do:
++                undo, return error substitute( "&1 запись N &2&3Позиция в файле &4", return-value, v-rec-cnt, {&new-line}, seek(imp-stream) ) .
+               end.
+-            end.
+-            else do:
+-              run nws/imp-cmd.p
+-                ( input this-procedure
+-                 ,input v-rec-full
+-                 ,input v-sub-rec-num
+-                 ,input p-db-src
+-                ).
+-            end.
++              if v-present = true then do:
++                assign
++                  v-qnty-skip  = v-sub-rec-num * 2
++                .
++                do v-ind = 1 to v-qnty-skip :
++                  /* пропускаем строчки */
++                  import stream imp-stream v-temp-all .
++                end.
++              end.
++              else do:
++                run nws/imp-cmd.p
++                  ( input this-procedure
++                   ,input v-rec-full
++                   ,input v-sub-rec-num
++                   ,input p-db-src
++                  ).
++              end.
++            end .
+           end.
+         end.
+         otherwise do :

@@ -1,0 +1,188 @@
+# HG changeset patch
+# User SSlivenko
+# Parent  1550181ffaaaae48b0023d8577c0593e4056b907
+refs #DEVBO-541 Возникает ошибка "Ошибка при закрытии документа <Номер док-та> Не все обязательные поля по доп. информации накладной заполнены", при закрытии документа прихода СУГ до "накл+" #BTS-1924
+
+https://msk-exp-jira.expertek.local/browse/DEVBO-541
+https://msk-exp-jira.expertek.local/browse/BTS-1924
+
+diff --git a/str/trn-stat.p b/str/trn-stat.p
+--- a/str/trn-stat.p
++++ b/str/trn-stat.p
+@@ -228,7 +228,8 @@ define variable vsdStr as class vsdtosto
+ define variable keyrecObj as class keyrec no-undo.
+ define variable v-error-attr  as character no-undo .
+ define variable is-fuel          as   character            no-undo.
+-def var isFuel as logical no-undo init false. /* топливо и СУГ*/
++define variable isFuel as logical no-undo init false. /* топливо и СУГ */
++define variable isSug as logical no-undo init false. /* СУГ */
+ define variable parisfueltype    as   character            no-undo.
+ define variable v-valuetype    as   character            no-undo.
+ define variable v-value        as   character            no-undo.
+@@ -399,7 +400,9 @@ if not isFuel then do:
+    is-fuel 
+    parisfueltype no-error}
+   assign
+-    isFuel = yes when is-fuel = "yes".
++    isFuel = yes when is-fuel = "yes"
++    isSug = yes when is-fuel = "yes"
++  .
+ end.
+ if not isFuel
+ then do:
+@@ -409,7 +412,9 @@ then do:
+    is-fuel 
+    parisfueltype no-error}
+   assign
+-    isFuel = yes when is-fuel = "yes".
++    isFuel = yes when is-fuel = "yes"
++    isSug = yes when is-fuel = "yes"
++  .
+ end.
+ 
+ 
+@@ -1153,77 +1158,81 @@ run waitfram-show in this-procedure ( input substitute( "Переход документа в статус &1&2."
+           and buf_doc-attr.attr-code = entry (ii, v-attr-dop-info) no-error. 
+       
+       if not available (buf_doc-attr) or (available (buf_doc-attr) and 
+-        (buf_doc-attr.attr-value = "" 
+-        or buf_doc-attr.attr-value = "" or buf_doc-attr.attr-value = ? or buf_doc-attr.attr-value = "?")
++        (buf_doc-attr.attr-value = "" or buf_doc-attr.attr-value = ? or buf_doc-attr.attr-value = "?")
+         )
+       then do:
+         v-error-attr = v-error-attr + ", " + entry (ii, v-attr-dop-info).
+       end.
+     end.
+     
+-    define variable enable-cb-sealing as logical no-undo .
+-    define variable v-nb-obj-type as character no-undo .
+-    define variable v-nb-obj-code as integer no-undo .
+-    define variable v-ae-obj-type as character no-undo .
+-    define variable v-ae-obj-code as integer no-undo .
+-    
+-    assign enable-cb-sealing = false .
+-    for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = bf_trn-doc.cli-type
+-                                         and buf_clients-attr.obj-code  = bf_trn-doc.cli-code
+-                                         and buf_clients-attr.attr-code = {&attr-own-supp}
+-                                         :
+-      if lookup(buf_clients-attr.attr-value, 'true,yes':u) > 0 then enable-cb-sealing = true .
+-    end .
+-    for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = bf_trn-doc.cli-type
+-                                         and buf_clients-attr.obj-code  = bf_trn-doc.cli-code
+-                                         and buf_clients-attr.attr-code = {&attr-owner-code}
+-                                         :
+-      if (buf_clients-attr.attr-value = {&cmp} + string(bf_trn-doc.host-code)) then enable-cb-sealing = true .
+-    end .
++    if not isSug
++    then do :
+     
+-    for first buf_doc-attr where buf_doc-attr.doc-code  = bf_trn-doc.doc-code
+-                             and buf_doc-attr.attr-code = {&trdcattr-ptbobj}
+-                             :
+-      assign
+-        v-nb-obj-type = entry(1, buf_doc-attr.attr-value, ";")
+-        v-nb-obj-code = integer(entry(2, buf_doc-attr.attr-value, ";"))
+-      no-error .                         
+-    end .
+-    for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = v-nb-obj-type
+-                                         and buf_clients-attr.obj-code  = v-nb-obj-code
+-                                         and buf_clients-attr.attr-code = {&attr-owner-code}
+-                                         :
+-      if (buf_clients-attr.attr-value = {&cmp} + string(bf_trn-doc.host-code)) then enable-cb-sealing = true .
+-    end .
++      define variable enable-cb-sealing as logical no-undo .
++      define variable v-nb-obj-type as character no-undo .
++      define variable v-nb-obj-code as integer no-undo .
++      define variable v-ae-obj-type as character no-undo .
++      define variable v-ae-obj-code as integer no-undo .
++      
++      assign enable-cb-sealing = false .
++      for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = bf_trn-doc.cli-type
++                                           and buf_clients-attr.obj-code  = bf_trn-doc.cli-code
++                                           and buf_clients-attr.attr-code = {&attr-own-supp}
++                                           :
++        if lookup(buf_clients-attr.attr-value, 'true,yes':u) > 0 then enable-cb-sealing = true .
++      end .
++      for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = bf_trn-doc.cli-type
++                                           and buf_clients-attr.obj-code  = bf_trn-doc.cli-code
++                                           and buf_clients-attr.attr-code = {&attr-owner-code}
++                                           :
++        if (buf_clients-attr.attr-value = {&cmp} + string(bf_trn-doc.host-code)) then enable-cb-sealing = true .
++      end .
++      
++      for first buf_doc-attr where buf_doc-attr.doc-code  = bf_trn-doc.doc-code
++                               and buf_doc-attr.attr-code = {&trdcattr-ptbobj}
++                               :
++        assign
++          v-nb-obj-type = entry(1, buf_doc-attr.attr-value, ";")
++          v-nb-obj-code = integer(entry(2, buf_doc-attr.attr-value, ";"))
++        no-error .                         
++      end .
++      for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = v-nb-obj-type
++                                           and buf_clients-attr.obj-code  = v-nb-obj-code
++                                           and buf_clients-attr.attr-code = {&attr-owner-code}
++                                           :
++        if (buf_clients-attr.attr-value = {&cmp} + string(bf_trn-doc.host-code)) then enable-cb-sealing = true .
++      end .
++      
++      for first buf_doc-attr where buf_doc-attr.doc-code  = bf_trn-doc.doc-code
++                               and buf_doc-attr.attr-code = {&trdcattr-autoent}
++                               :
++        assign
++          v-ae-obj-type = entry(1, buf_doc-attr.attr-value, ";")
++          v-ae-obj-code = integer(entry(2, buf_doc-attr.attr-value, ";"))
++        no-error .                         
++      end .
++      for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = v-ae-obj-type
++                                           and buf_clients-attr.obj-code  = v-ae-obj-code
++                                           and buf_clients-attr.attr-code = {&attr-have-SEP}
++                                           :
++        if lookup(buf_clients-attr.attr-value, 'true,yes':u) > 0 then enable-cb-sealing = true .
++      end .
++      if enable-cb-sealing
++      then do :
++        find first buf_doc-attr no-lock 
++          where buf_doc-attr.doc-code = pardoc-code 
++            and buf_doc-attr.attr-code = {&trdcattr-sealed} no-error. 
++        
++        if not available (buf_doc-attr) or (available (buf_doc-attr) and 
++          (buf_doc-attr.attr-value = "" or buf_doc-attr.attr-value = ? or buf_doc-attr.attr-value = "?" or buf_doc-attr.attr-value = "-1")
++          )
++        then do:
++          v-error-attr = v-error-attr + ", sealing".
++        end.
++      end .
+     
+-    for first buf_doc-attr where buf_doc-attr.doc-code  = bf_trn-doc.doc-code
+-                             and buf_doc-attr.attr-code = {&trdcattr-autoent}
+-                             :
+-      assign
+-        v-ae-obj-type = entry(1, buf_doc-attr.attr-value, ";")
+-        v-ae-obj-code = integer(entry(2, buf_doc-attr.attr-value, ";"))
+-      no-error .                         
+-    end .
+-    for first buf_clients-attr no-lock where buf_clients-attr.obj-type  = v-ae-obj-type
+-                                         and buf_clients-attr.obj-code  = v-ae-obj-code
+-                                         and buf_clients-attr.attr-code = {&attr-have-SEP}
+-                                         :
+-      if lookup(buf_clients-attr.attr-value, 'true,yes':u) > 0 then enable-cb-sealing = true .
+-    end .
+-    if enable-cb-sealing
+-    then do :
+-      find first buf_doc-attr no-lock 
+-        where buf_doc-attr.doc-code = pardoc-code 
+-          and buf_doc-attr.attr-code = {&trdcattr-sealed} no-error. 
+-      
+-      if not available (buf_doc-attr) or (available (buf_doc-attr) and 
+-        (buf_doc-attr.attr-value = "" 
+-        or buf_doc-attr.attr-value = "" or buf_doc-attr.attr-value = ? or buf_doc-attr.attr-value = "?" or buf_doc-attr.attr-value = "-1")
+-        )
+-      then do:
+-        v-error-attr = v-error-attr + ", sealing".
+-      end.
+-    end .
++    end.
++    
+     
+     if v-error-attr <> "" then do:
+       run waitfram-hide in this-procedure no-error.
